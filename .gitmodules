@@ -1,0 +1,6 @@
+[submodule "packages/tms-frontend"]
+	path = packages/tms-frontend
+	url = https://github.com/lqtrugg/tms-frontend
+[submodule "packages/tms-backend"]
+	path = packages/tms-backend
+	url = https://github.com/lqtrugg/tms-backend
