@@ -5,6 +5,8 @@
   "scripts": {
     "start:backend": "npm start --prefix tms-backend",
     "start:frontend": "npm start --prefix tms-frontend",
+    "build:backend": "npm run build --prefix tms-backend",
+    "build:frontend": "npm run build --prefix tms-frontend",
     "dev:backend": "npm run dev --prefix tms-backend",
     "dev:frontend": "npm run dev --prefix tms-frontend",
     "install": "cd tms-backend && npm install && cd ../tms-frontend && npm install"

@@ -56,6 +56,13 @@ app.use((_req, res) => {
   res.status(404).send('Not found');
 });
 
-app.listen(port, () => {
+const server = app.listen(port);
+
+server.on('listening', () => {
   console.log(`Backend server running at http://localhost:${port}`);
+});
+
+server.on('error', (error: NodeJS.ErrnoException) => {
+  console.error(`Failed to start backend server: ${error.message}`);
+  process.exit(1);
 });
