@@ -17,6 +17,7 @@ export function Layout() {
   const navigate = useNavigate();
 
   const handleLogout = () => {
+    localStorage.removeItem("tms_access_token");
     navigate('/login');
   };
 

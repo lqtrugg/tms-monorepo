@@ -5,12 +5,28 @@ import { LogIn } from "lucide-react";
 export function Login() {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    navigate('/');
+    setError("");
+
+    const response = await fetch(`/api/${isLogin ? "login" : "register"}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error ?? "Request failed");
+      return;
+    }
+
+    localStorage.setItem("tms_access_token", data.accessToken);
+    navigate("/me");
   };
 
   return (
@@ -32,13 +48,13 @@ export function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm text-zinc-700 mb-2">Email</label>
+              <label className="block text-sm text-zinc-700 mb-2">Username</label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400"
-                placeholder="email@example.com"
+                placeholder="teacher01"
                 required
               />
             </div>
@@ -54,6 +70,8 @@ export function Login() {
                 required
               />
             </div>
+
+            {error && <p className="text-sm text-red-600">{error}</p>}
 
             <button
               type="submit"

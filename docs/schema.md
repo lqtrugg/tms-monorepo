@@ -60,6 +60,7 @@ CREATE TABLE students (
     teacher_id             INTEGER                NOT NULL REFERENCES teachers (id) ON DELETE RESTRICT,
     full_name              VARCHAR(255)           NOT NULL,
     codeforces_handle      VARCHAR(100),
+    discord_username       VARCHAR(100),
     phone                  VARCHAR(20),
     note                   TEXT,
     status                 student_status         NOT NULL DEFAULT 'active',

@@ -8,6 +8,7 @@ import { Codeforces } from "./pages/Codeforces";
 import { Reports } from "./pages/Reports";
 import { Discord } from "./pages/Discord";
 import { Login } from "./pages/Login";
+import { Me } from "./pages/Me";
 import { Layout } from "./components/Layout";
 import { PendingArchive } from "./pages/PendingArchive";
 
@@ -15,6 +16,10 @@ export const router = createBrowserRouter([
   {
     path: "/login",
     Component: Login,
+  },
+  {
+    path: "/me",
+    Component: Me,
   },
   {
     path: "/",

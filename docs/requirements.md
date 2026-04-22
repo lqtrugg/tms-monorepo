@@ -61,19 +61,27 @@ Giáo viên có thể tra cứu:
 
 ### 6. Codeforces và chuyên đề
 
-Mỗi lớp đang mở tương ứng với một Codeforces group. Giáo viên tạo group, thêm/xoá thành viên thủ công theo danh sách lớp. Chuyên đề được tạo dưới dạng contest GYM trong group; bài tập được thêm vào thủ công.
+Mỗi lớp đang mở tương ứng với một Codeforces group. Giáo viên tạo group và thêm/xoá thành viên thủ công theo danh sách lớp. Chuyên đề được tạo dưới dạng contest GYM trong group; bài tập được thêm vào thủ công.
 
-Khi thêm một chuyên đề, hệ thống yêu cầu link GYM và tự động lấy thời gian hết hiệu lực qua Codeforces API. Với các chuyên đề còn hiệu lực, hệ thống tự động pull dữ liệu standing từ Codeforces API theo lịch định kỳ (mặc định mỗi giờ, có thể cấu hình), giúp giáo viên theo dõi số bài đã giải của từng học sinh qua mỗi chuyên đề.
+Khi thêm một chuyên đề vào hệ thống, giáo viên cung cấp link GYM — hệ thống tự động lấy thời gian hết hiệu lực qua Codeforces API và lưu lại. Với các chuyên đề còn hiệu lực, hệ thống tự động pull dữ liệu standing từ Codeforces API theo lịch định kỳ (mặc định mỗi giờ, có thể cấu hình).
 
 ---
 
-### 7. Discord
+### 7. Hồ sơ học tập
+
+Mỗi học sinh có một hồ sơ học lực riêng. Hệ thống tổng hợp dữ liệu standing đã pull về và trình bày theo góc nhìn từng học sinh — giáo viên có thể vào hồ sơ của một học sinh và thấy toàn bộ các chuyên đề học sinh đó đã tham gia, số bài đã giải trên từng chuyên đề, và sự tiến bộ theo thời gian. Đây là cơ sở để giáo viên đánh giá năng lực và theo dõi học lực liên tục của từng học sinh.
+
+---
+
+### 8. Discord
 
 Discord là kênh giao tiếp chính với học sinh: dạy online, trao đổi và giải đáp bài tập. Bot Discord gửi thông báo tự động (đóng học phí, nhắc làm bài, thông báo nghỉ học…) tới cá nhân hoặc nhóm chat chung tuỳ ngữ cảnh.
 
+Giáo viên có thể soạn tin nhắn và gửi tới nhiều học sinh cùng lúc thông qua hệ thống. Giáo viên chọn danh sách người nhận (có thể lọc theo lớp, hoặc chọn thủ công từng học sinh), soạn nội dung, và hệ thống sẽ nhờ bot gửi tin nhắn riêng tới từng người trên Discord. Hệ thống lưu lại lịch sử các lần gửi và trạng thái gửi thành công hay thất bại của từng người nhận.
+
 ---
 
-### 8. Báo cáo thống kê
+### 9. Báo cáo thống kê
 
 Giáo viên có thể xem báo cáo thu nhập (đơn vị VNĐ) với các tuỳ chọn lọc linh hoạt:
 - Khoảng thời gian tự chọn.
