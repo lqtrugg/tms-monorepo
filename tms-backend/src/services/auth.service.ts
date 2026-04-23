@@ -3,7 +3,7 @@ import jwt, { type Secret, type SignOptions } from 'jsonwebtoken';
 
 import config from '../config.js';
 import { AppDataSource } from '../data-source.js';
-import { Teacher } from '../entities/index.js';
+import { Teacher, TeacherRole } from '../entities/index.js';
 import { AuthError } from '../errors/auth.error.js';
 import {
   isUniqueViolation,
@@ -29,6 +29,7 @@ function signAccessToken(teacher: Teacher): string {
   const payload: AuthTokenPayload = {
     sub: teacher.id,
     username: teacher.username,
+    role: teacher.role,
   };
 
   const signOptions: SignOptions = {
@@ -53,6 +54,8 @@ export async function register(input: RegisterInput): Promise<AuthTokenResponse>
   const teacher = teacherRepository().create({
     username,
     password_hash: passwordHash,
+    role: TeacherRole.Teacher,
+    is_active: true,
     codeforces_handle,
     codeforces_api_key,
     codeforces_api_secret,
@@ -82,6 +85,10 @@ export async function login(input: LoginInput): Promise<AuthTokenResponse> {
 
   if (!teacher) {
     throw new AuthError('invalid username or password', 401);
+  }
+
+  if (!teacher.is_active) {
+    throw new AuthError('account is inactive', 403);
   }
 
   const passwordMatches = await bcrypt.compare(password, teacher.password_hash);
@@ -139,5 +146,49 @@ export async function updateMe(teacherId: number, input: UpdateTeacherInput): Pr
     }
 
     throw error;
+  }
+}
+
+export async function ensureSystemAdminAccount(): Promise<void> {
+  const username = config.auth.sysAdminUsername?.trim();
+  const password = config.auth.sysAdminPassword;
+
+  if (!username || !password) {
+    return;
+  }
+
+  const repository = teacherRepository();
+  let sysAdmin = await repository.findOneBy({ username });
+
+  if (!sysAdmin) {
+    const passwordHash = await bcrypt.hash(password, config.auth.bcryptSaltRounds);
+    sysAdmin = repository.create({
+      username,
+      password_hash: passwordHash,
+      role: TeacherRole.SysAdmin,
+      is_active: true,
+      codeforces_handle: null,
+      codeforces_api_key: null,
+      codeforces_api_secret: null,
+    });
+
+    await repository.save(sysAdmin);
+    return;
+  }
+
+  let hasChanges = false;
+
+  if (sysAdmin.role !== TeacherRole.SysAdmin) {
+    sysAdmin.role = TeacherRole.SysAdmin;
+    hasChanges = true;
+  }
+
+  if (!sysAdmin.is_active) {
+    sysAdmin.is_active = true;
+    hasChanges = true;
+  }
+
+  if (hasChanges) {
+    await repository.save(sysAdmin);
   }
 }

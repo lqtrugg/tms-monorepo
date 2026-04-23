@@ -1,0 +1,692 @@
+import { useEffect, useMemo, useState } from "react";
+import { KeyRound, Plus, Settings, Shield, UserCheck, UserX } from "lucide-react";
+
+import { ApiError } from "../services/apiClient";
+import {
+  createTeacherByAdmin,
+  listTeachersForAdmin,
+  updateTeacherByAdmin,
+  type BackendAdminTeacher,
+} from "../services/adminService";
+import { getMe, type AuthTeacher, updateMe } from "../services/authService";
+import { setStoredTeacher } from "../services/authStorage";
+
+function toErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    return error.message;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Đã có lỗi xảy ra";
+}
+
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) {
+    return dateString;
+  }
+
+  return date.toLocaleDateString("vi-VN");
+}
+
+export function AdminTeachers() {
+  const [teachers, setTeachers] = useState<BackendAdminTeacher[]>([]);
+  const [account, setAccount] = useState<AuthTeacher | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showResetModalFor, setShowResetModalFor] = useState<BackendAdminTeacher | null>(null);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [requestError, setRequestError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [updatingTeacherId, setUpdatingTeacherId] = useState<number | null>(null);
+
+  const loadData = async (): Promise<void> => {
+    setLoading(true);
+    setRequestError("");
+
+    try {
+      const [teacherList, me] = await Promise.all([
+        listTeachersForAdmin(),
+        getMe(),
+      ]);
+
+      setTeachers(teacherList);
+      setAccount(me);
+      setStoredTeacher(me);
+    } catch (error) {
+      setRequestError(toErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadData();
+  }, []);
+
+  const stats = useMemo(() => {
+    const total = teachers.length;
+    const active = teachers.filter((teacher) => teacher.is_active).length;
+    const sysadmin = teachers.filter((teacher) => teacher.role === "sysadmin").length;
+
+    return { total, active, sysadmin };
+  }, [teachers]);
+
+  const handleCreateTeacher = async (payload: {
+    username: string;
+    password: string;
+    role: "teacher" | "sysadmin";
+    codeforces_handle?: string | null;
+    codeforces_api_key?: string | null;
+    codeforces_api_secret?: string | null;
+  }) => {
+    setSubmitting(true);
+    setRequestError("");
+
+    try {
+      await createTeacherByAdmin({
+        username: payload.username,
+        password: payload.password,
+        role: payload.role,
+        is_active: true,
+        codeforces_handle: payload.codeforces_handle ?? null,
+        codeforces_api_key: payload.codeforces_api_key ?? null,
+        codeforces_api_secret: payload.codeforces_api_secret ?? null,
+      });
+      setShowCreateModal(false);
+      await loadData();
+    } catch (error) {
+      setRequestError(toErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleToggleActive = async (teacher: BackendAdminTeacher) => {
+    setUpdatingTeacherId(teacher.id);
+    setRequestError("");
+
+    try {
+      await updateTeacherByAdmin(teacher.id, {
+        is_active: !teacher.is_active,
+      });
+      await loadData();
+    } catch (error) {
+      setRequestError(toErrorMessage(error));
+    } finally {
+      setUpdatingTeacherId(null);
+    }
+  };
+
+  const handleToggleRole = async (teacher: BackendAdminTeacher) => {
+    setUpdatingTeacherId(teacher.id);
+    setRequestError("");
+
+    try {
+      await updateTeacherByAdmin(teacher.id, {
+        role: teacher.role === "sysadmin" ? "teacher" : "sysadmin",
+      });
+      await loadData();
+    } catch (error) {
+      setRequestError(toErrorMessage(error));
+    } finally {
+      setUpdatingTeacherId(null);
+    }
+  };
+
+  const handleResetPassword = async (teacherId: number, password: string) => {
+    setUpdatingTeacherId(teacherId);
+    setRequestError("");
+
+    try {
+      await updateTeacherByAdmin(teacherId, { password });
+      setShowResetModalFor(null);
+      await loadData();
+    } catch (error) {
+      setRequestError(toErrorMessage(error));
+    } finally {
+      setUpdatingTeacherId(null);
+    }
+  };
+
+  const handleUpdateMyAccount = async (payload: {
+    username?: string;
+    password?: string;
+    codeforces_handle?: string | null;
+    codeforces_api_key?: string | null;
+    codeforces_api_secret?: string | null;
+  }) => {
+    setSubmitting(true);
+    setRequestError("");
+
+    try {
+      const updated = await updateMe(payload);
+      setAccount(updated);
+      setStoredTeacher(updated);
+      setShowAccountModal(false);
+      await loadData();
+    } catch (error) {
+      setRequestError(toErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="p-8">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-semibold text-zinc-900 mb-2">Quản trị tài khoản</h1>
+          <p className="text-zinc-600">System admin quản lý tài khoản đăng nhập của giáo viên</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowAccountModal(true)}
+            className="flex items-center gap-2 px-4 py-3 bg-zinc-100 text-zinc-700 rounded-lg font-medium hover:bg-zinc-200 transition-colors"
+          >
+            <Settings className="w-5 h-5" />
+            Tài khoản của tôi
+          </button>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-2 px-4 py-3 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            Tạo tài khoản
+          </button>
+        </div>
+      </div>
+
+      {requestError && (
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {requestError}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
+          <p className="text-sm text-zinc-600 mb-2">Tổng tài khoản</p>
+          <p className="text-3xl font-semibold text-zinc-900">{loading ? "..." : stats.total}</p>
+        </div>
+        <div className="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
+          <p className="text-sm text-zinc-600 mb-2">Đang hoạt động</p>
+          <p className="text-3xl font-semibold text-zinc-900">{loading ? "..." : stats.active}</p>
+        </div>
+        <div className="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
+          <p className="text-sm text-zinc-600 mb-2">System admin</p>
+          <p className="text-3xl font-semibold text-zinc-900">{loading ? "..." : stats.sysadmin}</p>
+        </div>
+      </div>
+
+      <div className="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-zinc-900 mb-4">Danh sách tài khoản</h2>
+
+        <div className="space-y-4">
+          {teachers.map((teacher) => {
+            const isCurrentUser = account?.id === teacher.id;
+            const isRowLoading = updatingTeacherId === teacher.id;
+
+            return (
+              <div
+                key={teacher.id}
+                className="rounded-xl border border-zinc-200 bg-zinc-50 p-4"
+              >
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-zinc-900 font-semibold">{teacher.username}</p>
+                      {teacher.role === "sysadmin" ? (
+                        <span className="px-3 py-1 rounded-full text-xs bg-zinc-900 text-white">System Admin</span>
+                      ) : (
+                        <span className="px-3 py-1 rounded-full text-xs bg-zinc-200 text-zinc-700">Teacher</span>
+                      )}
+                      {teacher.is_active ? (
+                        <span className="px-3 py-1 rounded-full text-xs bg-zinc-200 text-zinc-700">Active</span>
+                      ) : (
+                        <span className="px-3 py-1 rounded-full text-xs bg-zinc-300 text-zinc-800">Inactive</span>
+                      )}
+                      {isCurrentUser && (
+                        <span className="px-3 py-1 rounded-full text-xs bg-zinc-100 text-zinc-600">Bạn</span>
+                      )}
+                    </div>
+                    <div className="mt-2 text-sm text-zinc-600 flex flex-wrap gap-x-4 gap-y-1">
+                      <span>Tạo ngày: {formatDate(teacher.created_at)}</span>
+                      <span>Codeforces: {teacher.codeforces_handle ?? "Chưa cập nhật"}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      disabled={isRowLoading || (isCurrentUser && teacher.role === "sysadmin")}
+                      onClick={() => void handleToggleRole(teacher)}
+                      className="px-3 py-2 rounded-lg bg-zinc-100 text-zinc-700 hover:bg-zinc-200 transition-colors text-sm disabled:opacity-50"
+                    >
+                      <Shield className="w-4 h-4 inline mr-2" />
+                      {teacher.role === "sysadmin" ? "Hạ quyền Teacher" : "Cấp quyền Sysadmin"}
+                    </button>
+                    <button
+                      disabled={isRowLoading || (isCurrentUser && teacher.is_active)}
+                      onClick={() => void handleToggleActive(teacher)}
+                      className="px-3 py-2 rounded-lg bg-zinc-100 text-zinc-700 hover:bg-zinc-200 transition-colors text-sm disabled:opacity-50"
+                    >
+                      {teacher.is_active ? (
+                        <>
+                          <UserX className="w-4 h-4 inline mr-2" />
+                          Khóa tài khoản
+                        </>
+                      ) : (
+                        <>
+                          <UserCheck className="w-4 h-4 inline mr-2" />
+                          Mở lại tài khoản
+                        </>
+                      )}
+                    </button>
+                    <button
+                      disabled={isRowLoading}
+                      onClick={() => setShowResetModalFor(teacher)}
+                      className="px-3 py-2 rounded-lg bg-zinc-900 text-white hover:bg-zinc-800 transition-colors text-sm disabled:opacity-50"
+                    >
+                      <KeyRound className="w-4 h-4 inline mr-2" />
+                      Đặt mật khẩu
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {!loading && teachers.length === 0 && (
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-10 text-center text-zinc-600">
+              Chưa có tài khoản nào
+            </div>
+          )}
+        </div>
+      </div>
+
+      {showCreateModal && (
+        <CreateTeacherModal
+          submitting={submitting}
+          onClose={() => setShowCreateModal(false)}
+          onSubmit={handleCreateTeacher}
+        />
+      )}
+
+      {showResetModalFor && (
+        <ResetPasswordModal
+          teacher={showResetModalFor}
+          submitting={updatingTeacherId === showResetModalFor.id}
+          onClose={() => setShowResetModalFor(null)}
+          onSubmit={handleResetPassword}
+        />
+      )}
+
+      {showAccountModal && account && (
+        <AccountSettingsModal
+          account={account}
+          submitting={submitting}
+          onClose={() => setShowAccountModal(false)}
+          onSubmit={handleUpdateMyAccount}
+        />
+      )}
+    </div>
+  );
+}
+
+function CreateTeacherModal({
+  submitting,
+  onClose,
+  onSubmit,
+}: {
+  submitting: boolean;
+  onClose: () => void;
+  onSubmit: (payload: {
+    username: string;
+    password: string;
+    role: "teacher" | "sysadmin";
+    codeforces_handle?: string | null;
+    codeforces_api_key?: string | null;
+    codeforces_api_secret?: string | null;
+  }) => Promise<void>;
+}) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<"teacher" | "sysadmin">("teacher");
+  const [codeforcesHandle, setCodeforcesHandle] = useState("");
+  const [codeforcesApiKey, setCodeforcesApiKey] = useState("");
+  const [codeforcesApiSecret, setCodeforcesApiSecret] = useState("");
+  const [localError, setLocalError] = useState("");
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLocalError("");
+
+    if (!username.trim() || !password.trim()) {
+      setLocalError("Username và password là bắt buộc");
+      return;
+    }
+
+    await onSubmit({
+      username: username.trim(),
+      password,
+      role,
+      codeforces_handle: codeforcesHandle.trim() || null,
+      codeforces_api_key: codeforcesApiKey.trim() || null,
+      codeforces_api_secret: codeforcesApiSecret.trim() || null,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white border border-zinc-200 rounded-xl p-6 w-full max-w-md shadow-xl">
+        <h2 className="text-xl font-semibold text-zinc-900 mb-6">Tạo tài khoản mới</h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm text-zinc-700 mb-2">Username</label>
+            <input
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              placeholder="teacher02"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-zinc-700 mb-2">Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-zinc-700 mb-2">Role</label>
+            <select
+              value={role}
+              onChange={(event) => setRole(event.target.value as "teacher" | "sysadmin")}
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            >
+              <option value="teacher">Teacher</option>
+              <option value="sysadmin">System Admin</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm text-zinc-700 mb-2">Codeforces Handle (optional)</label>
+            <input
+              value={codeforcesHandle}
+              onChange={(event) => setCodeforcesHandle(event.target.value)}
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              placeholder="tourist"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-zinc-700 mb-2">Codeforces API Key (optional)</label>
+            <input
+              value={codeforcesApiKey}
+              onChange={(event) => setCodeforcesApiKey(event.target.value)}
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-zinc-700 mb-2">Codeforces API Secret (optional)</label>
+            <input
+              type="password"
+              value={codeforcesApiSecret}
+              onChange={(event) => setCodeforcesApiSecret(event.target.value)}
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            />
+          </div>
+
+          {localError && <p className="text-sm text-red-600">{localError}</p>}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 px-4 py-3 bg-zinc-100 text-zinc-900 rounded-lg hover:bg-zinc-200 transition-colors"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 px-4 py-3 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-60"
+            >
+              {submitting ? "Đang tạo..." : "Tạo tài khoản"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ResetPasswordModal({
+  teacher,
+  submitting,
+  onClose,
+  onSubmit,
+}: {
+  teacher: BackendAdminTeacher;
+  submitting: boolean;
+  onClose: () => void;
+  onSubmit: (teacherId: number, password: string) => Promise<void>;
+}) {
+  const [password, setPassword] = useState("");
+  const [localError, setLocalError] = useState("");
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLocalError("");
+
+    if (!password.trim()) {
+      setLocalError("Mật khẩu mới không được để trống");
+      return;
+    }
+
+    await onSubmit(teacher.id, password);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white border border-zinc-200 rounded-xl p-6 w-full max-w-md shadow-xl">
+        <h2 className="text-xl font-semibold text-zinc-900 mb-2">Đặt lại mật khẩu</h2>
+        <p className="text-zinc-600 text-sm mb-6">Tài khoản: {teacher.username}</p>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm text-zinc-700 mb-2">Mật khẩu mới</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            />
+          </div>
+
+          {localError && <p className="text-sm text-red-600">{localError}</p>}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 px-4 py-3 bg-zinc-100 text-zinc-900 rounded-lg hover:bg-zinc-200 transition-colors"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 px-4 py-3 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-60"
+            >
+              {submitting ? "Đang lưu..." : "Lưu mật khẩu"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function AccountSettingsModal({
+  account,
+  submitting,
+  onClose,
+  onSubmit,
+}: {
+  account: AuthTeacher;
+  submitting: boolean;
+  onClose: () => void;
+  onSubmit: (payload: {
+    username?: string;
+    password?: string;
+    codeforces_handle?: string | null;
+    codeforces_api_key?: string | null;
+    codeforces_api_secret?: string | null;
+  }) => Promise<void>;
+}) {
+  const [username, setUsername] = useState(account.username);
+  const [password, setPassword] = useState("");
+  const [codeforcesHandle, setCodeforcesHandle] = useState(account.codeforces_handle ?? "");
+  const [codeforcesApiKey, setCodeforcesApiKey] = useState(account.codeforces_api_key ?? "");
+  const [codeforcesApiSecret, setCodeforcesApiSecret] = useState(account.codeforces_api_secret ?? "");
+  const [localError, setLocalError] = useState("");
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLocalError("");
+
+    const payload: {
+      username?: string;
+      password?: string;
+      codeforces_handle?: string | null;
+      codeforces_api_key?: string | null;
+      codeforces_api_secret?: string | null;
+    } = {};
+
+    const normalizedUsername = username.trim();
+    if (!normalizedUsername) {
+      setLocalError("Username không được để trống");
+      return;
+    }
+
+    if (normalizedUsername !== account.username) {
+      payload.username = normalizedUsername;
+    }
+
+    if (password.trim().length > 0) {
+      payload.password = password;
+    }
+
+    if (codeforcesHandle.trim() !== (account.codeforces_handle ?? "")) {
+      payload.codeforces_handle = codeforcesHandle.trim() || null;
+    }
+
+    if (codeforcesApiKey.trim() !== (account.codeforces_api_key ?? "")) {
+      payload.codeforces_api_key = codeforcesApiKey.trim() || null;
+    }
+
+    if (codeforcesApiSecret.trim() !== (account.codeforces_api_secret ?? "")) {
+      payload.codeforces_api_secret = codeforcesApiSecret.trim() || null;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      setLocalError("Không có thay đổi nào để lưu");
+      return;
+    }
+
+    await onSubmit(payload);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white border border-zinc-200 rounded-xl p-6 w-full max-w-md shadow-xl">
+        <h2 className="text-xl font-semibold text-zinc-900 mb-6">Cập nhật tài khoản</h2>
+
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div>
+            <label className="block text-sm text-zinc-700 mb-2">Username</label>
+            <input
+              type="text"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-zinc-700 mb-2">Mật khẩu mới (optional)</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              placeholder="Để trống nếu không đổi"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-zinc-700 mb-2">Codeforces Handle</label>
+            <input
+              type="text"
+              value={codeforcesHandle}
+              onChange={(event) => setCodeforcesHandle(event.target.value)}
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              placeholder="tourist"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-zinc-700 mb-2">Codeforces API Key (optional)</label>
+            <input
+              type="text"
+              value={codeforcesApiKey}
+              onChange={(event) => setCodeforcesApiKey(event.target.value)}
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-zinc-700 mb-2">Codeforces API Secret (optional)</label>
+            <input
+              type="password"
+              value={codeforcesApiSecret}
+              onChange={(event) => setCodeforcesApiSecret(event.target.value)}
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            />
+          </div>
+
+          {localError && <p className="text-sm text-red-600">{localError}</p>}
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 px-4 py-3 bg-zinc-100 text-zinc-900 rounded-lg hover:bg-zinc-200 transition-colors"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 px-4 py-3 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors font-medium disabled:opacity-60"
+            >
+              {submitting ? "Đang lưu..." : "Lưu thay đổi"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

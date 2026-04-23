@@ -1,46 +1,32 @@
 import { TeacherRole } from '../entities/index.js';
 
-export type LoginInput = {
+export type CreateTeacherByAdminInput = {
   username: unknown;
   password: unknown;
-};
-
-export type RegisterInput = {
-  username: unknown;
-  password: unknown;
+  role?: unknown;
+  is_active?: unknown;
   codeforces_handle?: unknown;
   codeforces_api_key?: unknown;
   codeforces_api_secret?: unknown;
 };
 
-export type UpdateTeacherInput = {
+export type UpdateTeacherByAdminInput = {
   username?: unknown;
   password?: unknown;
+  role?: unknown;
+  is_active?: unknown;
   codeforces_handle?: unknown;
   codeforces_api_key?: unknown;
   codeforces_api_secret?: unknown;
 };
 
-export type AuthTeacher = {
+export type AdminTeacher = {
   id: number;
   username: string;
   role: TeacherRole;
   is_active: boolean;
   codeforces_handle: string | null;
-  codeforces_api_key: string | null;
-  codeforces_api_secret: string | null;
+  has_codeforces_api_key: boolean;
+  has_codeforces_api_secret: boolean;
   created_at: Date;
-};
-
-export type AuthTokenPayload = {
-  sub: number;
-  username: string;
-  role: TeacherRole;
-};
-
-export type AuthTokenResponse = {
-  accessToken: string;
-  tokenType: 'Bearer';
-  expiresIn: string | undefined;
-  teacher: AuthTeacher;
 };

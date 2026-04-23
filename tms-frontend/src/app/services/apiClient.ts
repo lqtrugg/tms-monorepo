@@ -1,3 +1,5 @@
+import { clearAuthSession, getAccessToken } from "./authStorage";
+
 export class ApiError extends Error {
   status: number;
 
@@ -5,10 +7,6 @@ export class ApiError extends Error {
     super(message);
     this.status = status;
   }
-}
-
-function getAccessToken(): string | null {
-  return localStorage.getItem("tms_access_token");
 }
 
 type ApiRequestOptions = RequestInit & {
@@ -56,7 +54,7 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
       message = data.error;
     } else if (response.status === 401) {
       message = "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn";
-      localStorage.removeItem("tms_access_token");
+      clearAuthSession();
     } else if (responseText.trim().length > 0) {
       message = responseText.trim();
     }

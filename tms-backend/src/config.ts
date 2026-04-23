@@ -6,6 +6,15 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   return value.toLowerCase() === 'true';
 }
 
+function parseOptionalString(value: string | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
 const config = {
   nodeEnv: process.env.NODE_ENV,
   host: process.env.HOST,
@@ -17,6 +26,9 @@ const config = {
     jwtIssuer: process.env.JWT_ISSUER,
     jwtAudience: process.env.JWT_AUDIENCE,
     bcryptSaltRounds: Number(process.env.BCRYPT_SALT_ROUNDS),
+    allowPublicRegistration: parseBoolean(process.env.AUTH_ALLOW_PUBLIC_REGISTRATION, false),
+    sysAdminUsername: process.env.SYSADMIN_USERNAME ?? 'admin',
+    sysAdminPassword: parseOptionalString(process.env.SYSADMIN_PASSWORD),
   },
   database: {
     host: process.env.DB_HOST,

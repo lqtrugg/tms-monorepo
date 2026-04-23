@@ -1,9 +1,10 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import passport from 'passport';
 
-import { AttendanceStatus, Teacher } from '../entities/index.js';
+import { AttendanceStatus, Teacher, TeacherRole } from '../entities/index.js';
 import { ServiceError } from '../errors/service.error.js';
 import { asRecord, parseOptionalString, parsePositiveInteger } from '../helpers/service.helpers.js';
+import { requireRoles } from '../middlewares/rbac.middleware.js';
 import {
   listAttendanceRecords,
   listSessionAttendance,
@@ -14,6 +15,7 @@ import {
 export const attendanceRouter = Router();
 
 attendanceRouter.use(passport.authenticate('jwt', { session: false }));
+attendanceRouter.use(requireRoles([TeacherRole.Teacher]));
 
 function getTeacherId(req: Request): number {
   const teacher = req.user as Teacher | undefined;

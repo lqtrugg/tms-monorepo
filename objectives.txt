@@ -1,0 +1,10 @@
+Danh sách này chứa các thứ cần phải được cập nhập / bổ sung:
+
+- Danh sách học sinh nên unique theo codeforces_handle
+- Ở danh sách học sinh đã bị đuổi học, cần có nút thêm trở lại
+- Cần hỗ trợ tính năng thao tác hàng loạt, ví dụ đuổi học hàng loạt, hoặc chuyển lớp hàng loạt
+- Khi thêm học sinh, cần yêu cầu thêm thông tin discord_username
+- Mục cấu hình bot trong server Discord cần bổ sung bot_token
+- Trong mục gửi tin nhắn bulk DM, cần chuẩn bị sẵn các template như "Gửi đến những người còn nợ tiền
+- Khi thêm server discord, cần tự động sync thông tin như tên server
+- Cần cài đặt tự động sync dữ liệu từ cf / discord thay vì thủ công ấn nút như hiện tại

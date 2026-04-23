@@ -33,25 +33,16 @@ export function normalizeLoginInput(input: LoginInput): { username: string; pass
 export function normalizeRegisterInput(input: RegisterInput): {
   username: string;
   password: string;
-  codeforces_handle: string;
+  codeforces_handle: string | null;
   codeforces_api_key: string | null;
   codeforces_api_secret: string | null;
 } {
   const { username, password } = normalizeLoginInput(input);
 
-  if (typeof input.codeforces_handle !== 'string') {
-    throw new AuthError('codeforces_handle is required', 400);
-  }
-
-  const codeforcesHandle = input.codeforces_handle.trim();
-  if (!codeforcesHandle) {
-    throw new AuthError('codeforces_handle is required', 400);
-  }
-
   return {
     username,
     password,
-    codeforces_handle: codeforcesHandle,
+    codeforces_handle: normalizeOptionalString(input.codeforces_handle, 'codeforces_handle'),
     codeforces_api_key: normalizeOptionalString(input.codeforces_api_key, 'codeforces_api_key'),
     codeforces_api_secret: normalizeOptionalString(input.codeforces_api_secret, 'codeforces_api_secret'),
   };
@@ -124,6 +115,8 @@ export function toAuthTeacher(teacher: Teacher): AuthTeacher {
   return {
     id: teacher.id,
     username: teacher.username,
+    role: teacher.role,
+    is_active: teacher.is_active,
     codeforces_handle: teacher.codeforces_handle,
     codeforces_api_key: teacher.codeforces_api_key,
     codeforces_api_secret: teacher.codeforces_api_secret,

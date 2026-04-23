@@ -1,4 +1,5 @@
 import { Column, Entity, PrimaryGeneratedColumn, Unique } from 'typeorm';
+import { TeacherRole } from './enums.js';
 
 @Entity('teachers')
 @Unique('uq_teachers_username', ['username'])
@@ -11,6 +12,12 @@ export class Teacher {
 
   @Column({ type: 'text' })
   password_hash!: string;
+
+  @Column({ type: 'enum', enum: TeacherRole, default: TeacherRole.Teacher })
+  role!: TeacherRole;
+
+  @Column({ type: 'boolean', default: true })
+  is_active!: boolean;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   codeforces_handle!: string | null;

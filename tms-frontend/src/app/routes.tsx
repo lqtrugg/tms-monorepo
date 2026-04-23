@@ -12,9 +12,59 @@ import { Reports } from "./pages/Reports";
 import { Messaging } from "./pages/Messaging";
 import { Login } from "./pages/Login";
 import { Layout } from "./components/Layout";
+import { AdminTeachers } from "./pages/AdminTeachers";
+import type { TeacherRole } from "./services/authService";
+import {
+  clearAuthSession,
+  getAccessToken,
+  getDefaultHomePath,
+  getStoredTeacher,
+} from "./services/authStorage";
 
-function hasAccessToken(): boolean {
-  return Boolean(localStorage.getItem("tms_access_token"));
+function getAuthenticatedTeacher() {
+  const accessToken = getAccessToken();
+  const teacher = getStoredTeacher();
+
+  if (!accessToken || !teacher || !teacher.is_active) {
+    clearAuthSession();
+    return null;
+  }
+
+  return teacher;
+}
+
+function requireAuthLoader() {
+  const teacher = getAuthenticatedTeacher();
+  if (!teacher) {
+    return redirect("/login");
+  }
+
+  return null;
+}
+
+function requireRoleLoader(roles: TeacherRole[]) {
+  return () => {
+    const teacher = getAuthenticatedTeacher();
+
+    if (!teacher) {
+      return redirect("/login");
+    }
+
+    if (!roles.includes(teacher.role)) {
+      return redirect(getDefaultHomePath(teacher.role));
+    }
+
+    return null;
+  };
+}
+
+function redirectToDefaultHome() {
+  const teacher = getAuthenticatedTeacher();
+  if (!teacher) {
+    return redirect("/login");
+  }
+
+  return redirect(getDefaultHomePath(teacher.role));
 }
 
 export const router = createBrowserRouter([
@@ -22,8 +72,9 @@ export const router = createBrowserRouter([
     path: "/login",
     Component: Login,
     loader: () => {
-      if (hasAccessToken()) {
-        return redirect("/");
+      const teacher = getAuthenticatedTeacher();
+      if (teacher) {
+        return redirect(getDefaultHomePath(teacher.role));
       }
 
       return null;
@@ -32,25 +83,21 @@ export const router = createBrowserRouter([
   {
     path: "/",
     Component: Layout,
-    loader: () => {
-      if (!hasAccessToken()) {
-        return redirect("/login");
-      }
-
-      return null;
-    },
+    loader: requireAuthLoader,
     children: [
-      { index: true, Component: Dashboard },
-      { path: "students", Component: Students },
-      { path: "students/:id", Component: StudentDetail },
-      { path: "classes", Component: Classes },
-      { path: "sessions", Component: Sessions },
-      { path: "attendance", Component: Attendance },
-      { path: "transactions", Component: Transactions },
-      { path: "topics", Component: Topics },
-      { path: "topics/:id/standing", Component: TopicStanding },
-      { path: "messaging", Component: Messaging },
-      { path: "reports", Component: Reports },
+      { index: true, loader: redirectToDefaultHome },
+      { path: "dashboard", Component: Dashboard, loader: requireRoleLoader(["teacher"]) },
+      { path: "students", Component: Students, loader: requireRoleLoader(["teacher"]) },
+      { path: "students/:id", Component: StudentDetail, loader: requireRoleLoader(["teacher"]) },
+      { path: "classes", Component: Classes, loader: requireRoleLoader(["teacher"]) },
+      { path: "sessions", Component: Sessions, loader: requireRoleLoader(["teacher"]) },
+      { path: "attendance", Component: Attendance, loader: requireRoleLoader(["teacher"]) },
+      { path: "transactions", Component: Transactions, loader: requireRoleLoader(["teacher"]) },
+      { path: "topics", Component: Topics, loader: requireRoleLoader(["teacher"]) },
+      { path: "topics/:id/standing", Component: TopicStanding, loader: requireRoleLoader(["teacher"]) },
+      { path: "messaging", Component: Messaging, loader: requireRoleLoader(["teacher"]) },
+      { path: "reports", Component: Reports, loader: requireRoleLoader(["teacher"]) },
+      { path: "admin/teachers", Component: AdminTeachers, loader: requireRoleLoader(["sysadmin"]) },
     ],
   },
 ]);

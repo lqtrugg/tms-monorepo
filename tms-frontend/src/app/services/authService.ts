@@ -1,8 +1,12 @@
 import { apiRequest } from "./apiClient";
 
+export type TeacherRole = "sysadmin" | "teacher";
+
 export interface AuthTeacher {
   id: number;
   username: string;
+  role: TeacherRole;
+  is_active: boolean;
   codeforces_handle: string | null;
   codeforces_api_key: string | null;
   codeforces_api_secret: string | null;

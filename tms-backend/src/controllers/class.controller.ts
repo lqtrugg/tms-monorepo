@@ -1,7 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import passport from 'passport';
 
-import { Teacher } from '../entities/index.js';
+import { Teacher, TeacherRole } from '../entities/index.js';
 import { ClassServiceError } from '../errors/class.error.js';
 import {
   parseClassListFilters,
@@ -32,10 +32,12 @@ import {
   updateClassSchedule,
   upsertCodeforcesGroup,
 } from '../services/class.service.js';
+import { requireRoles } from '../middlewares/rbac.middleware.js';
 
 export const classRouter = Router();
 
 classRouter.use(passport.authenticate('jwt', { session: false }));
+classRouter.use(requireRoles([TeacherRole.Teacher]));
 
 function getTeacherId(req: Request): number {
   const teacher = req.user as Teacher | undefined;

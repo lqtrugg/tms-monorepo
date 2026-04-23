@@ -3,65 +3,94 @@ import {
   LayoutDashboard,
   Users,
   GraduationCap,
-  Calendar,
   ClipboardList,
   ClipboardCheck,
   DollarSign,
   BookOpen,
   BarChart3,
   LogOut,
-  Archive,
-  MessageSquare
+  MessageSquare,
+  Shield,
 } from "lucide-react";
+
+import { clearAuthSession, getAccessToken, getStoredTeacher } from "../services/authStorage";
+
+type NavItem = {
+  path: string;
+  icon: typeof LayoutDashboard;
+  label: string;
+};
+
+const teacherNavItems: NavItem[] = [
+  { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { path: "/students", icon: Users, label: "Học sinh" },
+  { path: "/classes", icon: GraduationCap, label: "Lớp học" },
+  { path: "/sessions", icon: ClipboardList, label: "Buổi học" },
+  { path: "/attendance", icon: ClipboardCheck, label: "Điểm danh" },
+  { path: "/transactions", icon: DollarSign, label: "Giao dịch" },
+  { path: "/topics", icon: BookOpen, label: "Chuyên đề" },
+  { path: "/messaging", icon: MessageSquare, label: "Tin nhắn" },
+  { path: "/reports", icon: BarChart3, label: "Báo cáo" },
+];
+
+const sysAdminNavItems: NavItem[] = [
+  { path: "/admin/teachers", icon: Shield, label: "Quản trị tài khoản" },
+];
+
+function isNavItemActive(currentPath: string, itemPath: string): boolean {
+  if (currentPath === itemPath) {
+    return true;
+  }
+
+  return currentPath.startsWith(`${itemPath}/`);
+}
 
 export function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const accessToken = localStorage.getItem("tms_access_token");
+  const accessToken = getAccessToken();
+  const teacher = getStoredTeacher();
 
-  if (!accessToken) {
+  if (!accessToken || !teacher || !teacher.is_active) {
+    clearAuthSession();
     return <Navigate to="/login" replace />;
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem("tms_access_token");
-    navigate('/login');
-  };
+  const navItems = teacher.role === "sysadmin" ? sysAdminNavItems : teacherNavItems;
 
-  const navItems = [
-    { path: "/", icon: LayoutDashboard, label: "Dashboard" },
-    { path: "/students", icon: Users, label: "Học sinh" },
-    { path: "/classes", icon: GraduationCap, label: "Lớp học" },
-    { path: "/sessions", icon: ClipboardList, label: "Buổi học" },
-    { path: "/attendance", icon: ClipboardCheck, label: "Điểm danh" },
-    { path: "/transactions", icon: DollarSign, label: "Giao dịch" },
-    { path: "/topics", icon: BookOpen, label: "Chuyên đề" },
-    { path: "/messaging", icon: MessageSquare, label: "Tin nhắn" },
-    { path: "/reports", icon: BarChart3, label: "Báo cáo" },
-  ];
+  const handleLogout = () => {
+    clearAuthSession();
+    navigate("/login");
+  };
 
   return (
     <div className="flex h-screen bg-zinc-50 text-zinc-900">
-      {/* Sidebar */}
       <aside className="w-64 bg-zinc-900 border-r border-zinc-800 flex flex-col">
         <div className="p-6 border-b border-zinc-800">
           <h1 className="text-xl font-semibold text-white">CP Training</h1>
           <p className="text-sm text-zinc-400 mt-1">Quản lý lập trình thi đấu</p>
+          <div className="mt-4 rounded-lg border border-zinc-700 bg-zinc-800/60 px-3 py-2">
+            <p className="text-xs text-zinc-400">Đăng nhập</p>
+            <p className="text-sm text-white font-medium mt-0.5">{teacher.username}</p>
+            <p className="text-xs text-zinc-400 mt-1">
+              Vai trò: {teacher.role === "sysadmin" ? "System Admin" : "Teacher"}
+            </p>
+          </div>
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.path;
+            const active = isNavItemActive(location.pathname, item.path);
 
             return (
               <Link
                 key={item.path}
                 to={item.path}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  isActive
-                    ? 'bg-zinc-800 text-white'
-                    : 'text-zinc-500 hover:bg-zinc-800 hover:text-white'
+                  active
+                    ? "bg-zinc-800 text-white"
+                    : "text-zinc-500 hover:bg-zinc-800 hover:text-white"
                 }`}
               >
                 <Icon className="w-5 h-5" />
@@ -82,7 +111,6 @@ export function Layout() {
         </div>
       </aside>
 
-      {/* Main content */}
       <main className="flex-1 overflow-auto">
         <Outlet />
       </main>

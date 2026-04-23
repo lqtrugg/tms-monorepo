@@ -21,7 +21,7 @@ export function configurePassport(): typeof passport {
             id: payload.sub,
           });
 
-          if (!teacher) {
+          if (!teacher || !teacher.is_active) {
             return done(null, false);
           }
 

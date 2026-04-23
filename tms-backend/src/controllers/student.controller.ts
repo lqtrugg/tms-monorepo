@@ -1,7 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import passport from 'passport';
 
-import { Teacher } from '../entities/index.js';
+import { Teacher, TeacherRole } from '../entities/index.js';
 import { StudentServiceError } from '../errors/student.error.js';
 import {
   parseArchivePendingStudentInput,
@@ -19,10 +19,12 @@ import {
   listStudents,
   transferStudent,
 } from '../services/student.service.js';
+import { requireRoles } from '../middlewares/rbac.middleware.js';
 
 export const studentRouter = Router();
 
 studentRouter.use(passport.authenticate('jwt', { session: false }));
+studentRouter.use(requireRoles([TeacherRole.Teacher]));
 
 function getTeacherId(req: Request): number {
   const teacher = req.user as Teacher | undefined;

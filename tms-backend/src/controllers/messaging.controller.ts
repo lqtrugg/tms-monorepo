@@ -1,7 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import passport from 'passport';
 
-import { DiscordMessageType, Teacher } from '../entities/index.js';
+import { DiscordMessageType, Teacher, TeacherRole } from '../entities/index.js';
 import { ServiceError } from '../errors/service.error.js';
 import {
   asRecord,
@@ -16,10 +16,12 @@ import {
   sendBulkDm,
   upsertDiscordServerByClass,
 } from '../services/messaging.service.js';
+import { requireRoles } from '../middlewares/rbac.middleware.js';
 
 export const messagingRouter = Router();
 
 messagingRouter.use(passport.authenticate('jwt', { session: false }));
+messagingRouter.use(requireRoles([TeacherRole.Teacher]));
 
 function getTeacherId(req: Request): number {
   const teacher = req.user as Teacher | undefined;

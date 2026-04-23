@@ -1,6 +1,7 @@
 import express from 'express';
 
 import config from './config.js';
+import { adminRouter } from './controllers/admin.controller.js';
 import { attendanceRouter } from './controllers/attendance.controller.js';
 import { authRouter } from './controllers/auth.controller.js';
 import { classRouter } from './controllers/class.controller.js';
@@ -10,6 +11,7 @@ import { reportingRouter } from './controllers/reporting.controller.js';
 import { studentRouter } from './controllers/student.controller.js';
 import { topicRouter } from './controllers/topic.controller.js';
 import { AppDataSource, initializeDatabase } from './data-source.js';
+import { ensureSystemAdminAccount } from './services/auth.service.js';
 import { configurePassport } from './services/auth.passport.js';
 
 const app = express();
@@ -23,6 +25,7 @@ app.get(`${config.apiPrefix}/health`, (_req, res) => {
 });
 
 app.use(config.apiPrefix, authRouter);
+app.use(`${config.apiPrefix}/admin`, adminRouter);
 app.use(config.apiPrefix, classRouter);
 app.use(config.apiPrefix, studentRouter);
 app.use(config.apiPrefix, attendanceRouter);
@@ -42,6 +45,7 @@ app.use((_req, res) => {
 
 async function main(): Promise<void> {
   await initializeDatabase();
+  await ensureSystemAdminAccount();
 
   const server = config.host ? app.listen(config.port, config.host) : app.listen(config.port);
 

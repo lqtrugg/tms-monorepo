@@ -48,6 +48,11 @@ export enum StudentStatus {
   Archived = 'archived',
 }
 
+export enum TeacherRole {
+  SysAdmin = 'sysadmin',
+  Teacher = 'teacher',
+}
+
 export enum TransactionType {
   Payment = 'payment',
   Refund = 'refund',

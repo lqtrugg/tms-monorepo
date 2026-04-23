@@ -1,7 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import passport from 'passport';
 
-import { FeeRecordStatus, StudentStatus, Teacher, TransactionType } from '../entities/index.js';
+import { FeeRecordStatus, StudentStatus, Teacher, TeacherRole, TransactionType } from '../entities/index.js';
 import { ServiceError } from '../errors/service.error.js';
 import {
   asRecord,
@@ -19,10 +19,12 @@ import {
   listStudentBalances,
   listTransactions,
 } from '../services/finance.service.js';
+import { requireRoles } from '../middlewares/rbac.middleware.js';
 
 export const financeRouter = Router();
 
 financeRouter.use(passport.authenticate('jwt', { session: false }));
+financeRouter.use(requireRoles([TeacherRole.Teacher]));
 
 function getTeacherId(req: Request): number {
   const teacher = req.user as Teacher | undefined;

@@ -3,6 +3,7 @@ import { Users, GraduationCap, DollarSign, TrendingUp, Settings } from "lucide-r
 
 import { ApiError } from "../services/apiClient";
 import { getMe, updateMe, type AuthTeacher } from "../services/authService";
+import { setStoredTeacher } from "../services/authStorage";
 import { type BackendClass, type BackendClassSchedule, listClassSchedules, listClasses } from "../services/classService";
 import { listStudentBalances } from "../services/financeService";
 import { getDashboardSummary } from "../services/reportingService";
@@ -123,6 +124,7 @@ export function Dashboard() {
       ]);
 
       setAccount(teacher);
+      setStoredTeacher(teacher);
       setSummary({
         active_students: dashboardSummary.active_students,
         active_classes: dashboardSummary.active_classes,
@@ -321,6 +323,7 @@ export function Dashboard() {
             try {
               const updated = await updateMe(payload);
               setAccount(updated);
+              setStoredTeacher(updated);
               setShowAccountModal(false);
             } catch (error) {
               setRequestError(toErrorMessage(error));
