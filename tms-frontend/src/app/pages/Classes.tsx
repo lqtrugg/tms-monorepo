@@ -1,16 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Edit2, Archive, Users, Calendar, Trash2 } from "lucide-react";
-import { mockClasses, Class } from "../data/mockData";
+
 import { ApiError } from "../services/apiClient";
 import {
-  BackendClassSchedule,
+  type BackendClass,
+  type BackendClassSchedule,
   archiveClass,
   createClass,
   createClassSchedule,
   deleteClassSchedule,
   listClassSchedules,
-  syncClassesFromBackendToMockData,
+  listClasses,
+  updateClass,
 } from "../services/classService";
+import { listStudents } from "../services/studentService";
+
+type ClassCard = {
+  id: number;
+  name: string;
+  schedule: string;
+  feePerSession: number;
+  status: "active" | "archived";
+  studentCount: number;
+};
 
 const DAY_OPTIONS = [
   { value: 0, label: "Chủ nhật" },
@@ -21,12 +33,6 @@ const DAY_OPTIONS = [
   { value: 5, label: "Thứ 6" },
   { value: 6, label: "Thứ 7" },
 ] as const;
-
-function formatScheduleItem(schedule: BackendClassSchedule): string {
-  const dayLabel = DAY_OPTIONS.find((item) => item.value === schedule.day_of_week)?.label ?? `Thứ ${schedule.day_of_week}`;
-  const timeLabel = `${schedule.start_time.slice(0, 5)}-${schedule.end_time.slice(0, 5)}`;
-  return `${dayLabel} - ${timeLabel}`;
-}
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -40,29 +46,82 @@ function toErrorMessage(error: unknown): string {
   return "Đã có lỗi xảy ra";
 }
 
+function parseAmount(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatScheduleItem(schedule: BackendClassSchedule): string {
+  const dayLabel = DAY_OPTIONS.find((item) => item.value === schedule.day_of_week)?.label ?? `Thứ ${schedule.day_of_week}`;
+  const timeLabel = `${schedule.start_time.slice(0, 5)}-${schedule.end_time.slice(0, 5)}`;
+  return `${dayLabel} - ${timeLabel}`;
+}
+
+function formatScheduleSummary(schedules: BackendClassSchedule[]): string {
+  if (schedules.length === 0) {
+    return "Chưa thiết lập";
+  }
+
+  const rows = schedules.map((schedule) => {
+    const dayLabel = DAY_OPTIONS.find((item) => item.value === schedule.day_of_week)?.label ?? `Thứ ${schedule.day_of_week}`;
+    return `${dayLabel} ${schedule.start_time.slice(0, 5)}-${schedule.end_time.slice(0, 5)}`;
+  });
+
+  return Array.from(new Set(rows)).join(", ");
+}
+
+async function buildClassCards(rawClasses: BackendClass[]): Promise<ClassCard[]> {
+  const [students, scheduleRows] = await Promise.all([
+    listStudents({ status: "active" }),
+    Promise.all(
+      rawClasses.map(async (classItem) => ({
+        class_id: classItem.id,
+        schedules: await listClassSchedules(classItem.id),
+      })),
+    ),
+  ]);
+
+  const studentCountByClassId = new Map<number, number>();
+  students.forEach((student) => {
+    if (student.current_class_id === null) {
+      return;
+    }
+
+    studentCountByClassId.set(
+      student.current_class_id,
+      (studentCountByClassId.get(student.current_class_id) ?? 0) + 1,
+    );
+  });
+
+  const scheduleByClassId = new Map<number, string>(
+    scheduleRows.map((row) => [row.class_id, formatScheduleSummary(row.schedules)]),
+  );
+
+  return rawClasses.map((classItem) => ({
+    id: classItem.id,
+    name: classItem.name,
+    schedule: scheduleByClassId.get(classItem.id) ?? "Chưa thiết lập",
+    feePerSession: parseAmount(classItem.fee_per_session),
+    status: classItem.status,
+    studentCount: studentCountByClassId.get(classItem.id) ?? 0,
+  }));
+}
+
 export function Classes() {
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedClass, setSelectedClass] = useState<Class | null>(null);
+  const [selectedClass, setSelectedClass] = useState<ClassCard | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showEditScheduleModal, setShowEditScheduleModal] = useState(false);
-  const [viewMode, setViewMode] = useState<'classes' | 'schedules'>('classes');
-  const [refreshTick, setRefreshTick] = useState(0);
+  const [viewMode, setViewMode] = useState<"classes" | "schedules">("classes");
+  const [classes, setClasses] = useState<ClassCard[]>([]);
   const [requestError, setRequestError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const refreshClasses = async (): Promise<void> => {
-    await syncClassesFromBackendToMockData();
-    setRefreshTick((current) => current + 1);
+    const rawClasses = await listClasses();
+    const classCards = await buildClassCards(rawClasses);
+    setClasses(classCards);
   };
-
-  const activeClasses = useMemo(
-    () => mockClasses.filter((c) => c.status === "active"),
-    [refreshTick],
-  );
-  const archivedClasses = useMemo(
-    () => mockClasses.filter((c) => c.status === "archived"),
-    [refreshTick],
-  );
 
   useEffect(() => {
     const loadClasses = async () => {
@@ -76,6 +135,15 @@ export function Classes() {
 
     void loadClasses();
   }, []);
+
+  const activeClasses = useMemo(
+    () => classes.filter((classItem) => classItem.status === "active"),
+    [classes],
+  );
+  const archivedClasses = useMemo(
+    () => classes.filter((classItem) => classItem.status === "archived"),
+    [classes],
+  );
 
   const handleCreateClass = async (payload: { name: string; feePerSession: number }) => {
     setSubmitting(true);
@@ -96,19 +164,31 @@ export function Classes() {
     }
   };
 
-  const handleArchiveClass = async (classId: string) => {
-    const parsedClassId = Number(classId);
-
-    if (!Number.isInteger(parsedClassId) || parsedClassId <= 0) {
-      setRequestError("Mã lớp không hợp lệ");
-      return;
-    }
-
+  const handleUpdateClass = async (payload: { classId: number; name: string; feePerSession: number }) => {
     setSubmitting(true);
     setRequestError("");
 
     try {
-      await archiveClass(parsedClassId);
+      await updateClass(payload.classId, {
+        name: payload.name,
+        fee_per_session: payload.feePerSession,
+      });
+      await refreshClasses();
+      setShowEditModal(false);
+      setSelectedClass(null);
+    } catch (error) {
+      setRequestError(toErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleArchiveClass = async (classId: number) => {
+    setSubmitting(true);
+    setRequestError("");
+
+    try {
+      await archiveClass(classId);
       await refreshClasses();
     } catch (error) {
       setRequestError(toErrorMessage(error));
@@ -138,21 +218,21 @@ export function Classes() {
       <div className="bg-white border border-zinc-200 rounded-xl p-6 mb-6">
         <div className="flex gap-2">
           <button
-            onClick={() => setViewMode('classes')}
+            onClick={() => setViewMode("classes")}
             className={`px-4 py-3 rounded-lg font-medium transition-colors ${
-              viewMode === 'classes'
-                ? 'bg-zinc-200 text-zinc-900'
-                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+              viewMode === "classes"
+                ? "bg-zinc-200 text-zinc-900"
+                : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
             }`}
           >
             Lớp học
           </button>
           <button
-            onClick={() => setViewMode('schedules')}
+            onClick={() => setViewMode("schedules")}
             className={`px-4 py-3 rounded-lg font-medium transition-colors ${
-              viewMode === 'schedules'
-                ? 'bg-zinc-200 text-zinc-900'
-                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+              viewMode === "schedules"
+                ? "bg-zinc-200 text-zinc-900"
+                : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
             }`}
           >
             Lịch học
@@ -166,7 +246,7 @@ export function Classes() {
         </div>
       )}
 
-      {viewMode === 'classes' ? (
+      {viewMode === "classes" ? (
         <>
           <div className="mb-8">
             <h2 className="text-lg font-semibold text-zinc-900 mb-4">Lớp đang mở</h2>
@@ -297,6 +377,9 @@ export function Classes() {
             setShowEditModal(false);
             setSelectedClass(null);
           }}
+          onSubmit={handleUpdateClass}
+          submitting={submitting}
+          error={requestError}
         />
       )}
 
@@ -413,17 +496,58 @@ function AddClassModal({
   );
 }
 
-function EditClassModal({ classData, onClose }: { classData: Class; onClose: () => void }) {
+function EditClassModal({
+  classData,
+  onClose,
+  onSubmit,
+  submitting,
+  error,
+}: {
+  classData: ClassCard;
+  onClose: () => void;
+  onSubmit: (payload: { classId: number; name: string; feePerSession: number }) => Promise<void>;
+  submitting: boolean;
+  error: string;
+}) {
+  const [name, setName] = useState(classData.name);
+  const [feePerSession, setFeePerSession] = useState(String(classData.feePerSession));
+  const [localError, setLocalError] = useState("");
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLocalError("");
+
+    const parsedFee = Number(feePerSession);
+    const normalizedName = name.trim();
+
+    if (!normalizedName) {
+      setLocalError("Tên lớp là bắt buộc");
+      return;
+    }
+
+    if (!Number.isInteger(parsedFee) || parsedFee < 0) {
+      setLocalError("Học phí/buổi phải là số nguyên không âm");
+      return;
+    }
+
+    await onSubmit({
+      classId: classData.id,
+      name: normalizedName,
+      feePerSession: parsedFee,
+    });
+  };
+
   return (
     <div className="fixed inset-0 bg-white/80 flex items-center justify-center p-4 z-50">
       <div className="bg-zinc-100 border border-zinc-200 rounded-xl p-6 w-full max-w-md">
         <h2 className="text-xl font-semibold text-zinc-900 mb-6">Chỉnh sửa lớp</h2>
-        <form className="space-y-4">
+        <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
             <label className="block text-sm text-zinc-600 mb-2">Tên lớp</label>
             <input
               type="text"
-              defaultValue={classData.name}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
               className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
             />
           </div>
@@ -432,7 +556,8 @@ function EditClassModal({ classData, onClose }: { classData: Class; onClose: () 
             <label className="block text-sm text-zinc-600 mb-2">Học phí/buổi (VNĐ)</label>
             <input
               type="number"
-              defaultValue={classData.feePerSession}
+              value={feePerSession}
+              onChange={(event) => setFeePerSession(event.target.value)}
               className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
             />
             <p className="text-xs text-zinc-600 mt-2">
@@ -446,19 +571,23 @@ function EditClassModal({ classData, onClose }: { classData: Class; onClose: () 
             </p>
           </div>
 
+          {(localError || error) && <p className="text-sm text-red-600">{localError || error}</p>}
+
           <div className="flex gap-3 pt-4">
             <button
               type="button"
               onClick={onClose}
+              disabled={submitting}
               className="flex-1 px-4 py-3 bg-zinc-100 text-zinc-900 rounded-lg hover:bg-zinc-200 transition-colors"
             >
               Hủy
             </button>
             <button
               type="submit"
+              disabled={submitting}
               className="flex-1 px-4 py-3 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors font-medium"
             >
-              Lưu thay đổi
+              {submitting ? "Đang lưu..." : "Lưu thay đổi"}
             </button>
           </div>
         </form>
@@ -472,7 +601,7 @@ function EditScheduleModal({
   onClose,
   onSaved,
 }: {
-  classData: Class;
+  classData: ClassCard;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -485,17 +614,9 @@ function EditScheduleModal({
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  const classId = Number(classData.id);
-  const hasValidClassId = Number.isInteger(classId) && classId > 0;
+  const classId = classData.id;
 
   const loadSchedules = async () => {
-    if (!hasValidClassId) {
-      setSchedules([]);
-      setLoadingSchedules(false);
-      setError("Mã lớp không hợp lệ");
-      return;
-    }
-
     setLoadingSchedules(true);
     setError("");
 
@@ -511,17 +632,12 @@ function EditScheduleModal({
 
   useEffect(() => {
     void loadSchedules();
-  }, [classData.id]);
+  }, [classId]);
 
   const handleCreateSchedule = async (event: React.FormEvent) => {
     event.preventDefault();
     setError("");
     setSuccessMessage("");
-
-    if (!hasValidClassId) {
-      setError("Mã lớp không hợp lệ");
-      return;
-    }
 
     const parsedDay = Number(dayOfWeek);
     if (!Number.isInteger(parsedDay) || parsedDay < 0 || parsedDay > 6) {
@@ -566,11 +682,6 @@ function EditScheduleModal({
   };
 
   const handleDeleteSchedule = async (scheduleId: number) => {
-    if (!hasValidClassId) {
-      setError("Mã lớp không hợp lệ");
-      return;
-    }
-
     setSubmitting(true);
     setError("");
     setSuccessMessage("");

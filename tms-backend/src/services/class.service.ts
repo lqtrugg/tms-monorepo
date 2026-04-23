@@ -1,4 +1,4 @@
-import { Between, EntityManager, MoreThanOrEqual } from 'typeorm';
+import { Between, EntityManager, In, MoreThanOrEqual } from 'typeorm';
 
 import { AppDataSource } from '../data-source.js';
 import {
@@ -6,6 +6,8 @@ import {
   ClassSchedule,
   ClassStatus,
   CodeforcesGroup,
+  FeeRecord,
+  FeeRecordStatus,
   Session,
   SessionStatus,
 } from '../entities/index.js';
@@ -161,6 +163,37 @@ async function generateSessionsForSchedule(
   return sessionsToCreate.length;
 }
 
+async function cancelFeeRecordsBySessionIds(
+  manager: EntityManager,
+  teacherId: number,
+  sessionIds: number[],
+  cancelledAt: Date,
+): Promise<void> {
+  if (sessionIds.length === 0) {
+    return;
+  }
+
+  const feeRecordRepo = manager.getRepository(FeeRecord);
+  const feeRecords = await feeRecordRepo.find({
+    where: {
+      teacher_id: teacherId,
+      session_id: In(sessionIds),
+      status: FeeRecordStatus.Active,
+    },
+  });
+
+  if (feeRecords.length === 0) {
+    return;
+  }
+
+  feeRecords.forEach((item) => {
+    item.status = FeeRecordStatus.Cancelled;
+    item.cancelled_at = cancelledAt;
+  });
+
+  await feeRecordRepo.save(feeRecords);
+}
+
 export async function listClasses(teacherId: number, filters: ClassListFilters): Promise<Class[]> {
   const where = {
     teacher_id: teacherId,
@@ -243,6 +276,12 @@ export async function archiveClass(teacherId: number, classId: number): Promise<
       });
 
       await sessionRepo.save(upcomingScheduledSessions);
+      await cancelFeeRecordsBySessionIds(
+        manager,
+        teacherId,
+        upcomingScheduledSessions.map((session) => session.id),
+        archivedAt,
+      );
     }
 
     return classEntity;
@@ -420,21 +459,27 @@ export async function createManualSession(
 }
 
 export async function cancelSession(teacherId: number, sessionId: number): Promise<Session> {
-  const sessionRepo = AppDataSource.getRepository(Session);
-  const session = await requireOwnedSession(AppDataSource.manager, teacherId, sessionId);
+  return AppDataSource.transaction(async (manager) => {
+    const sessionRepo = manager.getRepository(Session);
+    const session = await requireOwnedSession(manager, teacherId, sessionId);
 
-  if (session.status === SessionStatus.Cancelled) {
-    return session;
-  }
+    if (session.status === SessionStatus.Cancelled) {
+      return session;
+    }
 
-  if (session.status === SessionStatus.Completed) {
-    throw new ClassServiceError('cannot cancel a completed session', 409);
-  }
+    if (session.status === SessionStatus.Completed) {
+      throw new ClassServiceError('cannot cancel a completed session', 409);
+    }
 
-  session.status = SessionStatus.Cancelled;
-  session.cancelled_at = new Date();
+    const cancelledAt = new Date();
+    session.status = SessionStatus.Cancelled;
+    session.cancelled_at = cancelledAt;
+    const saved = await sessionRepo.save(session);
 
-  return sessionRepo.save(session);
+    await cancelFeeRecordsBySessionIds(manager, teacherId, [session.id], cancelledAt);
+
+    return saved;
+  });
 }
 
 export async function getCodeforcesGroup(teacherId: number, classId: number): Promise<CodeforcesGroup | null> {

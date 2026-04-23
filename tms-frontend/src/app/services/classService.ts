@@ -1,5 +1,4 @@
 import { apiRequest } from "./apiClient";
-import { mockClasses, type Class } from "../data/mockData";
 
 export type BackendClassStatus = "active" | "archived";
 export type BackendSessionStatus = "scheduled" | "completed" | "cancelled";
@@ -43,10 +42,6 @@ type RawBackendSession = Omit<BackendSession, "status"> & {
   status: string;
 };
 
-const DAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"] as const;
-
-let bootstrapPromise: Promise<void> | null = null;
-
 function buildQuery(params: Record<string, string | number | undefined>): string {
   const query = new URLSearchParams();
 
@@ -60,28 +55,6 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 
   const queryString = query.toString();
   return queryString ? `?${queryString}` : "";
-}
-
-function normalizeTime(startTime: string): string {
-  return startTime.slice(0, 5);
-}
-
-function formatScheduleSummary(schedules: BackendClassSchedule[]): string {
-  if (schedules.length === 0) {
-    return "Chưa thiết lập";
-  }
-
-  const summary = schedules
-    .map(
-      (schedule) => `${DAY_LABELS[schedule.day_of_week] ?? "?"} ${normalizeTime(schedule.start_time)}-${normalizeTime(schedule.end_time)}`,
-    );
-
-  return Array.from(new Set(summary)).join(", ");
-}
-
-function parseFeePerSession(feePerSession: string): number {
-  const parsed = Number(feePerSession);
-  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function normalizeClassStatus(status: string): BackendClassStatus {
@@ -236,51 +209,4 @@ export async function cancelSession(sessionId: number): Promise<BackendSession> 
   });
 
   return normalizeBackendSession(data.session);
-}
-
-async function mapBackendClassesToFrontendClasses(): Promise<Class[]> {
-  const classes = await listClasses();
-
-  const scheduleSummaryByClassId = new Map<number, string>();
-  await Promise.all(
-    classes.map(async (classItem) => {
-      try {
-        const schedules = await listClassSchedules(classItem.id);
-        scheduleSummaryByClassId.set(classItem.id, formatScheduleSummary(schedules));
-      } catch {
-        scheduleSummaryByClassId.set(classItem.id, "Không tải được lịch");
-      }
-    }),
-  );
-
-  return classes.map((classItem) => ({
-    id: String(classItem.id),
-    name: classItem.name,
-    schedule: scheduleSummaryByClassId.get(classItem.id) ?? "Chưa thiết lập",
-    feePerSession: parseFeePerSession(classItem.fee_per_session),
-    status: classItem.status,
-    studentCount: 0,
-  }));
-}
-
-export async function syncClassesFromBackendToMockData(): Promise<void> {
-  const classes = await mapBackendClassesToFrontendClasses();
-  mockClasses.splice(0, mockClasses.length, ...classes);
-}
-
-export async function bootstrapClassData(): Promise<void> {
-  if (!bootstrapPromise) {
-    bootstrapPromise = (async () => {
-      // Do not keep hardcoded class rows when switching to backend data.
-      mockClasses.splice(0, mockClasses.length);
-
-      try {
-        await syncClassesFromBackendToMockData();
-      } catch (error) {
-        console.error("Failed to load class data from backend", error);
-      }
-    })();
-  }
-
-  await bootstrapPromise;
 }

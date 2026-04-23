@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { LogIn } from "lucide-react";
-import { syncClassesFromBackendToMockData } from "../services/classService";
-import { syncStudentsFromBackendToMockData } from "../services/studentService";
 
 export function Login() {
   const navigate = useNavigate();
@@ -37,8 +35,6 @@ export function Login() {
       }
 
       localStorage.setItem("tms_access_token", data.accessToken);
-      await syncClassesFromBackendToMockData();
-      await syncStudentsFromBackendToMockData();
       navigate("/");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Request failed");

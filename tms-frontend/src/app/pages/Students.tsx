@@ -1,18 +1,34 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, UserX, ArrowRightLeft, Eye, AlertCircle, DollarSign, CheckCircle } from "lucide-react";
-import { mockStudents, mockClasses, Student } from "../data/mockData";
+
 import { ApiError } from "../services/apiClient";
-import { syncClassesFromBackendToMockData } from "../services/classService";
+import { listClasses } from "../services/classService";
 import {
   archiveStudent,
   buildStudentNote,
   createStudent,
   expelStudent,
-  parseStudentClassId,
-  parseStudentId,
-  syncStudentsFromBackendToMockData,
+  listStudents,
   transferStudent,
+  type BackendStudentSummary,
 } from "../services/studentService";
+
+type StudentView = {
+  id: number;
+  name: string;
+  email: string;
+  classId: number | null;
+  className: string;
+  status: "active" | "pending_archive" | "archived";
+  balance: number;
+  joinedDate: string;
+  codeforcesHandle?: string;
+};
+
+type ActiveClassOption = {
+  id: number;
+  name: string;
+};
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -26,23 +42,62 @@ function toErrorMessage(error: unknown): string {
   return "Đã có lỗi xảy ra";
 }
 
+function parseAmount(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseEmailFromNote(note: string | null): string {
+  if (!note) {
+    return "";
+  }
+
+  const match = /^email:(.+)$/im.exec(note);
+  return match ? match[1].trim() : "";
+}
+
+function toStudentView(
+  student: BackendStudentSummary,
+  classNameById: Map<number, string>,
+): StudentView {
+  return {
+    id: student.id,
+    name: student.full_name,
+    email: parseEmailFromNote(student.note),
+    classId: student.current_class_id,
+    className: student.current_class_id !== null
+      ? classNameById.get(student.current_class_id) ?? "N/A"
+      : "N/A",
+    status: student.status,
+    balance: parseAmount(student.balance),
+    joinedDate: student.created_at.slice(0, 10),
+    codeforcesHandle: student.codeforces_handle ?? undefined,
+  };
+}
+
 export function Students() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'pending_archive' | 'archived'>('all');
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "pending_archive" | "archived">("all");
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<StudentView | null>(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
-  const [refreshTick, setRefreshTick] = useState(0);
+  const [students, setStudents] = useState<StudentView[]>([]);
+  const [activeClasses, setActiveClasses] = useState<ActiveClassOption[]>([]);
   const [requestError, setRequestError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const loadData = async (): Promise<void> => {
     setRequestError("");
     try {
-      await syncClassesFromBackendToMockData();
-      await syncStudentsFromBackendToMockData();
-      setRefreshTick((current) => current + 1);
+      const [classList, studentList] = await Promise.all([
+        listClasses("active"),
+        listStudents(),
+      ]);
+
+      const classNameById = new Map(classList.map((item) => [item.id, item.name]));
+      setActiveClasses(classList.map((item) => ({ id: item.id, name: item.name })));
+      setStudents(studentList.map((student) => toStudentView(student, classNameById)));
     } catch (error) {
       setRequestError(toErrorMessage(error));
     }
@@ -53,18 +108,18 @@ export function Students() {
   }, []);
 
   const filteredStudents = useMemo(
-    () => mockStudents.filter((student) => {
+    () => students.filter((student) => {
       const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase())
         || student.email.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = filterStatus === 'all' || student.status === filterStatus;
+      const matchesStatus = filterStatus === "all" || student.status === filterStatus;
       return matchesSearch && matchesStatus;
     }),
-    [refreshTick, searchTerm, filterStatus],
+    [students, searchTerm, filterStatus],
   );
 
   const pendingStudents = useMemo(
-    () => mockStudents.filter((student) => student.status === 'pending_archive'),
-    [refreshTick],
+    () => students.filter((student) => student.status === "pending_archive"),
+    [students],
   );
 
   const needCollect = useMemo(
@@ -82,13 +137,13 @@ export function Students() {
     [pendingStudents],
   );
 
-  const getStatusBadge = (status: Student['status']) => {
+  const getStatusBadge = (status: StudentView["status"]) => {
     switch (status) {
-      case 'active':
+      case "active":
         return <span className="px-3 py-1 bg-zinc-900 text-white rounded-full text-sm">Đang học</span>;
-      case 'pending_archive':
+      case "pending_archive":
         return <span className="px-3 py-1 bg-zinc-300 text-zinc-700 rounded-full text-sm">Chờ xử lý</span>;
-      case 'archived':
+      case "archived":
         return <span className="px-3 py-1 bg-zinc-200 text-zinc-600 rounded-full text-sm">Đã lưu trữ</span>;
       default:
         return null;
@@ -97,14 +152,14 @@ export function Students() {
 
   const getBalanceColor = (balance: number) => {
     if (balance < 0) {
-      return 'text-zinc-700';
+      return "text-zinc-700";
     }
 
     if (balance > 0) {
-      return 'text-zinc-600';
+      return "text-zinc-600";
     }
 
-    return 'text-zinc-500';
+    return "text-zinc-500";
   };
 
   const handleCreateStudent = async (payload: {
@@ -146,19 +201,12 @@ export function Students() {
     }
   };
 
-  const handleExpelStudent = async (student: Student) => {
-    const studentId = parseStudentId(student.id);
-
-    if (studentId === null) {
-      setRequestError("ID học sinh không hợp lệ");
-      return;
-    }
-
+  const handleExpelStudent = async (student: StudentView) => {
     setSubmitting(true);
     setRequestError("");
 
     try {
-      await expelStudent(studentId);
+      await expelStudent(student.id);
       setShowArchiveModal(false);
       setSelectedStudent(null);
       await loadData();
@@ -169,19 +217,12 @@ export function Students() {
     }
   };
 
-  const handleArchivePendingStudent = async (student: Student) => {
-    const studentId = parseStudentId(student.id);
-
-    if (studentId === null) {
-      setRequestError("ID học sinh không hợp lệ");
-      return;
-    }
-
+  const handleArchivePendingStudent = async (student: StudentView) => {
     setSubmitting(true);
     setRequestError("");
 
     try {
-      await archiveStudent(studentId);
+      await archiveStudent(student.id);
       await loadData();
     } catch (error) {
       setRequestError(toErrorMessage(error));
@@ -227,24 +268,24 @@ export function Students() {
             />
           </div>
           <div className="flex gap-2">
-            {(['all', 'active', 'pending_archive', 'archived'] as const).map((status) => (
+            {(["all", "active", "pending_archive", "archived"] as const).map((status) => (
               <button
                 key={status}
                 onClick={() => setFilterStatus(status)}
                 className={`px-4 py-3 rounded-lg font-medium transition-colors ${
                   filterStatus === status
-                    ? 'bg-zinc-200 text-zinc-900'
-                    : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                    ? "bg-zinc-200 text-zinc-900"
+                    : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
                 }`}
               >
-                {status === 'all' ? 'Tất cả' : status === 'active' ? 'Đang học' : status === 'pending_archive' ? 'Chờ xử lý' : 'Đã lưu'}
+                {status === "all" ? "Tất cả" : status === "active" ? "Đang học" : status === "pending_archive" ? "Chờ xử lý" : "Đã lưu"}
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      {filterStatus === 'pending_archive' ? (
+      {filterStatus === "pending_archive" ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <div className="bg-white border border-zinc-200 rounded-xl p-6">
@@ -283,154 +324,36 @@ export function Students() {
           </div>
 
           {needCollect.length > 0 && (
-            <div className="mb-8">
-              <h2 className="text-lg font-semibold text-zinc-900 mb-4">Cần đòi nợ</h2>
-              <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-zinc-100 border-b border-zinc-200">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Học sinh</th>
-                      <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Lớp cũ</th>
-                      <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Số nợ</th>
-                      <th className="px-6 py-4 text-right text-sm font-medium text-zinc-600">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100">
-                    {needCollect.map((student) => {
-                      const className = mockClasses.find((c) => c.id === student.classId)?.name;
-
-                      return (
-                        <tr key={student.id} className="hover:bg-zinc-100/50 transition-colors">
-                          <td className="px-6 py-4">
-                            <div>
-                              <p className="text-zinc-900 font-medium">{student.name}</p>
-                              <p className="text-sm text-zinc-600">{student.email || "N/A"}</p>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-zinc-700">{className || "N/A"}</td>
-                          <td className="px-6 py-4">
-                            <span className="text-zinc-900 font-semibold">
-                              {(Math.abs(student.balance) / 1000).toFixed(0)}K
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => void handleArchivePendingStudent(student)}
-                                className="px-4 py-2 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-60"
-                                disabled={submitting}
-                              >
-                                Đã thu đủ nợ
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <PendingTable
+              title="Cần đòi nợ"
+              students={needCollect}
+              amountLabel="Số nợ"
+              actionLabel="Đã thu đủ nợ"
+              submitting={submitting}
+              onAction={handleArchivePendingStudent}
+            />
           )}
 
           {needRefund.length > 0 && (
-            <div>
-              <h2 className="text-lg font-semibold text-zinc-900 mb-4">Cần hoàn trả</h2>
-              <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-zinc-100 border-b border-zinc-200">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Học sinh</th>
-                      <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Lớp cũ</th>
-                      <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Số dư</th>
-                      <th className="px-6 py-4 text-right text-sm font-medium text-zinc-600">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100">
-                    {needRefund.map((student) => {
-                      const className = mockClasses.find((c) => c.id === student.classId)?.name;
-
-                      return (
-                        <tr key={student.id} className="hover:bg-zinc-100/50 transition-colors">
-                          <td className="px-6 py-4">
-                            <div>
-                              <p className="text-zinc-900 font-medium">{student.name}</p>
-                              <p className="text-sm text-zinc-600">{student.email || "N/A"}</p>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-zinc-700">{className || "N/A"}</td>
-                          <td className="px-6 py-4">
-                            <span className="text-zinc-600 font-semibold">
-                              {(student.balance / 1000).toFixed(0)}K
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => void handleArchivePendingStudent(student)}
-                                className="px-4 py-2 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-60"
-                                disabled={submitting}
-                              >
-                                Đã hoàn trả
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <PendingTable
+              title="Cần hoàn trả"
+              students={needRefund}
+              amountLabel="Số dư"
+              actionLabel="Đã hoàn trả"
+              submitting={submitting}
+              onAction={handleArchivePendingStudent}
+            />
           )}
 
           {readyToArchive.length > 0 && (
-            <div className="mt-8">
-              <h2 className="text-lg font-semibold text-zinc-900 mb-4">Sẵn sàng lưu trữ</h2>
-              <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-zinc-100 border-b border-zinc-200">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Học sinh</th>
-                      <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Lớp cũ</th>
-                      <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Số dư</th>
-                      <th className="px-6 py-4 text-right text-sm font-medium text-zinc-600">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100">
-                    {readyToArchive.map((student) => {
-                      const className = mockClasses.find((c) => c.id === student.classId)?.name;
-
-                      return (
-                        <tr key={student.id} className="hover:bg-zinc-100/50 transition-colors">
-                          <td className="px-6 py-4">
-                            <div>
-                              <p className="text-zinc-900 font-medium">{student.name}</p>
-                              <p className="text-sm text-zinc-600">{student.email || "N/A"}</p>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-zinc-700">{className || "N/A"}</td>
-                          <td className="px-6 py-4">
-                            <span className="text-zinc-600 font-semibold">0K</span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => void handleArchivePendingStudent(student)}
-                                className="px-4 py-2 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-60"
-                                disabled={submitting}
-                              >
-                                Lưu trữ
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <PendingTable
+              title="Sẵn sàng lưu trữ"
+              students={readyToArchive}
+              amountLabel="Số dư"
+              actionLabel="Lưu trữ"
+              submitting={submitting}
+              onAction={handleArchivePendingStudent}
+            />
           )}
 
           {pendingStudents.length === 0 && (
@@ -454,63 +377,59 @@ export function Students() {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
-              {filteredStudents.map((student) => {
-                const className = mockClasses.find((c) => c.id === student.classId)?.name || 'N/A';
-
-                return (
-                  <tr key={student.id} className="hover:bg-zinc-200/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div>
-                        <p className="text-zinc-900 font-medium">{student.name}</p>
-                        <p className="text-sm text-zinc-600">{student.email || 'N/A'}</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-zinc-700">{className}</td>
-                    <td className="px-6 py-4">{getStatusBadge(student.status)}</td>
-                    <td className="px-6 py-4">
-                      <span className={`font-semibold ${getBalanceColor(student.balance)}`}>
-                        {student.balance < 0 ? '-' : student.balance > 0 ? '+' : ''}
-                        {(Math.abs(student.balance) / 1000).toFixed(0)}K
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => setSelectedStudent(student)}
-                          className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
-                          title="Xem chi tiết"
-                        >
-                          <Eye className="w-4 h-4 text-zinc-600" />
-                        </button>
-                        {student.status === 'active' && (
-                          <>
-                            <button
-                              onClick={() => {
-                                setSelectedStudent(student);
-                                setShowTransferModal(true);
-                              }}
-                              className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
-                              title="Chuyển lớp"
-                            >
-                              <ArrowRightLeft className="w-4 h-4 text-zinc-600" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setSelectedStudent(student);
-                                setShowArchiveModal(true);
-                              }}
-                              className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
-                              title="Đuổi học"
-                            >
-                              <UserX className="w-4 h-4 text-zinc-600" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+              {filteredStudents.map((student) => (
+                <tr key={student.id} className="hover:bg-zinc-200/50 transition-colors">
+                  <td className="px-6 py-4">
+                    <div>
+                      <p className="text-zinc-900 font-medium">{student.name}</p>
+                      <p className="text-sm text-zinc-600">{student.email || "N/A"}</p>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-zinc-700">{student.className}</td>
+                  <td className="px-6 py-4">{getStatusBadge(student.status)}</td>
+                  <td className="px-6 py-4">
+                    <span className={`font-semibold ${getBalanceColor(student.balance)}`}>
+                      {student.balance < 0 ? "-" : student.balance > 0 ? "+" : ""}
+                      {(Math.abs(student.balance) / 1000).toFixed(0)}K
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => setSelectedStudent(student)}
+                        className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
+                        title="Xem chi tiết"
+                      >
+                        <Eye className="w-4 h-4 text-zinc-600" />
+                      </button>
+                      {student.status === "active" && (
+                        <>
+                          <button
+                            onClick={() => {
+                              setSelectedStudent(student);
+                              setShowTransferModal(true);
+                            }}
+                            className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
+                            title="Chuyển lớp"
+                          >
+                            <ArrowRightLeft className="w-4 h-4 text-zinc-600" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedStudent(student);
+                              setShowArchiveModal(true);
+                            }}
+                            className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
+                            title="Đuổi học"
+                          >
+                            <UserX className="w-4 h-4 text-zinc-600" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -518,6 +437,7 @@ export function Students() {
 
       {showAddModal && (
         <AddStudentModal
+          classes={activeClasses}
           onClose={() => setShowAddModal(false)}
           onSubmit={handleCreateStudent}
           submitting={submitting}
@@ -528,6 +448,7 @@ export function Students() {
       {showTransferModal && selectedStudent && (
         <TransferClassModal
           student={selectedStudent}
+          classes={activeClasses}
           onClose={() => {
             setShowTransferModal(false);
             setSelectedStudent(null);
@@ -554,12 +475,77 @@ export function Students() {
   );
 }
 
+function PendingTable({
+  title,
+  students,
+  amountLabel,
+  actionLabel,
+  submitting,
+  onAction,
+}: {
+  title: string;
+  students: StudentView[];
+  amountLabel: string;
+  actionLabel: string;
+  submitting: boolean;
+  onAction: (student: StudentView) => Promise<void>;
+}) {
+  return (
+    <div className="mb-8">
+      <h2 className="text-lg font-semibold text-zinc-900 mb-4">{title}</h2>
+      <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-zinc-100 border-b border-zinc-200">
+            <tr>
+              <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Học sinh</th>
+              <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Lớp cũ</th>
+              <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">{amountLabel}</th>
+              <th className="px-6 py-4 text-right text-sm font-medium text-zinc-600">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-100">
+            {students.map((student) => (
+              <tr key={student.id} className="hover:bg-zinc-100/50 transition-colors">
+                <td className="px-6 py-4">
+                  <div>
+                    <p className="text-zinc-900 font-medium">{student.name}</p>
+                    <p className="text-sm text-zinc-600">{student.email || "N/A"}</p>
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-zinc-700">{student.className || "N/A"}</td>
+                <td className="px-6 py-4">
+                  <span className="text-zinc-900 font-semibold">
+                    {(Math.abs(student.balance) / 1000).toFixed(0)}K
+                  </span>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => void onAction(student)}
+                      className="px-4 py-2 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-60"
+                      disabled={submitting}
+                    >
+                      {actionLabel}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function AddStudentModal({
+  classes,
   onClose,
   onSubmit,
   submitting,
   error,
 }: {
+  classes: ActiveClassOption[];
   onClose: () => void;
   onSubmit: (payload: {
     full_name: string;
@@ -580,14 +566,14 @@ function AddStudentModal({
     event.preventDefault();
     setLocalError("");
 
-    const classIdValue = parseStudentClassId(classId);
+    const classIdValue = Number(classId);
 
     if (!name.trim()) {
       setLocalError("Họ tên là bắt buộc");
       return;
     }
 
-    if (classIdValue === null) {
+    if (!Number.isInteger(classIdValue) || classIdValue <= 0) {
       setLocalError("Vui lòng chọn lớp hợp lệ");
       return;
     }
@@ -633,7 +619,7 @@ function AddStudentModal({
               className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
             >
               <option value="">Chọn lớp</option>
-              {mockClasses.filter((cls) => cls.status === 'active').map((cls) => (
+              {classes.map((cls) => (
                 <option key={cls.id} value={cls.id}>{cls.name}</option>
               ))}
             </select>
@@ -676,12 +662,14 @@ function AddStudentModal({
 
 function TransferClassModal({
   student,
+  classes,
   onClose,
   onSubmit,
   submitting,
   error,
 }: {
-  student: Student;
+  student: StudentView;
+  classes: ActiveClassOption[];
   onClose: () => void;
   onSubmit: (payload: { student_id: number; to_class_id: number }) => Promise<void>;
   submitting: boolean;
@@ -694,21 +682,14 @@ function TransferClassModal({
     event.preventDefault();
     setLocalError("");
 
-    const studentId = parseStudentId(student.id);
-    const classId = parseStudentClassId(toClassId);
-
-    if (studentId === null) {
-      setLocalError("ID học sinh không hợp lệ");
-      return;
-    }
-
-    if (classId === null) {
+    const classId = Number(toClassId);
+    if (!Number.isInteger(classId) || classId <= 0) {
       setLocalError("Vui lòng chọn lớp mới hợp lệ");
       return;
     }
 
     await onSubmit({
-      student_id: studentId,
+      student_id: student.id,
       to_class_id: classId,
     });
   };
@@ -737,9 +718,11 @@ function TransferClassModal({
               className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
             >
               <option value="">Chọn lớp</option>
-              {mockClasses.filter((cls) => cls.status === 'active' && cls.id !== student.classId).map((cls) => (
-                <option key={cls.id} value={cls.id}>{cls.name}</option>
-              ))}
+              {classes
+                .filter((cls) => cls.id !== student.classId)
+                .map((cls) => (
+                  <option key={cls.id} value={cls.id}>{cls.name}</option>
+                ))}
             </select>
           </div>
 
@@ -775,13 +758,13 @@ function ArchiveStudentModal({
   submitting,
   error,
 }: {
-  student: Student;
+  student: StudentView;
   onClose: () => void;
-  onConfirm: (student: Student) => Promise<void>;
+  onConfirm: (student: StudentView) => Promise<void>;
   submitting: boolean;
   error: string;
 }) {
-  const action = student.balance < 0 ? 'collect' : student.balance > 0 ? 'refund' : 'archive';
+  const action = student.balance < 0 ? "collect" : student.balance > 0 ? "refund" : "archive";
 
   return (
     <div className="fixed inset-0 bg-white/80 flex items-center justify-center p-4 z-50">
@@ -790,7 +773,7 @@ function ArchiveStudentModal({
         <p className="text-zinc-600 mb-6">Học sinh: {student.name}</p>
 
         <div className="bg-zinc-100 border border-zinc-700 rounded-lg p-4 mb-6">
-          {action === 'collect' && (
+          {action === "collect" && (
             <>
               <p className="text-zinc-900 font-semibold mb-2">Học sinh còn nợ</p>
               <p className="text-zinc-600 text-sm">
@@ -801,7 +784,7 @@ function ArchiveStudentModal({
               </p>
             </>
           )}
-          {action === 'refund' && (
+          {action === "refund" && (
             <>
               <p className="text-zinc-900 font-semibold mb-2">Học sinh dư tiền</p>
               <p className="text-zinc-600 text-sm">
@@ -812,7 +795,7 @@ function ArchiveStudentModal({
               </p>
             </>
           )}
-          {action === 'archive' && (
+          {action === "archive" && (
             <>
               <p className="text-zinc-700 font-semibold mb-2">Không nợ, không dư</p>
               <p className="text-zinc-600 text-sm">

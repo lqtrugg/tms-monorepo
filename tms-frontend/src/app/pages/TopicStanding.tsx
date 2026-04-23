@@ -1,35 +1,99 @@
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { ArrowLeft, RefreshCw } from "lucide-react";
-import { mockTopics, mockClasses, mockStudents } from "../data/mockData";
+
+import { ApiError } from "../services/apiClient";
+import { listClasses } from "../services/classService";
+import { getTopicStanding, type BackendTopicStandingMatrix } from "../services/topicService";
+
+function toErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    return error.message;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Đã có lỗi xảy ra";
+}
 
 export function TopicStanding() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [requestError, setRequestError] = useState("");
+  const [matrix, setMatrix] = useState<BackendTopicStandingMatrix | null>(null);
+  const [className, setClassName] = useState<string>("N/A");
 
-  const topic = mockTopics.find(t => t.id === id);
-  const className = topic ? mockClasses.find(c => c.id === topic.classId)?.name : null;
-  const classStudents = topic ? mockStudents.filter(s => s.classId === topic.classId && s.status === 'active') : [];
+  const loadData = async () => {
+    const topicId = Number(id);
+    if (!Number.isInteger(topicId) || topicId <= 0) {
+      setRequestError("ID chuyên đề không hợp lệ");
+      setLoading(false);
+      return;
+    }
 
-  // Mock standing data
-  const standingData = classStudents.map((student, idx) => ({
-    studentName: student.name,
-    solved: Math.floor(Math.random() * 10),
-    problems: Array.from({ length: 8 }, (_, i) => ({
-      problemId: `${String.fromCharCode(65 + i)}`,
-      solved: Math.random() > 0.5,
-      attempts: Math.floor(Math.random() * 5),
-    })),
-  }));
+    setLoading(true);
+    setRequestError("");
 
-  const lastPulled = new Date();
+    try {
+      const [standingMatrix, classes] = await Promise.all([
+        getTopicStanding(topicId),
+        listClasses(),
+      ]);
 
-  if (!topic) {
+      const classItem = classes.find((item) => item.id === standingMatrix.topic.class_id);
+      setClassName(classItem?.name ?? `Lớp #${standingMatrix.topic.class_id}`);
+      setMatrix(standingMatrix);
+    } catch (error) {
+      setRequestError(toErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadData();
+  }, [id]);
+
+  const lastPulled = useMemo(() => {
+    if (!matrix) {
+      return null;
+    }
+
+    let last = matrix.topic.last_pulled_at ? new Date(matrix.topic.last_pulled_at) : null;
+    matrix.rows.forEach((row) => {
+      row.problems.forEach((problem) => {
+        if (!problem.pulled_at) {
+          return;
+        }
+
+        const pulledAt = new Date(problem.pulled_at);
+        if (!last || pulledAt.getTime() > last.getTime()) {
+          last = pulledAt;
+        }
+      });
+    });
+
+    return last;
+  }, [matrix]);
+
+  if (loading) {
+    return (
+      <div className="p-8">
+        <p className="text-zinc-600">Đang tải standing...</p>
+      </div>
+    );
+  }
+
+  if (!matrix || requestError) {
     return (
       <div className="p-8">
         <div className="bg-white border border-zinc-200 rounded-xl p-12 text-center">
-          <p className="text-zinc-600">Không tìm thấy chuyên đề</p>
+          <p className="text-zinc-600">{requestError || "Không tìm thấy chuyên đề"}</p>
           <button
-            onClick={() => navigate('/topics')}
+            onClick={() => navigate("/topics")}
             className="mt-4 px-4 py-2 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800"
           >
             Quay lại
@@ -39,10 +103,12 @@ export function TopicStanding() {
     );
   }
 
+  const sortedProblems = [...matrix.problems].sort((a, b) => a.problem_index.localeCompare(b.problem_index, "vi"));
+
   return (
     <div className="p-8">
       <button
-        onClick={() => navigate('/topics')}
+        onClick={() => navigate("/topics")}
         className="flex items-center gap-2 text-zinc-600 hover:text-zinc-900 mb-6"
       >
         <ArrowLeft className="w-4 h-4" />
@@ -51,10 +117,13 @@ export function TopicStanding() {
 
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-semibold text-zinc-900 mb-2">{topic.name}</h1>
+          <h1 className="text-3xl font-semibold text-zinc-900 mb-2">{matrix.topic.title}</h1>
           <p className="text-zinc-600">{className}</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-zinc-100 text-zinc-700 rounded-lg hover:bg-zinc-200 transition-colors">
+        <button
+          onClick={() => void loadData()}
+          className="flex items-center gap-2 px-4 py-2 bg-zinc-100 text-zinc-700 rounded-lg hover:bg-zinc-200 transition-colors"
+        >
           <RefreshCw className="w-4 h-4" />
           Làm mới
         </button>
@@ -62,7 +131,7 @@ export function TopicStanding() {
 
       <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 mb-6">
         <p className="text-sm text-zinc-600">
-          Cập nhật lần cuối: {lastPulled.toLocaleString('vi-VN')}
+          Cập nhật lần cuối: {lastPulled ? lastPulled.toLocaleString("vi-VN") : "Chưa có dữ liệu"}
         </p>
       </div>
 
@@ -77,49 +146,64 @@ export function TopicStanding() {
                 <th className="px-6 py-4 text-center text-sm font-medium text-zinc-700">
                   Số bài AC
                 </th>
-                {standingData[0]?.problems.map((p) => (
-                  <th key={p.problemId} className="px-4 py-4 text-center text-sm font-medium text-zinc-700">
-                    {p.problemId}
+                {sortedProblems.map((problem) => (
+                  <th key={problem.id} className="px-4 py-4 text-center text-sm font-medium text-zinc-700">
+                    {problem.problem_index}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
-              {standingData.map((row, idx) => (
-                <tr key={idx} className="hover:bg-zinc-50 transition-colors">
-                  <td className="px-6 py-4 text-zinc-900 font-medium sticky left-0 bg-white">
-                    {row.studentName}
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className="px-3 py-1 bg-zinc-900 text-white rounded-full text-sm font-semibold">
-                      {row.solved}
-                    </span>
-                  </td>
-                  {row.problems.map((p) => (
-                    <td key={p.problemId} className="px-4 py-4 text-center">
-                      {p.solved ? (
-                        <span className="inline-block w-8 h-8 bg-zinc-900 text-white rounded-full flex items-center justify-center text-xs font-semibold">
-                          ✓
-                        </span>
-                      ) : p.attempts > 0 ? (
-                        <span className="inline-block w-8 h-8 bg-zinc-200 text-zinc-700 rounded-full flex items-center justify-center text-xs">
-                          -{p.attempts}
-                        </span>
-                      ) : (
-                        <span className="text-zinc-400">—</span>
-                      )}
+              {matrix.rows.map((row) => {
+                const cellByProblemId = new Map(row.problems.map((problem) => [problem.problem_id, problem]));
+
+                return (
+                  <tr key={row.student_id} className="hover:bg-zinc-50 transition-colors">
+                    <td className="px-6 py-4 text-zinc-900 font-medium sticky left-0 bg-white">
+                      {row.student_name}
                     </td>
-                  ))}
-                </tr>
-              ))}
+                    <td className="px-6 py-4 text-center">
+                      <span className="px-3 py-1 bg-zinc-900 text-white rounded-full text-sm font-semibold">
+                        {row.solved_count}
+                      </span>
+                    </td>
+                    {sortedProblems.map((problem) => {
+                      const cell = cellByProblemId.get(problem.id);
+                      if (!cell) {
+                        return (
+                          <td key={problem.id} className="px-4 py-4 text-center">
+                            <span className="text-zinc-400">—</span>
+                          </td>
+                        );
+                      }
+
+                      return (
+                        <td key={problem.id} className="px-4 py-4 text-center">
+                          {cell.solved ? (
+                            <span className="inline-block w-8 h-8 bg-zinc-900 text-white rounded-full flex items-center justify-center text-xs font-semibold">
+                              ✓
+                            </span>
+                          ) : typeof cell.penalty_minutes === "number" && cell.penalty_minutes > 0 ? (
+                            <span className="inline-block w-8 h-8 bg-zinc-200 text-zinc-700 rounded-full flex items-center justify-center text-xs">
+                              -{cell.penalty_minutes}
+                            </span>
+                          ) : (
+                            <span className="text-zinc-400">—</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
 
-      {classStudents.length === 0 && (
+      {matrix.rows.length === 0 && (
         <div className="bg-white border border-zinc-200 rounded-xl p-12 text-center mt-6">
-          <p className="text-zinc-600">Chưa có học sinh nào trong lớp này</p>
+          <p className="text-zinc-600">Chưa có học sinh hoặc dữ liệu standing cho chuyên đề này</p>
         </div>
       )}
     </div>
