@@ -1,4 +1,3 @@
-import { mockStudents, type Student } from "../data/mockData";
 import { apiRequest } from "./apiClient";
 
 export type BackendStudentStatus = "active" | "pending_archive" | "archived";
@@ -30,39 +29,6 @@ type ListStudentsResponse = {
 type StudentResponse = {
   student: BackendStudentSummary;
 };
-
-let bootstrapPromise: Promise<void> | null = null;
-
-function parseAmount(value: string): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function parseEmailFromNote(note: string | null): string {
-  if (!note) {
-    return "";
-  }
-
-  const match = /^email:(.+)$/im.exec(note);
-  if (!match) {
-    return "";
-  }
-
-  return match[1].trim();
-}
-
-function toFrontendStudent(student: BackendStudentSummary): Student {
-  return {
-    id: String(student.id),
-    name: student.full_name,
-    email: parseEmailFromNote(student.note),
-    classId: student.current_class_id === null ? "" : String(student.current_class_id),
-    status: student.status,
-    balance: parseAmount(student.balance),
-    joinedDate: student.created_at.slice(0, 10),
-    codeforcesHandle: student.codeforces_handle ?? undefined,
-  };
-}
 
 function toClassIdOrNull(classId: string): number | null {
   const parsed = Number(classId);
@@ -152,27 +118,6 @@ export async function archiveStudent(studentId: number): Promise<BackendStudentS
   });
 
   return data.student;
-}
-
-export async function syncStudentsFromBackendToMockData(): Promise<void> {
-  const students = await listStudents();
-  const mapped = students.map(toFrontendStudent);
-  mockStudents.splice(0, mockStudents.length, ...mapped);
-}
-
-export async function bootstrapStudentData(): Promise<void> {
-  if (!bootstrapPromise) {
-    bootstrapPromise = (async () => {
-      mockStudents.splice(0, mockStudents.length);
-      try {
-        await syncStudentsFromBackendToMockData();
-      } catch (error) {
-        console.error("Failed to load student data from backend", error);
-      }
-    })();
-  }
-
-  await bootstrapPromise;
 }
 
 export function buildStudentNote(email: string): string | null {

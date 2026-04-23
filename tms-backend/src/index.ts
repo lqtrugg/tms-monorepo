@@ -1,9 +1,14 @@
 import express from 'express';
 
 import config from './config.js';
+import { attendanceRouter } from './controllers/attendance.controller.js';
 import { authRouter } from './controllers/auth.controller.js';
 import { classRouter } from './controllers/class.controller.js';
+import { financeRouter } from './controllers/finance.controller.js';
+import { messagingRouter } from './controllers/messaging.controller.js';
+import { reportingRouter } from './controllers/reporting.controller.js';
 import { studentRouter } from './controllers/student.controller.js';
+import { topicRouter } from './controllers/topic.controller.js';
 import { AppDataSource, initializeDatabase } from './data-source.js';
 import { configurePassport } from './services/auth.passport.js';
 
@@ -20,6 +25,11 @@ app.get(`${config.apiPrefix}/health`, (_req, res) => {
 app.use(config.apiPrefix, authRouter);
 app.use(config.apiPrefix, classRouter);
 app.use(config.apiPrefix, studentRouter);
+app.use(config.apiPrefix, attendanceRouter);
+app.use(config.apiPrefix, financeRouter);
+app.use(config.apiPrefix, topicRouter);
+app.use(config.apiPrefix, messagingRouter);
+app.use(config.apiPrefix, reportingRouter);
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(error);

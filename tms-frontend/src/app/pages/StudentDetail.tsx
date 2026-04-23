@@ -1,22 +1,130 @@
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { ArrowLeft, Mail, GraduationCap, DollarSign } from "lucide-react";
-import { mockStudents, mockClasses, mockTransactions } from "../data/mockData";
+
+import { ApiError } from "../services/apiClient";
+import { listClasses } from "../services/classService";
+import { listTransactions } from "../services/financeService";
+import { getStudent, type BackendStudentSummary } from "../services/studentService";
+
+function toErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    return error.message;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Đã có lỗi xảy ra";
+}
+
+function parseAmount(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseEmailFromNote(note: string | null): string {
+  if (!note) {
+    return "";
+  }
+
+  const match = /^email:(.+)$/im.exec(note);
+  return match ? match[1].trim() : "";
+}
 
 export function StudentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [requestError, setRequestError] = useState("");
+  const [student, setStudent] = useState<BackendStudentSummary | null>(null);
+  const [className, setClassName] = useState<string>("N/A");
+  const [transactions, setTransactions] = useState<
+    Array<{
+      id: number;
+      type: "payment" | "refund";
+      amount: number;
+      recorded_at: string;
+      notes: string | null;
+    }>
+  >([]);
 
-  const student = mockStudents.find(s => s.id === id);
-  const className = student ? mockClasses.find(c => c.id === student.classId)?.name : null;
-  const studentTransactions = mockTransactions.filter(t => t.studentId === id);
+  useEffect(() => {
+    const studentId = Number(id);
+    if (!Number.isInteger(studentId) || studentId <= 0) {
+      setRequestError("ID học sinh không hợp lệ");
+      setLoading(false);
+      return;
+    }
 
-  if (!student) {
+    const loadData = async () => {
+      setLoading(true);
+      setRequestError("");
+
+      try {
+        const [studentData, classes, txList] = await Promise.all([
+          getStudent(studentId),
+          listClasses(),
+          listTransactions({ student_id: studentId }),
+        ]);
+
+        setStudent(studentData);
+
+        const matchedClass = classes.find((item) => item.id === studentData.current_class_id);
+        setClassName(matchedClass?.name ?? "N/A");
+
+        setTransactions(
+          txList.map((item) => ({
+            id: item.id,
+            type: item.type,
+            amount: parseAmount(item.amount),
+            recorded_at: item.recorded_at,
+            notes: item.notes,
+          })),
+        );
+      } catch (error) {
+        setRequestError(toErrorMessage(error));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadData();
+  }, [id]);
+
+  const statusBadge = useMemo(() => {
+    if (!student) {
+      return null;
+    }
+
+    switch (student.status) {
+      case "active":
+        return <span className="px-3 py-1 bg-zinc-900 text-white rounded-full text-sm">Đang học</span>;
+      case "pending_archive":
+        return <span className="px-3 py-1 bg-zinc-300 text-zinc-700 rounded-full text-sm">Chờ xử lý</span>;
+      case "archived":
+        return <span className="px-3 py-1 bg-zinc-200 text-zinc-600 rounded-full text-sm">Đã lưu trữ</span>;
+      default:
+        return null;
+    }
+  }, [student]);
+
+  if (loading) {
+    return (
+      <div className="p-8">
+        <p className="text-zinc-600">Đang tải dữ liệu học sinh...</p>
+      </div>
+    );
+  }
+
+  if (!student || requestError) {
     return (
       <div className="p-8">
         <div className="bg-white border border-zinc-200 rounded-xl p-12 text-center">
-          <p className="text-zinc-600">Không tìm thấy học sinh</p>
+          <p className="text-zinc-600">{requestError || "Không tìm thấy học sinh"}</p>
           <button
-            onClick={() => navigate('/students')}
+            onClick={() => navigate("/students")}
             className="mt-4 px-4 py-2 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800"
           >
             Quay lại
@@ -26,23 +134,12 @@ export function StudentDetail() {
     );
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <span className="px-3 py-1 bg-zinc-900 text-white rounded-full text-sm">Đang học</span>;
-      case 'pending_archive':
-        return <span className="px-3 py-1 bg-zinc-300 text-zinc-700 rounded-full text-sm">Chờ xử lý</span>;
-      case 'archived':
-        return <span className="px-3 py-1 bg-zinc-200 text-zinc-600 rounded-full text-sm">Đã lưu trữ</span>;
-      default:
-        return null;
-    }
-  };
+  const studentBalance = parseAmount(student.balance);
 
   return (
     <div className="p-8">
       <button
-        onClick={() => navigate('/students')}
+        onClick={() => navigate("/students")}
         className="flex items-center gap-2 text-zinc-600 hover:text-zinc-900 mb-6"
       >
         <ArrowLeft className="w-4 h-4" />
@@ -52,13 +149,13 @@ export function StudentDetail() {
       <div className="bg-white border border-zinc-200 rounded-xl p-8 mb-6 shadow-sm">
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-semibold text-zinc-900 mb-2">{student.name}</h1>
+            <h1 className="text-3xl font-semibold text-zinc-900 mb-2">{student.full_name}</h1>
             <div className="flex items-center gap-2 text-zinc-600">
               <Mail className="w-4 h-4" />
-              <span>{student.email}</span>
+              <span>{parseEmailFromNote(student.note) || "N/A"}</span>
             </div>
           </div>
-          {getStatusBadge(student.status)}
+          {statusBadge}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -67,7 +164,7 @@ export function StudentDetail() {
               <GraduationCap className="w-5 h-5 text-zinc-600" />
               <span className="text-sm text-zinc-600">Lớp học</span>
             </div>
-            <p className="text-lg font-semibold text-zinc-900">{className || 'N/A'}</p>
+            <p className="text-lg font-semibold text-zinc-900">{className}</p>
           </div>
 
           <div className="bg-zinc-50 rounded-lg p-4 border border-zinc-200">
@@ -76,10 +173,10 @@ export function StudentDetail() {
               <span className="text-sm text-zinc-600">Số dư</span>
             </div>
             <p className={`text-lg font-semibold ${
-              student.balance < 0 ? 'text-zinc-700' : student.balance > 0 ? 'text-zinc-600' : 'text-zinc-500'
+              studentBalance < 0 ? "text-zinc-700" : studentBalance > 0 ? "text-zinc-600" : "text-zinc-500"
             }`}>
-              {student.balance < 0 ? '-' : student.balance > 0 ? '+' : ''}
-              {(Math.abs(student.balance) / 1000).toFixed(0)}K
+              {studentBalance < 0 ? "-" : studentBalance > 0 ? "+" : ""}
+              {(Math.abs(studentBalance) / 1000).toFixed(0)}K
             </p>
           </div>
 
@@ -88,7 +185,7 @@ export function StudentDetail() {
               <span className="text-sm text-zinc-600">Ngày nhập học</span>
             </div>
             <p className="text-lg font-semibold text-zinc-900">
-              {new Date(student.joinedDate).toLocaleDateString('vi-VN')}
+              {new Date(student.created_at).toLocaleDateString("vi-VN")}
             </p>
           </div>
         </div>
@@ -97,27 +194,23 @@ export function StudentDetail() {
       <div className="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
         <h2 className="text-xl font-semibold text-zinc-900 mb-4">Lịch sử giao dịch</h2>
 
-        {studentTransactions.length > 0 ? (
+        {transactions.length > 0 ? (
           <div className="space-y-3">
-            {studentTransactions.map((tx) => (
+            {transactions.map((tx) => (
               <div key={tx.id} className="flex items-center justify-between p-4 bg-zinc-50 rounded-lg border border-zinc-200">
                 <div>
-                  <p className="text-zinc-900 font-medium">{tx.description}</p>
+                  <p className="text-zinc-900 font-medium">{tx.notes || "Giao dịch tài chính"}</p>
                   <p className="text-sm text-zinc-600">
-                    {new Date(tx.date).toLocaleDateString('vi-VN')}
+                    {new Date(tx.recorded_at).toLocaleDateString("vi-VN")}
                   </p>
                 </div>
                 <div className="text-right">
-                  <span className={`font-semibold ${
-                    tx.type === 'payment'
-                      ? 'text-zinc-900'
-                      : 'text-zinc-600'
-                  }`}>
-                    {tx.type === 'payment' ? '+' : '-'}
+                  <span className={`font-semibold ${tx.type === "payment" ? "text-zinc-900" : "text-zinc-600"}`}>
+                    {tx.type === "payment" ? "+" : "-"}
                     {(Math.abs(tx.amount) / 1000).toFixed(0)}K
                   </span>
                   <p className="text-xs text-zinc-500 mt-1">
-                    {tx.type === 'payment' ? 'Thu tiền' : tx.type === 'refund' ? 'Hoàn trả' : 'Học phí'}
+                    {tx.type === "payment" ? "Thu tiền" : "Hoàn trả"}
                   </p>
                 </div>
               </div>
