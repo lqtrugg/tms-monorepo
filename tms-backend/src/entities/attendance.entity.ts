@@ -18,17 +18,13 @@ import { Teacher } from './teacher.entity.js';
   name: 'fk_attendance_student_id',
   onDelete: 'RESTRICT',
 })
-@ForeignKey(() => Teacher, ['overridden_by'], ['id'], {
-  name: 'fk_attendance_overridden_by',
-  onDelete: 'SET NULL',
-})
 @Unique('uq_attendance_session_student', ['session_id', 'student_id'])
 @Index('idx_attendance_teacher_id', ['teacher_id'])
 @Index('idx_attendance_session_id', ['session_id'])
 @Index('idx_attendance_student_id', ['student_id'])
 @Check(
   'chk_attendance_override',
-  "(source = 'manual' AND overridden_by IS NOT NULL AND overridden_at IS NOT NULL) OR (source = 'bot' AND overridden_by IS NULL AND overridden_at IS NULL)",
+  "(source = 'manual' AND overridden_at IS NOT NULL) OR (source = 'bot' AND overridden_at IS NULL)",
 )
 export class Attendance {
   @PrimaryGeneratedColumn()
@@ -57,9 +53,6 @@ export class Attendance {
     default: AttendanceSource.Bot,
   })
   source!: AttendanceSource;
-
-  @Column({ type: 'integer', nullable: true })
-  overridden_by!: number | null;
 
   @Column({ type: 'timestamptz', nullable: true })
   overridden_at!: Date | null;

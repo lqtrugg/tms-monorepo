@@ -2,6 +2,8 @@ import express from 'express';
 
 import config from './config.js';
 import { authRouter } from './controllers/auth.controller.js';
+import { classRouter } from './controllers/class.controller.js';
+import { studentRouter } from './controllers/student.controller.js';
 import { AppDataSource, initializeDatabase } from './data-source.js';
 import { configurePassport } from './services/auth.passport.js';
 
@@ -16,6 +18,8 @@ app.get(`${config.apiPrefix}/health`, (_req, res) => {
 });
 
 app.use(config.apiPrefix, authRouter);
+app.use(config.apiPrefix, classRouter);
+app.use(config.apiPrefix, studentRouter);
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(error);

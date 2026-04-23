@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { LogIn } from "lucide-react";
+import { syncClassesFromBackendToMockData } from "../services/classService";
+import { syncStudentsFromBackendToMockData } from "../services/studentService";
 
 export function Login() {
   const navigate = useNavigate();
@@ -8,25 +10,41 @@ export function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSubmitting(true);
 
-    const response = await fetch(`/api/${isLogin ? "login" : "register"}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
+    try {
+      const response = await fetch(`/api/${isLogin ? "login" : "register"}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
 
-    const data = await response.json();
-    if (!response.ok) {
-      setError(data.error ?? "Request failed");
-      return;
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(typeof data?.error === "string" ? data.error : "Request failed");
+        return;
+      }
+
+      if (typeof data?.accessToken !== "string" || data.accessToken.length === 0) {
+        setError("Không nhận được access token");
+        return;
+      }
+
+      localStorage.setItem("tms_access_token", data.accessToken);
+      await syncClassesFromBackendToMockData();
+      await syncStudentsFromBackendToMockData();
+      navigate("/");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Request failed");
+    } finally {
+      setSubmitting(false);
     }
-
-    localStorage.setItem("tms_access_token", data.accessToken);
-    navigate("/me");
   };
 
   return (
@@ -75,6 +93,7 @@ export function Login() {
 
             <button
               type="submit"
+              disabled={submitting}
               className="w-full py-3 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 transition-colors"
             >
               {isLogin ? 'Đăng nhập' : 'Đăng ký'}

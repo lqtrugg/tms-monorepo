@@ -13,10 +13,6 @@ import { Teacher } from './teacher.entity.js';
   name: 'fk_transactions_student_id',
   onDelete: 'RESTRICT',
 })
-@ForeignKey(() => Teacher, ['recorded_by'], ['id'], {
-  name: 'fk_transactions_recorded_by',
-  onDelete: 'RESTRICT',
-})
 @Index('idx_transactions_teacher_id', ['teacher_id'])
 @Index('idx_transactions_student_id', ['student_id'])
 @Index('idx_transactions_recorded_at', ['recorded_at'])
@@ -41,9 +37,6 @@ export class Transaction {
     enumName: 'transaction_type',
   })
   type!: TransactionType;
-
-  @Column({ type: 'integer' })
-  recorded_by!: number;
 
   @Column({ type: 'timestamptz', default: () => 'NOW()' })
   recorded_at!: Date;

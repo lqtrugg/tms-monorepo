@@ -1,7 +1,8 @@
-import { Check, Column, Entity, ForeignKey, Index, PrimaryGeneratedColumn, Unique } from 'typeorm';
+import { Column, Entity, ForeignKey, Index, PrimaryGeneratedColumn, Unique } from 'typeorm';
 
 import { Student } from './student.entity.js';
 import { Teacher } from './teacher.entity.js';
+import { TopicProblem } from './topic-problem.entity.js';
 import { Topic } from './topic.entity.js';
 
 @Entity('topic_standings')
@@ -17,11 +18,14 @@ import { Topic } from './topic.entity.js';
   name: 'fk_topic_standings_student_id',
   onDelete: 'RESTRICT',
 })
-@Unique('uq_topic_standings_topic_student', ['topic_id', 'student_id'])
+@ForeignKey(() => TopicProblem, ['problem_id'], ['id'], {
+  name: 'fk_topic_standings_problem_id',
+  onDelete: 'CASCADE',
+})
+@Unique('uq_topic_standings_student_problem', ['topic_id', 'student_id', 'problem_id'])
 @Index('idx_topic_standings_teacher_id', ['teacher_id'])
 @Index('idx_topic_standings_topic_id', ['topic_id'])
 @Index('idx_topic_standings_student_id', ['student_id'])
-@Check('chk_topic_standings_problems_solved', 'problems_solved >= 0')
 export class TopicStanding {
   @PrimaryGeneratedColumn()
   id!: number;
@@ -35,11 +39,14 @@ export class TopicStanding {
   @Column({ type: 'integer' })
   student_id!: number;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  codeforces_handle!: string | null;
+  @Column({ type: 'integer' })
+  problem_id!: number;
 
-  @Column({ type: 'integer', default: 0 })
-  problems_solved!: number;
+  @Column({ type: 'boolean', default: false })
+  solved!: boolean;
+
+  @Column({ type: 'integer', nullable: true })
+  penalty_minutes!: number | null;
 
   @Column({ type: 'timestamptz', default: () => 'NOW()' })
   pulled_at!: Date;

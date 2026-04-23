@@ -15,7 +15,7 @@ import { Teacher } from './teacher.entity.js';
 @Index('idx_class_schedules_teacher_id', ['teacher_id'])
 @Index('idx_class_schedules_class_id', ['class_id'])
 @Check('chk_class_schedules_day_of_week', 'day_of_week BETWEEN 0 AND 6')
-@Check('chk_class_schedules_effective', 'effective_until IS NULL OR effective_until > effective_from')
+@Check('chk_class_schedules_time_range', 'end_time > start_time')
 export class ClassSchedule {
   @PrimaryGeneratedColumn()
   id!: number;
@@ -32,9 +32,6 @@ export class ClassSchedule {
   @Column({ type: 'time' })
   start_time!: string;
 
-  @Column({ type: 'date' })
-  effective_from!: string;
-
-  @Column({ type: 'date', nullable: true })
-  effective_until!: string | null;
+  @Column({ type: 'time' })
+  end_time!: string;
 }

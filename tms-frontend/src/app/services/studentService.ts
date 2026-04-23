@@ -1,0 +1,199 @@
+import { mockStudents, type Student } from "../data/mockData";
+import { apiRequest } from "./apiClient";
+
+export type BackendStudentStatus = "active" | "pending_archive" | "archived";
+export type BackendPendingArchiveReason = "needs_collection" | "needs_refund";
+
+export interface BackendStudentSummary {
+  id: number;
+  teacher_id: number;
+  full_name: string;
+  codeforces_handle: string | null;
+  discord_username: string | null;
+  phone: string | null;
+  note: string | null;
+  status: BackendStudentStatus;
+  pending_archive_reason: BackendPendingArchiveReason | null;
+  created_at: string;
+  archived_at: string | null;
+  current_class_id: number | null;
+  current_enrollment_id: number | null;
+  transactions_total: string;
+  active_fee_total: string;
+  balance: string;
+}
+
+type ListStudentsResponse = {
+  students: BackendStudentSummary[];
+};
+
+type StudentResponse = {
+  student: BackendStudentSummary;
+};
+
+let bootstrapPromise: Promise<void> | null = null;
+
+function parseAmount(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseEmailFromNote(note: string | null): string {
+  if (!note) {
+    return "";
+  }
+
+  const match = /^email:(.+)$/im.exec(note);
+  if (!match) {
+    return "";
+  }
+
+  return match[1].trim();
+}
+
+function toFrontendStudent(student: BackendStudentSummary): Student {
+  return {
+    id: String(student.id),
+    name: student.full_name,
+    email: parseEmailFromNote(student.note),
+    classId: student.current_class_id === null ? "" : String(student.current_class_id),
+    status: student.status,
+    balance: parseAmount(student.balance),
+    joinedDate: student.created_at.slice(0, 10),
+    codeforcesHandle: student.codeforces_handle ?? undefined,
+  };
+}
+
+function toClassIdOrNull(classId: string): number | null {
+  const parsed = Number(classId);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
+export async function listStudents(filters?: {
+  status?: BackendStudentStatus;
+  pending_archive_reason?: BackendPendingArchiveReason;
+  class_id?: number;
+  search?: string;
+}): Promise<BackendStudentSummary[]> {
+  const query = new URLSearchParams();
+
+  if (filters?.status) {
+    query.set("status", filters.status);
+  }
+
+  if (filters?.pending_archive_reason) {
+    query.set("pending_archive_reason", filters.pending_archive_reason);
+  }
+
+  if (filters?.class_id !== undefined) {
+    query.set("class_id", String(filters.class_id));
+  }
+
+  if (filters?.search) {
+    query.set("search", filters.search);
+  }
+
+  const suffix = query.toString();
+  const path = suffix ? `/students?${suffix}` : "/students";
+  const data = await apiRequest<ListStudentsResponse>(path);
+  return data.students;
+}
+
+export async function getStudent(studentId: number): Promise<BackendStudentSummary> {
+  const data = await apiRequest<StudentResponse>(`/students/${studentId}`);
+  return data.student;
+}
+
+export async function createStudent(payload: {
+  full_name: string;
+  class_id: number;
+  codeforces_handle: string | null;
+  note: string | null;
+}): Promise<BackendStudentSummary> {
+  const data = await apiRequest<StudentResponse>("/students", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  return data.student;
+}
+
+export async function transferStudent(payload: {
+  student_id: number;
+  to_class_id: number;
+}): Promise<BackendStudentSummary> {
+  const data = await apiRequest<StudentResponse>(`/students/${payload.student_id}/transfer`, {
+    method: "POST",
+    body: JSON.stringify({
+      to_class_id: payload.to_class_id,
+    }),
+  });
+
+  return data.student;
+}
+
+export async function expelStudent(studentId: number): Promise<BackendStudentSummary> {
+  const data = await apiRequest<StudentResponse>(`/students/${studentId}/expel`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+
+  return data.student;
+}
+
+export async function archiveStudent(studentId: number): Promise<BackendStudentSummary> {
+  const data = await apiRequest<StudentResponse>(`/students/${studentId}/archive`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+
+  return data.student;
+}
+
+export async function syncStudentsFromBackendToMockData(): Promise<void> {
+  const students = await listStudents();
+  const mapped = students.map(toFrontendStudent);
+  mockStudents.splice(0, mockStudents.length, ...mapped);
+}
+
+export async function bootstrapStudentData(): Promise<void> {
+  if (!bootstrapPromise) {
+    bootstrapPromise = (async () => {
+      mockStudents.splice(0, mockStudents.length);
+      try {
+        await syncStudentsFromBackendToMockData();
+      } catch (error) {
+        console.error("Failed to load student data from backend", error);
+      }
+    })();
+  }
+
+  await bootstrapPromise;
+}
+
+export function buildStudentNote(email: string): string | null {
+  const normalizedEmail = email.trim();
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  return `email:${normalizedEmail}`;
+}
+
+export function parseStudentId(value: string): number | null {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
+export function parseStudentClassId(value: string): number | null {
+  return toClassIdOrNull(value);
+}
