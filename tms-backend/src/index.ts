@@ -47,7 +47,9 @@ async function main(): Promise<void> {
 
   server.on('listening', () => {
     console.log(`Backend server running at http://${config.host}:${config.port}`);
-    console.log('Postgres schema refresh is enabled');
+    console.log(
+      `Database mode: synchronize=${String(config.database.synchronize)}, dropSchema=${String(config.database.dropSchema)}`,
+    );
   });
 
   server.on('error', (error: NodeJS.ErrnoException) => {

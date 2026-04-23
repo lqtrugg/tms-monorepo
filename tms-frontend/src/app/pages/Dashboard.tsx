@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Users, GraduationCap, DollarSign, TrendingUp } from "lucide-react";
+import { Users, GraduationCap, DollarSign, TrendingUp, Settings } from "lucide-react";
 
 import { ApiError } from "../services/apiClient";
+import { getMe, updateMe, type AuthTeacher } from "../services/authService";
 import { type BackendClass, type BackendClassSchedule, listClassSchedules, listClasses } from "../services/classService";
 import { listStudentBalances } from "../services/financeService";
 import { getDashboardSummary } from "../services/reportingService";
@@ -93,6 +94,8 @@ async function loadActiveClassCards(
 export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [requestError, setRequestError] = useState("");
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [account, setAccount] = useState<AuthTeacher | null>(null);
   const [summary, setSummary] = useState<{
     active_students: number;
     active_classes: number;
@@ -101,57 +104,60 @@ export function Dashboard() {
   } | null>(null);
   const [activeClasses, setActiveClasses] = useState<ActiveClassCard[]>([]);
   const [recentDebts, setRecentDebts] = useState<DebtStudent[]>([]);
+  const [savingAccount, setSavingAccount] = useState(false);
+
+  const loadData = async () => {
+    setLoading(true);
+    setRequestError("");
+
+    try {
+      const [dashboardSummary, balances, classes, activeStudents, teacher] = await Promise.all([
+        getDashboardSummary(),
+        listStudentBalances({
+          status: "active",
+          include_pending_archive: false,
+        }),
+        listClasses("active"),
+        listStudents({ status: "active" }),
+        getMe(),
+      ]);
+
+      setAccount(teacher);
+      setSummary({
+        active_students: dashboardSummary.active_students,
+        active_classes: dashboardSummary.active_classes,
+        total_debt: parseAmount(dashboardSummary.total_debt),
+        monthly_revenue: parseAmount(dashboardSummary.monthly_revenue),
+      });
+
+      const classCards = await loadActiveClassCards(classes, activeStudents);
+      setActiveClasses(classCards);
+
+      const classNameById = new Map(classCards.map((item) => [item.id, item.name]));
+      const classIdByStudentId = new Map<number, number>(
+        activeStudents
+          .filter((student) => student.current_class_id !== null)
+          .map((student) => [student.id, student.current_class_id as number]),
+      );
+      const debtRows = balances
+        .map((balance) => ({
+          student_id: balance.student_id,
+          full_name: balance.full_name,
+          balance: parseAmount(balance.balance),
+          class_name: classNameById.get(classIdByStudentId.get(balance.student_id) ?? -1) ?? "N/A",
+        }))
+        .filter((item) => item.balance < 0)
+        .sort((a, b) => a.balance - b.balance)
+        .slice(0, 5);
+      setRecentDebts(debtRows);
+    } catch (error) {
+      setRequestError(toErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      setRequestError("");
-
-      try {
-        const [dashboardSummary, balances, classes, activeStudents] = await Promise.all([
-          getDashboardSummary(),
-          listStudentBalances({
-            status: "active",
-            include_pending_archive: false,
-          }),
-          listClasses("active"),
-          listStudents({ status: "active" }),
-        ]);
-
-        setSummary({
-          active_students: dashboardSummary.active_students,
-          active_classes: dashboardSummary.active_classes,
-          total_debt: parseAmount(dashboardSummary.total_debt),
-          monthly_revenue: parseAmount(dashboardSummary.monthly_revenue),
-        });
-
-        const classCards = await loadActiveClassCards(classes, activeStudents);
-        setActiveClasses(classCards);
-
-        const classNameById = new Map(classCards.map((item) => [item.id, item.name]));
-        const classIdByStudentId = new Map<number, number>(
-          activeStudents
-            .filter((student) => student.current_class_id !== null)
-            .map((student) => [student.id, student.current_class_id as number]),
-        );
-        const debtRows = balances
-          .map((balance) => ({
-            student_id: balance.student_id,
-            full_name: balance.full_name,
-            balance: parseAmount(balance.balance),
-            class_name: classNameById.get(classIdByStudentId.get(balance.student_id) ?? -1) ?? "N/A",
-          }))
-          .filter((item) => item.balance < 0)
-          .sort((a, b) => a.balance - b.balance)
-          .slice(0, 5);
-        setRecentDebts(debtRows);
-      } catch (error) {
-        setRequestError(toErrorMessage(error));
-      } finally {
-        setLoading(false);
-      }
-    };
-
     void loadData();
   }, []);
 
@@ -191,9 +197,18 @@ export function Dashboard() {
 
   return (
     <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-zinc-900 mb-2">Dashboard</h1>
-        <p className="text-zinc-600">Tổng quan hệ thống quản lý</p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold text-zinc-900 mb-2">Dashboard</h1>
+          <p className="text-zinc-600">Tổng quan hệ thống quản lý</p>
+        </div>
+        <button
+          onClick={() => setShowAccountModal(true)}
+          className="flex items-center gap-2 px-4 py-3 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 transition-colors"
+        >
+          <Settings className="w-5 h-5" />
+          Tài khoản
+        </button>
       </div>
 
       {requestError && (
@@ -201,6 +216,24 @@ export function Dashboard() {
           {requestError}
         </div>
       )}
+
+      <div className="mb-6 bg-white border border-zinc-200 rounded-xl p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-sm text-zinc-600 mb-1">Tài khoản hiện tại</p>
+            <p className="text-lg font-semibold text-zinc-900">{account?.username ?? "..."}</p>
+            <p className="text-sm text-zinc-600">
+              Codeforces: {account?.codeforces_handle ?? "Chưa cập nhật"}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowAccountModal(true)}
+            className="px-4 py-2 bg-zinc-100 text-zinc-700 rounded-lg hover:bg-zinc-200 transition-colors"
+          >
+            Cập nhật thông tin
+          </button>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {stats.map((stat) => {
@@ -275,6 +308,179 @@ export function Dashboard() {
             )}
           </div>
         </div>
+      </div>
+
+      {showAccountModal && account && (
+        <AccountSettingsModal
+          account={account}
+          submitting={savingAccount}
+          onClose={() => setShowAccountModal(false)}
+          onSubmit={async (payload) => {
+            setSavingAccount(true);
+            setRequestError("");
+            try {
+              const updated = await updateMe(payload);
+              setAccount(updated);
+              setShowAccountModal(false);
+            } catch (error) {
+              setRequestError(toErrorMessage(error));
+            } finally {
+              setSavingAccount(false);
+            }
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AccountSettingsModal({
+  account,
+  submitting,
+  onClose,
+  onSubmit,
+}: {
+  account: AuthTeacher;
+  submitting: boolean;
+  onClose: () => void;
+  onSubmit: (payload: {
+    username?: string;
+    password?: string;
+    codeforces_handle?: string | null;
+    codeforces_api_key?: string | null;
+    codeforces_api_secret?: string | null;
+  }) => Promise<void>;
+}) {
+  const [username, setUsername] = useState(account.username);
+  const [password, setPassword] = useState("");
+  const [codeforcesHandle, setCodeforcesHandle] = useState(account.codeforces_handle ?? "");
+  const [codeforcesApiKey, setCodeforcesApiKey] = useState(account.codeforces_api_key ?? "");
+  const [codeforcesApiSecret, setCodeforcesApiSecret] = useState(account.codeforces_api_secret ?? "");
+  const [localError, setLocalError] = useState("");
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLocalError("");
+
+    const payload: {
+      username?: string;
+      password?: string;
+      codeforces_handle?: string | null;
+      codeforces_api_key?: string | null;
+      codeforces_api_secret?: string | null;
+    } = {};
+
+    const normalizedUsername = username.trim();
+    if (!normalizedUsername) {
+      setLocalError("Username không được để trống");
+      return;
+    }
+
+    if (normalizedUsername !== account.username) {
+      payload.username = normalizedUsername;
+    }
+
+    if (password.trim().length > 0) {
+      payload.password = password;
+    }
+
+    if (codeforcesHandle.trim() !== (account.codeforces_handle ?? "")) {
+      payload.codeforces_handle = codeforcesHandle.trim() || null;
+    }
+
+    if (codeforcesApiKey.trim() !== (account.codeforces_api_key ?? "")) {
+      payload.codeforces_api_key = codeforcesApiKey.trim() || null;
+    }
+
+    if (codeforcesApiSecret.trim() !== (account.codeforces_api_secret ?? "")) {
+      payload.codeforces_api_secret = codeforcesApiSecret.trim() || null;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      setLocalError("Không có thay đổi nào để lưu");
+      return;
+    }
+
+    await onSubmit(payload);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white border border-zinc-200 rounded-xl p-6 w-full max-w-md shadow-xl">
+        <h2 className="text-xl font-semibold text-zinc-900 mb-6">Cập nhật tài khoản</h2>
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div>
+            <label className="block text-sm text-zinc-700 mb-2">Username</label>
+            <input
+              type="text"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-zinc-700 mb-2">Mật khẩu mới (optional)</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              placeholder="Để trống nếu không đổi"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-zinc-700 mb-2">Codeforces Handle</label>
+            <input
+              type="text"
+              value={codeforcesHandle}
+              onChange={(event) => setCodeforcesHandle(event.target.value)}
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              placeholder="tourist"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-zinc-700 mb-2">Codeforces API Key (optional)</label>
+            <input
+              type="text"
+              value={codeforcesApiKey}
+              onChange={(event) => setCodeforcesApiKey(event.target.value)}
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-zinc-700 mb-2">Codeforces API Secret (optional)</label>
+            <input
+              type="password"
+              value={codeforcesApiSecret}
+              onChange={(event) => setCodeforcesApiSecret(event.target.value)}
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            />
+          </div>
+
+          {localError && <p className="text-sm text-red-600">{localError}</p>}
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 px-4 py-3 bg-zinc-100 text-zinc-900 rounded-lg hover:bg-zinc-200 transition-colors"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 px-4 py-3 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors font-medium disabled:opacity-60"
+            >
+              {submitting ? "Đang lưu..." : "Lưu thay đổi"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

@@ -3,7 +3,7 @@ import passport from 'passport';
 
 import { Teacher } from '../entities/index.js';
 import { AuthError } from '../errors/auth.error.js';
-import { login, me, register } from '../services/auth.service.js';
+import { login, me, register, updateMe } from '../services/auth.service.js';
 
 export const authRouter = Router();
 
@@ -36,6 +36,16 @@ authRouter.post('/login', async (req, res, next) => {
 
 authRouter.get('/me', passport.authenticate('jwt', { session: false }), (req, res) => {
   res.json({ teacher: me(req.user as Teacher) });
+});
+
+authRouter.patch('/me', passport.authenticate('jwt', { session: false }), async (req, res, next) => {
+  try {
+    const teacher = req.user as Teacher;
+    const updatedTeacher = await updateMe(teacher.id, req.body);
+    res.json({ teacher: updatedTeacher });
+  } catch (error) {
+    next(error);
+  }
 });
 
 authRouter.use(handleAuthError);

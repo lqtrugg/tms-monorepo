@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, redirect } from "react-router";
 import { Dashboard } from "./pages/Dashboard";
 import { Students } from "./pages/Students";
 import { StudentDetail } from "./pages/StudentDetail";
@@ -13,14 +13,32 @@ import { Messaging } from "./pages/Messaging";
 import { Login } from "./pages/Login";
 import { Layout } from "./components/Layout";
 
+function hasAccessToken(): boolean {
+  return Boolean(localStorage.getItem("tms_access_token"));
+}
+
 export const router = createBrowserRouter([
   {
     path: "/login",
     Component: Login,
+    loader: () => {
+      if (hasAccessToken()) {
+        return redirect("/");
+      }
+
+      return null;
+    },
   },
   {
     path: "/",
     Component: Layout,
+    loader: () => {
+      if (!hasAccessToken()) {
+        return redirect("/login");
+      }
+
+      return null;
+    },
     children: [
       { index: true, Component: Dashboard },
       { path: "students", Component: Students },

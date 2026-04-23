@@ -14,6 +14,8 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
+      - DB_SYNCHRONIZE=${DB_SYNCHRONIZE}
+      - DB_DROP_SCHEMA=${DB_DROP_SCHEMA}
       - DATABASE_URL=${DATABASE_URL}
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
@@ -36,7 +38,7 @@ services:
     ports:
       - "${POSTGRES_PORT}:${DB_PORT}"
     volumes:
-      - postgres-data:/var/lib/postgresql
+      - postgres-data:/var/lib/postgresql/data
     networks:
       - tms-network
 

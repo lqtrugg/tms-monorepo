@@ -16,8 +16,8 @@ export const AppDataSource = new DataSource({
   type: 'postgres',
   ...connectionOptions,
   entities: appEntities,
-  dropSchema: true,
-  synchronize: true,
+  dropSchema: config.database.dropSchema,
+  synchronize: config.database.synchronize,
   logging: config.database.logging,
 });
 

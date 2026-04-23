@@ -1,6 +1,8 @@
 docs/assumptions.txt
 .DS_Store
 
+tms-frontend/to_be_merge
+
 # Node modules
 node_modules/
 */node_modules/

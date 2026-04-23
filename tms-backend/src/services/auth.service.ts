@@ -5,8 +5,21 @@ import config from '../config.js';
 import { AppDataSource } from '../data-source.js';
 import { Teacher } from '../entities/index.js';
 import { AuthError } from '../errors/auth.error.js';
-import { isUniqueViolation, normalizeCredentials, toAuthTeacher } from '../helpers/auth.helpers.js';
-import type { AuthCredentials, AuthTeacher, AuthTokenPayload, AuthTokenResponse } from '../types/auth.types.js';
+import {
+  isUniqueViolation,
+  normalizeLoginInput,
+  normalizeRegisterInput,
+  normalizeUpdateTeacherInput,
+  toAuthTeacher,
+} from '../helpers/auth.helpers.js';
+import type {
+  AuthTeacher,
+  AuthTokenPayload,
+  AuthTokenResponse,
+  LoginInput,
+  RegisterInput,
+  UpdateTeacherInput,
+} from '../types/auth.types.js';
 
 function teacherRepository() {
   return AppDataSource.getRepository(Teacher);
@@ -27,13 +40,22 @@ function signAccessToken(teacher: Teacher): string {
   return jwt.sign(payload, config.auth.jwtSecret as Secret, signOptions);
 }
 
-export async function register(input: AuthCredentials): Promise<AuthTokenResponse> {
-  const { username, password } = normalizeCredentials(input);
+export async function register(input: RegisterInput): Promise<AuthTokenResponse> {
+  const {
+    username,
+    password,
+    codeforces_handle,
+    codeforces_api_key,
+    codeforces_api_secret,
+  } = normalizeRegisterInput(input);
   const passwordHash = await bcrypt.hash(password, config.auth.bcryptSaltRounds);
 
   const teacher = teacherRepository().create({
     username,
     password_hash: passwordHash,
+    codeforces_handle,
+    codeforces_api_key,
+    codeforces_api_secret,
   });
 
   try {
@@ -54,8 +76,8 @@ export async function register(input: AuthCredentials): Promise<AuthTokenRespons
   }
 }
 
-export async function login(input: AuthCredentials): Promise<AuthTokenResponse> {
-  const { username, password } = normalizeCredentials(input);
+export async function login(input: LoginInput): Promise<AuthTokenResponse> {
+  const { username, password } = normalizeLoginInput(input);
   const teacher = await teacherRepository().findOneBy({ username });
 
   if (!teacher) {
@@ -77,4 +99,45 @@ export async function login(input: AuthCredentials): Promise<AuthTokenResponse> 
 
 export function me(teacher: Teacher): AuthTeacher {
   return toAuthTeacher(teacher);
+}
+
+export async function updateMe(teacherId: number, input: UpdateTeacherInput): Promise<AuthTeacher> {
+  const patch = normalizeUpdateTeacherInput(input);
+  const repository = teacherRepository();
+  const teacher = await repository.findOneBy({ id: teacherId });
+
+  if (!teacher) {
+    throw new AuthError('teacher not found', 404);
+  }
+
+  if (patch.username !== undefined) {
+    teacher.username = patch.username;
+  }
+
+  if (patch.password !== undefined) {
+    teacher.password_hash = await bcrypt.hash(patch.password, config.auth.bcryptSaltRounds);
+  }
+
+  if (patch.codeforces_handle !== undefined) {
+    teacher.codeforces_handle = patch.codeforces_handle;
+  }
+
+  if (patch.codeforces_api_key !== undefined) {
+    teacher.codeforces_api_key = patch.codeforces_api_key;
+  }
+
+  if (patch.codeforces_api_secret !== undefined) {
+    teacher.codeforces_api_secret = patch.codeforces_api_secret;
+  }
+
+  try {
+    const saved = await repository.save(teacher);
+    return toAuthTeacher(saved);
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      throw new AuthError('username already exists', 409);
+    }
+
+    throw error;
+  }
 }

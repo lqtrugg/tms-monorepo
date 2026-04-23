@@ -1,43 +1,65 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { LogIn } from "lucide-react";
+import { login, register } from "../services/authService";
+import { ApiError } from "../services/apiClient";
 
 export function Login() {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [codeforcesHandle, setCodeforcesHandle] = useState("");
+  const [codeforcesApiKey, setCodeforcesApiKey] = useState("");
+  const [codeforcesApiSecret, setCodeforcesApiSecret] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
     setSubmitting(true);
 
     try {
-      const response = await fetch(`/api/${isLogin ? "login" : "register"}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+      if (isLogin) {
+        const data = await login({
+          username,
+          password,
+        });
+
+        localStorage.setItem("tms_access_token", data.accessToken);
+        navigate("/");
+        return;
+      }
+
+      const normalizedHandle = codeforcesHandle.trim();
+      if (!normalizedHandle) {
+        setError("Codeforces handle là bắt buộc khi đăng ký");
+        return;
+      }
+
+      await register({
+        username,
+        password,
+        codeforces_handle: normalizedHandle,
+        codeforces_api_key: codeforcesApiKey.trim() || null,
+        codeforces_api_secret: codeforcesApiSecret.trim() || null,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(typeof data?.error === "string" ? data.error : "Request failed");
-        return;
-      }
-
-      if (typeof data?.accessToken !== "string" || data.accessToken.length === 0) {
-        setError("Không nhận được access token");
-        return;
-      }
-
-      localStorage.setItem("tms_access_token", data.accessToken);
-      navigate("/");
+      setIsLogin(true);
+      setPassword("");
+      setCodeforcesHandle("");
+      setCodeforcesApiKey("");
+      setCodeforcesApiSecret("");
+      setSuccess("Đăng ký thành công. Hãy đăng nhập để vào hệ thống.");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Request failed");
+      setError(
+        requestError instanceof ApiError || requestError instanceof Error
+          ? requestError.message
+          : "Request failed",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -85,7 +107,46 @@ export function Login() {
               />
             </div>
 
+            {!isLogin && (
+              <>
+                <div>
+                  <label className="block text-sm text-zinc-700 mb-2">Codeforces Handle</label>
+                  <input
+                    type="text"
+                    value={codeforcesHandle}
+                    onChange={(e) => setCodeforcesHandle(e.target.value)}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                    placeholder="tourist"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-zinc-700 mb-2">Codeforces API Key (optional)</label>
+                  <input
+                    type="text"
+                    value={codeforcesApiKey}
+                    onChange={(e) => setCodeforcesApiKey(e.target.value)}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                    placeholder="api-key"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-zinc-700 mb-2">Codeforces API Secret (optional)</label>
+                  <input
+                    type="password"
+                    value={codeforcesApiSecret}
+                    onChange={(e) => setCodeforcesApiSecret(e.target.value)}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                    placeholder="api-secret"
+                  />
+                </div>
+              </>
+            )}
+
             {error && <p className="text-sm text-red-600">{error}</p>}
+            {success && <p className="text-sm text-emerald-700">{success}</p>}
 
             <button
               type="submit"
@@ -98,7 +159,11 @@ export function Login() {
 
           <div className="mt-6 text-center">
             <button
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setError("");
+                setSuccess("");
+              }}
               className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors"
             >
               {isLogin ? 'Chưa có tài khoản? Đăng ký' : 'Đã có tài khoản? Đăng nhập'}

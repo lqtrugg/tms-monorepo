@@ -1,4 +1,4 @@
-import { Outlet, Link, useLocation, useNavigate } from "react-router";
+import { Navigate, Outlet, Link, useLocation, useNavigate } from "react-router";
 import {
   LayoutDashboard,
   Users,
@@ -17,6 +17,11 @@ import {
 export function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
+  const accessToken = localStorage.getItem("tms_access_token");
+
+  if (!accessToken) {
+    return <Navigate to="/login" replace />;
+  }
 
   const handleLogout = () => {
     localStorage.removeItem("tms_access_token");
