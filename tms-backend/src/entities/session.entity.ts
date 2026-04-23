@@ -13,17 +13,13 @@ import { Teacher } from './teacher.entity.js';
   name: 'fk_sessions_class_id',
   onDelete: 'RESTRICT',
 })
-@ForeignKey(() => Teacher, ['cancelled_by'], ['id'], {
-  name: 'fk_sessions_cancelled_by',
-  onDelete: 'SET NULL',
-})
 @Index('idx_sessions_teacher_id', ['teacher_id'])
 @Index('idx_sessions_class_id', ['class_id'])
 @Index('idx_sessions_scheduled_at', ['scheduled_at'])
 @Index('idx_sessions_status', ['status'])
 @Check(
   'chk_sessions_cancelled',
-  "(status = 'cancelled' AND cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL) OR (status <> 'cancelled' AND cancelled_at IS NULL AND cancelled_by IS NULL)",
+  "(status = 'cancelled' AND cancelled_at IS NOT NULL) OR (status <> 'cancelled' AND cancelled_at IS NULL)",
 )
 export class Session {
   @PrimaryGeneratedColumn()
@@ -54,7 +50,4 @@ export class Session {
 
   @Column({ type: 'timestamptz', nullable: true })
   cancelled_at!: Date | null;
-
-  @Column({ type: 'integer', nullable: true })
-  cancelled_by!: number | null;
 }
