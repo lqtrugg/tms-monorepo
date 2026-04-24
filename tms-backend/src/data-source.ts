@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 
 import config from './config.js';
+import { installDatabaseIntegrityRules } from './database-integrity.js';
 import { appEntities } from './entities/index.js';
 
 const connectionOptions = {
@@ -24,6 +25,7 @@ export const AppDataSource = new DataSource({
 export async function initializeDatabase(): Promise<DataSource> {
   if (!AppDataSource.isInitialized) {
     await AppDataSource.initialize();
+    await installDatabaseIntegrityRules(AppDataSource);
   }
 
   return AppDataSource;

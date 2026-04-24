@@ -333,7 +333,7 @@ function AddTransactionModal({
     return (normalizedSearch === ""
       ? students
       : students.filter((student) => student.name.toLowerCase().includes(normalizedSearch))
-    ).slice(0, 8);
+    ).slice(0, 3);
   }, [students, studentSearch]);
 
   const handleSubmit = async (event: React.FormEvent) => {

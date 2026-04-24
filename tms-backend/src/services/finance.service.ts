@@ -1,4 +1,4 @@
-import { In, IsNull } from 'typeorm';
+import { In, IsNull, QueryFailedError } from 'typeorm';
 
 import { AppDataSource } from '../data-source.js';
 import {
@@ -18,6 +18,36 @@ function parseAmountToBigInt(value: string | null | undefined): bigint {
   }
 
   return BigInt(value);
+}
+
+function isRefundBalanceConstraintError(error: unknown): boolean {
+  if (!(error instanceof QueryFailedError)) {
+    return false;
+  }
+
+  const driverError = error.driverError as { constraint?: string };
+  return driverError.constraint === 'chk_transactions_refund_not_over_payment';
+}
+
+async function assertRefundDoesNotExceedPayments(
+  teacherId: number,
+  studentId: number,
+  refundAmount: bigint,
+): Promise<void> {
+  const totals = await AppDataSource.getRepository(Transaction)
+    .createQueryBuilder('transaction')
+    .select("COALESCE(SUM(CASE WHEN transaction.type = 'payment' THEN transaction.amount ELSE 0 END), 0)", 'payments')
+    .addSelect("COALESCE(SUM(CASE WHEN transaction.type = 'refund' THEN ABS(transaction.amount) ELSE 0 END), 0)", 'refunds')
+    .where('transaction.teacher_id = :teacherId', { teacherId })
+    .andWhere('transaction.student_id = :studentId', { studentId })
+    .getRawOne<{ payments: string; refunds: string }>();
+
+  const totalPayments = parseAmountToBigInt(totals?.payments);
+  const totalRefunds = parseAmountToBigInt(totals?.refunds);
+
+  if (totalRefunds + refundAmount > totalPayments) {
+    throw new ServiceError('Tổng số tiền hoàn trả không được lớn hơn tổng số tiền đã nhận', 400);
+  }
 }
 
 function toDateRange(from?: Date, to?: Date): { from?: Date; to?: Date } {
@@ -101,6 +131,10 @@ export async function createTransaction(teacherId: number, input: {
     throw new ServiceError('refund amount must be negative', 400);
   }
 
+  if (input.type === TransactionType.Refund) {
+    await assertRefundDoesNotExceedPayments(teacherId, input.student_id, amount * -1n);
+  }
+
   const transaction = AppDataSource.getRepository(Transaction).create({
     teacher_id: teacherId,
     student_id: input.student_id,
@@ -110,7 +144,15 @@ export async function createTransaction(teacherId: number, input: {
     recorded_at: input.recorded_at ?? new Date(),
   });
 
-  return AppDataSource.getRepository(Transaction).save(transaction);
+  try {
+    return await AppDataSource.getRepository(Transaction).save(transaction);
+  } catch (error) {
+    if (isRefundBalanceConstraintError(error)) {
+      throw new ServiceError('Tổng số tiền hoàn trả không được lớn hơn tổng số tiền đã nhận', 400);
+    }
+
+    throw error;
+  }
 }
 
 export async function listFeeRecords(teacherId: number, filters: {
