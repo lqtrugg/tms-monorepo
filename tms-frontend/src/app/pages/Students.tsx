@@ -5,7 +5,6 @@ import {
   Search,
   UserX,
   ArrowRightLeft,
-  Eye,
   Pencil,
   AlertCircle,
   DollarSign,
@@ -557,12 +556,17 @@ export function Students() {
                   const isSelected = selectedStudentIds.includes(student.id);
 
                   return (
-                    <tr key={student.id} className="hover:bg-zinc-200/50 transition-colors">
+                    <tr
+                      key={student.id}
+                      onClick={() => navigate(`/students/${student.id}`)}
+                      className="cursor-pointer hover:bg-zinc-200/50 transition-colors"
+                    >
                       <td className="px-4 py-4">
                         {isSelectable ? (
                           <input
                             type="checkbox"
                             checked={isSelected}
+                            onClick={(event) => event.stopPropagation()}
                             onChange={() => toggleStudentSelection(student.id)}
                             aria-label={`Chọn học sinh ${student.name}`}
                           />
@@ -570,12 +574,9 @@ export function Students() {
                       </td>
                       <td className="px-6 py-4">
                         <div>
-                          <p className="text-zinc-900 font-medium">
-                            {student.codeforcesHandle || "CF: N/A"}
-                          </p>
-                          <p className="text-sm text-zinc-600">
-                            {student.discordUsername || "Discord: N/A"}
-                          </p>
+                          <p className="text-zinc-900 font-medium">{student.name}</p>
+                          <StudentIdentityLine icon={<CodeforcesIcon />} value={student.codeforcesHandle || "N/A"} />
+                          <StudentIdentityLine icon={<DiscordIcon />} value={student.discordUsername || "N/A"} muted />
                         </div>
                       </td>
                       <td className="px-6 py-4 text-zinc-700">{student.className}</td>
@@ -587,14 +588,10 @@ export function Students() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => navigate(`/students/${student.id}`)}
-                            className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
-                            title="Xem chi tiết"
-                          >
-                            <Eye className="w-4 h-4 text-zinc-600" />
-                          </button>
+                        <div
+                          className="flex items-center justify-end gap-2"
+                          onClick={(event) => event.stopPropagation()}
+                        >
                           <button
                             onClick={() => {
                               setSelectedStudent(student);
@@ -776,8 +773,9 @@ function PendingTable({
               <tr key={student.id} className="hover:bg-zinc-100/50 transition-colors">
                 <td className="px-6 py-4">
                   <div>
-                    <p className="text-zinc-900 font-medium">{student.codeforcesHandle || "CF: N/A"}</p>
-                    <p className="text-sm text-zinc-600">{student.discordUsername || "Discord: N/A"}</p>
+                    <p className="text-zinc-900 font-medium">{student.name}</p>
+                    <StudentIdentityLine icon={<CodeforcesIcon />} value={student.codeforcesHandle || "N/A"} />
+                    <StudentIdentityLine icon={<DiscordIcon />} value={student.discordUsername || "N/A"} muted />
                   </div>
                 </td>
                 <td className="px-6 py-4 text-zinc-700">{student.className || "N/A"}</td>
@@ -803,6 +801,48 @@ function PendingTable({
         </table>
       </div>
     </div>
+  );
+}
+
+function StudentIdentityLine({
+  icon,
+  value,
+  muted,
+}: {
+  icon: React.ReactNode;
+  value: string;
+  muted?: boolean;
+}) {
+  return (
+    <p className={`mt-1 flex items-center gap-2 ${muted ? "text-sm text-zinc-600" : "text-sm text-zinc-700"}`}>
+      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-zinc-500">
+        {icon}
+      </span>
+      <span>{value}</span>
+    </p>
+  );
+}
+
+function CodeforcesIcon() {
+  return (
+    <span className="inline-flex h-4 w-4 items-end justify-center gap-0.5" aria-label="Codeforces">
+      <span className="h-2.5 w-1 rounded-sm bg-current" />
+      <span className="h-4 w-1 rounded-sm bg-current" />
+      <span className="h-3 w-1 rounded-sm bg-current" />
+    </span>
+  );
+}
+
+function DiscordIcon() {
+  return (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-label="Discord"
+    >
+      <path d="M19.3 5.2A17.1 17.1 0 0 0 15.1 4l-.2.4c1.5.4 2.2 1 2.2 1s-2.7-1.5-6.2-1.5c-3.5 0-6.2 1.5-6.2 1.5s.8-.7 2.4-1.1L6.9 4a17.1 17.1 0 0 0-4.2 1.2C.1 9.1-.6 12.8-.3 16.5A17 17 0 0 0 5 19.2l.7-1.1a7.1 7.1 0 0 1-1.2-.6l.3-.2c2.3 1.1 4.8 1.1 7.2 1.1s4.9 0 7.2-1.1l.3.2c-.4.3-.8.5-1.2.6l.7 1.1a17 17 0 0 0 5.3-2.7c.4-4.3-.7-8-3-11.3ZM8.2 14.3c-.8 0-1.4-.7-1.4-1.5s.6-1.5 1.4-1.5 1.4.7 1.4 1.5-.6 1.5-1.4 1.5Zm7.6 0c-.8 0-1.4-.7-1.4-1.5s.6-1.5 1.4-1.5 1.4.7 1.4 1.5-.6 1.5-1.4 1.5Z" />
+    </svg>
   );
 }
 
@@ -865,7 +905,6 @@ function AddStudentModal({
   return (
     <div className="fixed inset-0 bg-white/80 flex items-center justify-center p-4 z-50">
       <div className="bg-zinc-100 border border-zinc-200 rounded-xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-semibold text-zinc-900 mb-6">Thêm học sinh mới</h2>
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
             <label className="block text-sm text-zinc-600 mb-2">Họ tên</label>
@@ -935,7 +974,7 @@ function AddStudentModal({
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 px-4 py-3 bg-white text-black rounded-lg hover:bg-zinc-200 transition-colors font-medium disabled:opacity-60"
+              className="flex-1 px-4 py-3 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors font-medium disabled:opacity-60"
             >
               {submitting ? "Đang thêm..." : "Thêm học sinh"}
             </button>
@@ -1160,7 +1199,7 @@ function TransferClassModal({
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 px-4 py-3 bg-white text-black rounded-lg hover:bg-zinc-200 transition-colors font-medium disabled:opacity-60"
+              className="flex-1 px-4 py-3 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors font-medium disabled:opacity-60"
             >
               {submitting ? "Đang chuyển..." : "Chuyển lớp"}
             </button>
@@ -1287,7 +1326,6 @@ function ReinstateStudentModal({
   return (
     <div className="fixed inset-0 bg-white/80 flex items-center justify-center p-4 z-50">
       <div className="bg-zinc-100 border border-zinc-200 rounded-xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-semibold text-zinc-900 mb-2">Thêm học sinh trở lại</h2>
         <p className="text-zinc-600 mb-6">Học sinh: {student.name}</p>
 
         <form className="space-y-4" onSubmit={handleSubmit}>

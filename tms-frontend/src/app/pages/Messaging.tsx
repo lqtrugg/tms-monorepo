@@ -5,13 +5,18 @@ import {
   Eye,
   Send,
   CircleDollarSign,
-  CalendarClock,
+  BookOpenCheck,
   TriangleAlert,
+  Search,
+  ListChecks,
+  X,
   type LucideIcon,
 } from "lucide-react";
 
 import { ApiError } from "../services/apiClient";
-import { listClasses } from "../services/classService";
+import { listClasses, listSessions } from "../services/classService";
+import { listSessionAttendance } from "../services/attendanceService";
+import { listStudentBalances } from "../services/financeService";
 import {
   listDiscordServers,
   listMessages,
@@ -21,9 +26,11 @@ import {
   type BackendDiscordServer,
   type BackendMessageListRow,
 } from "../services/messagingService";
+import { getStudentLearningProfile } from "../services/reportingService";
 import { listStudents } from "../services/studentService";
 
 type MessageFilter = "all" | "auto_notification" | "channel_post" | "bulk_dm";
+type BulkRecipientFilter = "debt" | "incomplete_topic" | "recent_absence";
 
 type ClassOption = {
   id: number;
@@ -34,6 +41,9 @@ type StudentOption = {
   id: number;
   name: string;
   class_id: number | null;
+  has_debt: boolean;
+  has_incomplete_topic: boolean;
+  absent_in_recent_session: boolean;
 };
 
 const BULK_DM_TEMPLATES = [
@@ -44,22 +54,44 @@ const BULK_DM_TEMPLATES = [
     content: "Chào bạn, hiện bạn còn nợ học phí. Vui lòng hoàn tất thanh toán trước buổi học tiếp theo. Nếu đã chuyển khoản, hãy phản hồi lại tin nhắn này.",
   },
   {
-    id: "topic_deadline",
-    label: "Nhắc chuyên đề sắp hết hạn",
-    icon: CalendarClock,
-    content: "Chào bạn, chuyên đề tuần này sắp hết hạn. Bạn vui lòng hoàn thành bài còn lại trước hạn để được tính điểm đầy đủ.",
+    id: "topic_progress",
+    label: "Nhắc tiến độ chuyên đề",
+    icon: BookOpenCheck,
+    content: "Chào bạn, chuyên đề tuần này còn bài chưa hoàn thành. Bạn vui lòng kiểm tra và hoàn thành các bài còn lại để được ghi nhận đầy đủ.",
   },
   {
     id: "attendance_warning",
     label: "Nhắc nhở chuyên cần",
     icon: TriangleAlert,
-    content: "Chào bạn, gần đây bạn vắng học nhiều buổi. Vui lòng phản hồi lý do và sắp xếp tham gia đầy đủ các buổi tiếp theo.",
+    content: "Chào bạn, buổi học gần đây bạn vắng mặt. Vui lòng phản hồi lý do và sắp xếp tham gia đầy đủ các buổi tiếp theo.",
   },
 ] as const satisfies ReadonlyArray<{
   id: string;
   label: string;
   icon: LucideIcon;
   content: string;
+}>;
+
+const BULK_RECIPIENT_FILTERS = [
+  {
+    id: "debt",
+    label: "Còn nợ",
+    icon: CircleDollarSign,
+  },
+  {
+    id: "incomplete_topic",
+    label: "Chưa hoàn thành bài tập",
+    icon: BookOpenCheck,
+  },
+  {
+    id: "recent_absence",
+    label: "Vắng buổi gần đây",
+    icon: TriangleAlert,
+  },
+] as const satisfies ReadonlyArray<{
+  id: BulkRecipientFilter;
+  label: string;
+  icon: LucideIcon;
 }>;
 
 function toErrorMessage(error: unknown): string {
@@ -72,6 +104,11 @@ function toErrorMessage(error: unknown): string {
   }
 
   return "Đã có lỗi xảy ra";
+}
+
+function parseAmount(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 export function Messaging() {
@@ -92,12 +129,53 @@ export function Messaging() {
   const loadData = async () => {
     setRequestError("");
     try {
-      const [serverList, messageList, classList, studentList] = await Promise.all([
+      const [serverList, messageList, classList, studentList, balances, sessions] = await Promise.all([
         listDiscordServers(),
         listMessages(),
         listClasses("active"),
         listStudents({ status: "active" }),
+        listStudentBalances({ status: "active", include_pending_archive: false }),
+        listSessions(),
       ]);
+
+      const debtStudentIds = new Set(
+        balances
+          .filter((balance) => parseAmount(balance.balance) < 0)
+          .map((balance) => balance.student_id),
+      );
+      const incompleteTopicResults = await Promise.all(studentList.map(async (student) => {
+        try {
+          const profile = await getStudentLearningProfile(student.id);
+          return {
+            studentId: student.id,
+            incomplete: profile.topics.some((topic) => topic.total_problems > topic.solved_count),
+          };
+        } catch {
+          return {
+            studentId: student.id,
+            incomplete: false,
+          };
+        }
+      }));
+      const incompleteTopicStudentIds = new Set(
+        incompleteTopicResults
+          .filter((item) => item.incomplete)
+          .map((item) => item.studentId),
+      );
+      const latestSession = sessions
+        .filter((session) => session.status !== "cancelled" && new Date(session.scheduled_at).getTime() <= Date.now())
+        .sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime())[0];
+      const absentStudentIds = new Set<number>();
+      if (latestSession) {
+        try {
+          const sessionAttendance = await listSessionAttendance(latestSession.id);
+          sessionAttendance.attendance
+            .filter((row) => row.attendance_status === "absent_excused" || row.attendance_status === "absent_unexcused")
+            .forEach((row) => absentStudentIds.add(row.student_id));
+        } catch {
+          // Keep the messaging page usable even when recent attendance data is unavailable.
+        }
+      }
 
       setServers(serverList);
       setMessages(messageList);
@@ -106,6 +184,9 @@ export function Messaging() {
         id: item.id,
         name: item.full_name,
         class_id: item.current_class_id,
+        has_debt: debtStudentIds.has(item.id),
+        has_incomplete_topic: incompleteTopicStudentIds.has(item.id),
+        absent_in_recent_session: absentStudentIds.has(item.id),
       })));
     } catch (error) {
       setRequestError(toErrorMessage(error));
@@ -305,6 +386,19 @@ export function Messaging() {
                 ) : (
                   <p className="text-sm text-zinc-600">Loại tin nhắn: Thông báo tự động</p>
                 )}
+
+                {msg.type === "bulk_dm" && msg.failures.length > 0 && (
+                  <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3">
+                    <p className="mb-2 text-sm font-medium text-red-700">Lý do gửi thất bại</p>
+                    <div className="space-y-1">
+                      {msg.failures.map((failure) => (
+                        <p key={`${msg.id}-${failure.student_id}`} className="text-sm text-red-700">
+                          <span className="font-medium">{failure.student_name}:</span> {failure.error}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
             {filteredMessages.length === 0 && (
@@ -383,7 +477,6 @@ export function Messaging() {
 
       {showSendMessageModal && (
         <SendMessageModal
-          classes={classes}
           servers={servers}
           students={students}
           submitting={submitting}
@@ -599,14 +692,12 @@ function ChannelsModal({ server, onClose }: { server: BackendDiscordServer; onCl
 }
 
 function SendMessageModal({
-  classes,
   servers,
   students,
   submitting,
   onClose,
   onSubmit,
 }: {
-  classes: ClassOption[];
   servers: BackendDiscordServer[];
   students: StudentOption[];
   submitting: boolean;
@@ -617,7 +708,8 @@ function SendMessageModal({
   ) => Promise<void>;
 }) {
   const [messageMode, setMessageMode] = useState<"channel_post" | "bulk_dm">("channel_post");
-  const [classId, setClassId] = useState("");
+  const [studentSearchTerm, setStudentSearchTerm] = useState("");
+  const [showBulkSelect, setShowBulkSelect] = useState(false);
   const [selectedServers, setSelectedServers] = useState<number[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<number[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState("");
@@ -625,13 +717,32 @@ function SendMessageModal({
   const [localError, setLocalError] = useState("");
 
   const visibleStudents = useMemo(() => {
-    const parsedClassId = Number(classId);
-    if (!Number.isInteger(parsedClassId) || parsedClassId <= 0) {
+    const normalizedSearch = studentSearchTerm.trim().toLowerCase();
+    if (!normalizedSearch) {
       return students;
     }
 
-    return students.filter((student) => student.class_id === parsedClassId);
-  }, [students, classId]);
+    return students.filter((student) => student.name.toLowerCase().includes(normalizedSearch));
+  }, [students, studentSearchTerm]);
+
+  const getStudentsByBulkFilter = (filterId: BulkRecipientFilter) => {
+    switch (filterId) {
+      case "debt":
+        return students.filter((student) => student.has_debt);
+      case "incomplete_topic":
+        return students.filter((student) => student.has_incomplete_topic);
+      case "recent_absence":
+        return students.filter((student) => student.absent_in_recent_session);
+      default:
+        return [];
+    }
+  };
+
+  const selectStudentsByBulkFilter = (filterId: BulkRecipientFilter) => {
+    const nextStudentIds = getStudentsByBulkFilter(filterId).map((student) => student.id);
+    setSelectedStudents((current) => Array.from(new Set([...current, ...nextStudentIds])));
+    setShowBulkSelect(false);
+  };
 
   const toggleServer = (serverId: number) => {
     setSelectedServers((current) => (
@@ -694,9 +805,7 @@ function SendMessageModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white border border-zinc-200 rounded-xl p-6 w-full max-w-2xl shadow-xl">
-        <h2 className="text-xl font-semibold text-zinc-900 mb-6">Gửi tin nhắn</h2>
-
+      <div className="bg-white border border-zinc-200 rounded-xl p-6 w-full max-w-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto shadow-xl">
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="flex gap-2">
             <button
@@ -787,22 +896,67 @@ function SendMessageModal({
           ) : (
             <div>
               <div>
-                <label className="block text-sm text-zinc-700 mb-2">Lọc danh sách theo lớp (tùy chọn)</label>
-                <select
-                  value={classId}
-                  onChange={(event) => setClassId(event.target.value)}
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
-                >
-                  <option value="">Tất cả lớp</option>
-                  {classes.map((cls) => (
-                    <option key={cls.id} value={cls.id}>{cls.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="mt-4">
                 <label className="block text-sm text-zinc-700 mb-2">Chọn học sinh</label>
-                <div className="max-h-60 overflow-y-auto border border-zinc-200 rounded-lg bg-zinc-50 p-3 space-y-2">
+                <div className="mb-3 flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                    <input
+                      type="text"
+                      value={studentSearchTerm}
+                      onChange={(event) => setStudentSearchTerm(event.target.value)}
+                      className="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2.5 pl-10 pr-4 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                      placeholder="Nhập tên học sinh..."
+                    />
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowBulkSelect((current) => !current)}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-100"
+                        title="Chọn hàng loạt"
+                        aria-label="Chọn hàng loạt"
+                      >
+                        <ListChecks className="h-4 w-4" />
+                      </button>
+
+                      {showBulkSelect && (
+                        <div className="absolute right-0 z-10 mt-2 w-72 rounded-lg border border-zinc-200 bg-white p-2 shadow-xl">
+                          {BULK_RECIPIENT_FILTERS.map((filter) => {
+                            const FilterIcon = filter.icon;
+                            const count = getStudentsByBulkFilter(filter.id).length;
+
+                            return (
+                              <button
+                                key={filter.id}
+                                type="button"
+                                onClick={() => selectStudentsByBulkFilter(filter.id)}
+                                className="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100"
+                              >
+                                <span className="flex items-center gap-2">
+                                  <FilterIcon className="h-4 w-4 text-zinc-500" />
+                                  {filter.label}
+                                </span>
+                                <span className="text-xs text-zinc-500">{count}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStudents([])}
+                      disabled={selectedStudents.length === 0}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-100 disabled:opacity-40"
+                      title="Bỏ chọn tất cả"
+                      aria-label="Bỏ chọn tất cả"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="max-h-56 overflow-y-auto border border-zinc-200 rounded-lg bg-zinc-50 p-3 space-y-2">
                   {visibleStudents.map((student) => (
                     <label
                       key={student.id}

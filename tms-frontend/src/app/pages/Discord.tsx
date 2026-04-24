@@ -76,7 +76,7 @@ export function Discord() {
           </button>
           <button
             onClick={() => setShowSendMessageModal(true)}
-            className="flex items-center gap-2 px-4 py-3 bg-white text-black rounded-lg font-medium hover:bg-zinc-200 transition-colors"
+            className="flex items-center gap-2 px-4 py-3 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 transition-colors"
           >
             <Send className="w-5 h-5" />
             Gửi tin nhắn
@@ -212,7 +212,7 @@ export function Discord() {
               </div>
               <div className="p-4 bg-white rounded-lg border border-zinc-200">
                 <h4 className="text-zinc-900 font-medium mb-2">Nhắc làm bài</h4>
-                <p className="text-sm text-zinc-600">Thông báo chuyên đề sắp hết hạn</p>
+                <p className="text-sm text-zinc-600">Thông báo khi học sinh còn bài chưa hoàn thành</p>
               </div>
               <div className="p-4 bg-white rounded-lg border border-zinc-200">
                 <h4 className="text-zinc-900 font-medium mb-2">Thông báo nghỉ học</h4>
@@ -242,7 +242,6 @@ function AddServerModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-white/80 flex items-center justify-center p-4 z-50">
       <div className="bg-zinc-100 border border-zinc-200 rounded-xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-semibold text-zinc-900 mb-6">Thêm Discord Server</h2>
         <form className="space-y-4">
           <div>
             <label className="block text-sm text-zinc-600 mb-2">Tên server</label>
@@ -335,7 +334,6 @@ function SendMessageModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-white/80 flex items-center justify-center p-4 z-50">
       <div className="bg-zinc-100 border border-zinc-200 rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <h2 className="text-xl font-semibold text-zinc-900 mb-6">Gửi tin nhắn</h2>
         <form className="space-y-4">
           <div>
             <label className="block text-sm text-zinc-600 mb-2">Loại tin nhắn</label>

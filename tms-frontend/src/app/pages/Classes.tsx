@@ -440,7 +440,6 @@ function AddClassModal({
   return (
     <div className="fixed inset-0 bg-white/80 flex items-center justify-center p-4 z-50">
       <div className="bg-zinc-100 border border-zinc-200 rounded-xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-semibold text-zinc-900 mb-6">Tạo lớp mới</h2>
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
             <label className="block text-sm text-zinc-600 mb-2">Tên lớp</label>

@@ -221,7 +221,7 @@ export async function getStudentLearningProfile(teacherId: number, studentId: nu
         class_name: classNameById.get(topic.class_id) ?? `Lớp #${topic.class_id}`,
         gym_link: topic.gym_link,
         gym_id: topic.gym_id,
-        expires_at: topic.expires_at,
+        closed_at: topic.closed_at,
         solved_count: solvedCount,
         total_problems: uniqueProblemIds.size,
         last_pulled_at: latestPulledAt,

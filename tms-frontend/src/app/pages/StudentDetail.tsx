@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router";
-import { ArrowLeft, Mail, GraduationCap, DollarSign } from "lucide-react";
+import { ArrowLeft, Mail, GraduationCap, DollarSign, BookOpen, ExternalLink } from "lucide-react";
 
 import { ApiError } from "../services/apiClient";
 import { listClasses } from "../services/classService";
 import { listTransactions } from "../services/financeService";
+import { getStudentLearningProfile, type StudentLearningProfile } from "../services/reportingService";
 import { getStudent, type BackendStudentSummary } from "../services/studentService";
 
 function toErrorMessage(error: unknown): string {
@@ -49,6 +50,7 @@ export function StudentDetail() {
       notes: string | null;
     }>
   >([]);
+  const [learningTopics, setLearningTopics] = useState<StudentLearningProfile["topics"]>([]);
 
   useEffect(() => {
     const studentId = Number(id);
@@ -63,10 +65,11 @@ export function StudentDetail() {
       setRequestError("");
 
       try {
-        const [studentData, classes, txList] = await Promise.all([
+        const [studentData, classes, txList, learningProfile] = await Promise.all([
           getStudent(studentId),
           listClasses(),
           listTransactions({ student_id: studentId }),
+          getStudentLearningProfile(studentId),
         ]);
 
         setStudent(studentData);
@@ -83,6 +86,7 @@ export function StudentDetail() {
             notes: item.notes,
           })),
         );
+        setLearningTopics(learningProfile.topics);
       } catch (error) {
         setRequestError(toErrorMessage(error));
       } finally {
@@ -189,6 +193,78 @@ export function StudentDetail() {
             </p>
           </div>
         </div>
+      </div>
+
+      <div className="bg-white border border-zinc-200 rounded-xl p-6 mb-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-xl font-semibold text-zinc-900">Tiến độ chuyên đề</h2>
+            <p className="text-sm text-zinc-600 mt-1">Số bài đã giải trong các chuyên đề học sinh tham gia</p>
+          </div>
+          <BookOpen className="w-5 h-5 text-zinc-600" />
+        </div>
+
+        {learningTopics.length > 0 ? (
+          <div className="space-y-3">
+            {learningTopics.map((topic) => {
+              const totalProblems = topic.total_problems;
+              const solvedCount = topic.solved_count;
+              const progress = totalProblems > 0 ? Math.round((solvedCount / totalProblems) * 100) : 0;
+
+              return (
+                <div key={topic.topic_id} className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <p className="font-medium text-zinc-900">{topic.topic_title}</p>
+                      <p className="text-sm text-zinc-600">{topic.class_name}</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {topic.problems.map((problem) => (
+                          <span
+                            key={problem.problem_id}
+                            className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-xs ${
+                              problem.solved
+                                ? "bg-zinc-900 text-white"
+                                : "bg-white text-zinc-500 border border-zinc-200"
+                            }`}
+                            title={problem.problem_name ?? problem.problem_index}
+                          >
+                            {problem.problem_index}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="md:min-w-44 md:text-right">
+                      <p className="text-2xl font-semibold text-zinc-900">
+                        {solvedCount}/{totalProblems}
+                      </p>
+                      <p className="text-sm text-zinc-600">bài đã giải</p>
+                      <div className="mt-3 h-2 rounded-full bg-zinc-200">
+                        <div
+                          className="h-2 rounded-full bg-zinc-900"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <a
+                        href={topic.gym_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 inline-flex items-center gap-1 text-sm text-zinc-600 hover:text-zinc-900"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Codeforces
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-zinc-500 text-center py-8">
+            Chưa có dữ liệu standing cho học sinh này.
+          </p>
+        )}
       </div>
 
       <div className="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">

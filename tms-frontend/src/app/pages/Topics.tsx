@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, ExternalLink, Clock, BarChart3 } from "lucide-react";
+import { Plus, ExternalLink, BarChart3, XCircle } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { ApiError } from "../services/apiClient";
 import { listClasses } from "../services/classService";
-import { createTopic, listTopics, type BackendTopic } from "../services/topicService";
+import { closeTopic, createTopic, listTopics, type BackendTopic } from "../services/topicService";
 
 type ClassOption = {
   id: number;
@@ -65,7 +65,26 @@ export function Topics() {
   );
 
   const activeTopics = filteredTopics.filter((topic) => topic.status === "active");
-  const expiredTopics = filteredTopics.filter((topic) => topic.status === "expired");
+  const closedTopics = filteredTopics.filter((topic) => topic.status === "closed");
+
+  const handleCloseTopic = async (topic: BackendTopic) => {
+    const confirmed = window.confirm(`Đóng chuyên đề "${topic.title}"?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setSubmitting(true);
+    setRequestError("");
+
+    try {
+      await closeTopic(topic.id);
+      await loadData();
+    } catch (error) {
+      setRequestError(toErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="p-8">
@@ -89,30 +108,19 @@ export function Topics() {
         </div>
       )}
 
-      <div className="bg-white border border-zinc-200 rounded-xl p-6 mb-6 shadow-sm">
-        <label className="block text-sm text-zinc-700 mb-2">Lọc theo lớp</label>
-        <select
-          value={selectedClassId}
-          onChange={(e) => setSelectedClassId(e.target.value)}
-          className="px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
-        >
-          <option value="all">Tất cả lớp</option>
-          {classes.map((cls) => (
-            <option key={cls.id} value={cls.id}>{cls.name}</option>
-          ))}
-        </select>
-      </div>
-
       <div className="mb-8">
-        <h2 className="text-lg font-semibold text-zinc-900 mb-4">Chuyên đề đang mở</h2>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-zinc-900">Chuyên đề đang mở</h2>
+          <TopicClassFilter
+            classes={classes}
+            selectedClassId={selectedClassId}
+            onChange={setSelectedClassId}
+          />
+        </div>
         {activeTopics.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {activeTopics.map((topic) => {
               const className = classNameById.get(topic.class_id) ?? `Lớp #${topic.class_id}`;
-              const deadline = topic.expires_at ? new Date(topic.expires_at) : null;
-              const daysLeft = deadline
-                ? Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-                : null;
 
               return (
                 <div key={topic.id} className="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
@@ -127,23 +135,6 @@ export function Topics() {
                   </div>
 
                   <div className="space-y-3 mb-4">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="w-4 h-4 text-zinc-600" />
-                      {deadline ? (
-                        <>
-                          <span className="text-zinc-700">
-                            Còn {Math.max(daysLeft ?? 0, 0)} ngày
-                          </span>
-                          <span className="text-zinc-400">•</span>
-                          <span className="text-zinc-600">
-                            {deadline.toLocaleDateString("vi-VN")}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-zinc-600">Không có hạn kết thúc</span>
-                      )}
-                    </div>
-
                     <a
                       href={topic.gym_link}
                       target="_blank"
@@ -161,6 +152,15 @@ export function Topics() {
                       <BarChart3 className="w-4 h-4" />
                       Xem standing
                     </button>
+
+                    <button
+                      onClick={() => void handleCloseTopic(topic)}
+                      disabled={submitting}
+                      className="flex items-center gap-2 text-sm text-zinc-700 hover:text-zinc-900 transition-colors disabled:opacity-60"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      Đóng chuyên đề
+                    </button>
                   </div>
                 </div>
               );
@@ -173,11 +173,18 @@ export function Topics() {
         )}
       </div>
 
-      {expiredTopics.length > 0 && (
+      {closedTopics.length > 0 && (
         <div>
-          <h2 className="text-lg font-semibold text-zinc-900 mb-4">Chuyên đề đã hết hạn</h2>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-zinc-900">Chuyên đề đã đóng</h2>
+            <TopicClassFilter
+              classes={classes}
+              selectedClassId={selectedClassId}
+              onChange={setSelectedClassId}
+            />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {expiredTopics.map((topic) => {
+            {closedTopics.map((topic) => {
               const className = classNameById.get(topic.class_id) ?? `Lớp #${topic.class_id}`;
               return (
                 <div key={topic.id} className="bg-white border border-zinc-200 rounded-xl p-6 opacity-60 shadow-sm">
@@ -187,7 +194,7 @@ export function Topics() {
                       <p className="text-sm text-zinc-600">{className}</p>
                     </div>
                     <span className="px-3 py-1 bg-zinc-200 text-zinc-600 rounded-full text-sm">
-                      Đã hết hạn
+                      Đã đóng
                     </span>
                   </div>
                   <div className="space-y-2">
@@ -243,6 +250,30 @@ export function Topics() {
   );
 }
 
+function TopicClassFilter({
+  classes,
+  selectedClassId,
+  onChange,
+}: {
+  classes: ClassOption[];
+  selectedClassId: string;
+  onChange: (classId: string) => void;
+}) {
+  return (
+    <select
+      value={selectedClassId}
+      onChange={(event) => onChange(event.target.value)}
+      className="min-w-48 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+      aria-label="Lọc chuyên đề theo lớp"
+    >
+      <option value="all">Tất cả lớp</option>
+      {classes.map((cls) => (
+        <option key={cls.id} value={cls.id}>{cls.name}</option>
+      ))}
+    </select>
+  );
+}
+
 function AddTopicModal({
   classes,
   submitting,
@@ -283,7 +314,6 @@ function AddTopicModal({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white border border-zinc-200 rounded-xl p-6 w-full max-w-md shadow-lg">
-        <h2 className="text-xl font-semibold text-zinc-900 mb-6">Thêm chuyên đề</h2>
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
             <label className="block text-sm text-zinc-700 mb-2">Lớp</label>
@@ -308,12 +338,6 @@ function AddTopicModal({
               className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
               placeholder="https://codeforces.com/gym/123456"
             />
-          </div>
-
-          <div className="bg-zinc-100 border border-zinc-200 rounded-lg p-4">
-            <p className="text-zinc-700 text-sm">
-              💡 Hệ thống sẽ tự động lấy thời gian hết hạn từ Codeforces API (khi đồng bộ).
-            </p>
           </div>
 
           {localError && <p className="text-sm text-red-600">{localError}</p>}

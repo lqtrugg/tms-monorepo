@@ -17,6 +17,53 @@ type ContestStandingsResult = {
   };
 };
 
+type ContestStandingsFullResult = {
+  contest?: {
+    id?: number;
+    name?: string;
+  };
+  problems?: Array<{
+    index?: string;
+    name?: string;
+  }>;
+  rows?: Array<{
+    party?: {
+      members?: Array<{
+        handle?: string;
+      }>;
+    };
+    problemResults?: Array<{
+      points?: number;
+      rejectedAttemptCount?: number;
+      bestSubmissionTimeSeconds?: number;
+    }>;
+  }>;
+};
+
+const HTML_ENTITY_BY_NAME: Record<string, string> = {
+  amp: '&',
+  apos: "'",
+  gt: '>',
+  lt: '<',
+  quot: '"',
+  aacute: 'á',
+  agrave: 'à',
+  acirc: 'â',
+  atilde: 'ã',
+  eacute: 'é',
+  egrave: 'è',
+  ecirc: 'ê',
+  iacute: 'í',
+  igrave: 'ì',
+  oacute: 'ó',
+  ograve: 'ò',
+  ocirc: 'ô',
+  otilde: 'õ',
+  uacute: 'ú',
+  ugrave: 'ù',
+  yacute: 'ý',
+};
+
 export type CodeforcesCredentials = {
   apiKey: string;
   apiSecret: string;
@@ -79,6 +126,26 @@ function parseCodeforcesError(payload: unknown): string | null {
   }
 
   return null;
+}
+
+function decodeHtmlEntities(value: string): string {
+  return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, token: string) => {
+    if (token.startsWith('#x') || token.startsWith('#X')) {
+      const codePoint = Number.parseInt(token.slice(2), 16);
+      return Number.isInteger(codePoint) && codePoint >= 0 && codePoint <= 0x10FFFF
+        ? String.fromCodePoint(codePoint)
+        : entity;
+    }
+
+    if (token.startsWith('#')) {
+      const codePoint = Number.parseInt(token.slice(1), 10);
+      return Number.isInteger(codePoint) && codePoint >= 0 && codePoint <= 0x10FFFF
+        ? String.fromCodePoint(codePoint)
+        : entity;
+    }
+
+    return HTML_ENTITY_BY_NAME[token.toLowerCase()] ?? entity;
+  });
 }
 
 export function resolveCodeforcesCredentials(
@@ -159,6 +226,65 @@ export async function fetchCodeforcesGymMetadata(
 
   return {
     gym_id: String(result.contest.id),
-    title: result.contest.name.trim(),
+    title: decodeHtmlEntities(result.contest.name).trim(),
+  };
+}
+
+export async function fetchCodeforcesGymStandings(
+  gymId: string,
+  credentials: CodeforcesCredentials | null,
+): Promise<{
+  gym_id: string;
+  title: string;
+  problems: Array<{ index: string; name: string | null }>;
+  rows: Array<{
+    handles: string[];
+    problemResults: Array<{
+      solved: boolean;
+      penalty_minutes: number | null;
+    }>;
+  }>;
+}> {
+  const result = await callCodeforcesApi<ContestStandingsFullResult>(
+    'contest.standings',
+    {
+      contestId: gymId,
+      from: 1,
+      count: 10000,
+      showUnofficial: true,
+    },
+    credentials,
+  );
+
+  if (!result.contest?.id || typeof result.contest.name !== 'string' || result.contest.name.trim().length === 0) {
+    throw new ServiceError('invalid Codeforces gym standings', 502);
+  }
+
+  return {
+    gym_id: String(result.contest.id),
+    title: decodeHtmlEntities(result.contest.name).trim(),
+    problems: (result.problems ?? [])
+      .filter((problem) => typeof problem.index === 'string' && problem.index.trim().length > 0)
+      .map((problem) => ({
+        index: problem.index!.trim(),
+        name: typeof problem.name === 'string' && problem.name.trim().length > 0
+          ? decodeHtmlEntities(problem.name).trim()
+          : null,
+      })),
+    rows: (result.rows ?? []).map((row) => ({
+      handles: (row.party?.members ?? [])
+        .map((member) => member.handle?.trim().toLowerCase())
+        .filter((handle): handle is string => Boolean(handle)),
+      problemResults: (row.problemResults ?? []).map((problemResult) => {
+        const solved = typeof problemResult.points === 'number' && problemResult.points > 0;
+        const bestSubmissionTimeSeconds = problemResult.bestSubmissionTimeSeconds;
+        return {
+          solved,
+          penalty_minutes: solved && typeof bestSubmissionTimeSeconds === 'number'
+            ? Math.max(0, Math.floor(bestSubmissionTimeSeconds / 60))
+            : null,
+        };
+      }),
+    })),
   };
 }

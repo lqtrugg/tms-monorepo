@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, ExternalLink, Clock, CheckCircle, XCircle } from "lucide-react";
+import { Plus, ExternalLink } from "lucide-react";
 import { mockTopics, mockClasses } from "../data/mockData";
 
 export function Codeforces() {
@@ -11,7 +11,7 @@ export function Codeforces() {
     : mockTopics.filter(t => t.classId === selectedClassId);
 
   const activeTopics = filteredTopics.filter(t => t.status === 'active');
-  const expiredTopics = filteredTopics.filter(t => t.status === 'expired');
+  const closedTopics = filteredTopics.filter(t => t.status === 'closed');
 
   return (
     <div className="p-8">
@@ -22,7 +22,7 @@ export function Codeforces() {
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-3 bg-white text-black rounded-lg font-medium hover:bg-zinc-200 transition-colors"
+          className="flex items-center gap-2 px-4 py-3 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 transition-colors"
         >
           <Plus className="w-5 h-5" />
           Thêm chuyên đề
@@ -49,8 +49,6 @@ export function Codeforces() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {activeTopics.map((topic) => {
               const className = mockClasses.find(c => c.id === topic.classId)?.name;
-              const deadline = new Date(topic.deadline);
-              const daysLeft = Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 
               return (
                 <div key={topic.id} className="bg-white border border-zinc-200 rounded-xl p-6 hover:border-zinc-700 transition-colors">
@@ -65,17 +63,6 @@ export function Codeforces() {
                   </div>
 
                   <div className="space-y-3 mb-4">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="w-4 h-4 text-zinc-600" />
-                      <span className="text-zinc-600">
-                        Còn {daysLeft} ngày
-                      </span>
-                      <span className="text-zinc-600">•</span>
-                      <span className="text-zinc-600">
-                        {deadline.toLocaleDateString('vi-VN')}
-                      </span>
-                    </div>
-
                     <a
                       href={topic.gymLink}
                       target="_blank"
@@ -115,11 +102,11 @@ export function Codeforces() {
         )}
       </div>
 
-      {expiredTopics.length > 0 && (
+      {closedTopics.length > 0 && (
         <div>
-          <h2 className="text-lg font-semibold text-zinc-900 mb-4">Chuyên đề đã hết hạn</h2>
+          <h2 className="text-lg font-semibold text-zinc-900 mb-4">Chuyên đề đã đóng</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {expiredTopics.map((topic) => {
+            {closedTopics.map((topic) => {
               const className = mockClasses.find(c => c.id === topic.classId)?.name;
               return (
                 <div key={topic.id} className="bg-white border border-zinc-200 rounded-xl p-6 opacity-60">
@@ -129,7 +116,7 @@ export function Codeforces() {
                       <p className="text-sm text-zinc-600">{className}</p>
                     </div>
                     <span className="px-3 py-1 bg-zinc-100 text-zinc-600 rounded-full text-sm">
-                      Đã hết hạn
+                      Đã đóng
                     </span>
                   </div>
                   <a
@@ -159,7 +146,6 @@ function AddTopicModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-white/80 flex items-center justify-center p-4 z-50">
       <div className="bg-zinc-100 border border-zinc-200 rounded-xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-semibold text-zinc-900 mb-6">Thêm chuyên đề</h2>
         <form className="space-y-4">
           <div>
             <label className="block text-sm text-zinc-600 mb-2">Lớp</label>
@@ -187,12 +173,6 @@ function AddTopicModal({ onClose }: { onClose: () => void }) {
               className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
               placeholder="https://codeforces.com/gym/123456"
             />
-          </div>
-
-          <div className="bg-zinc-100 border border-zinc-700 rounded-lg p-4">
-            <p className="text-zinc-700 text-sm">
-              💡 Hệ thống sẽ tự động lấy thời gian hết hạn từ Codeforces API và pull standing theo lịch định kỳ
-            </p>
           </div>
 
           <div className="flex gap-3 pt-4">

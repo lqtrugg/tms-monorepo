@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Calendar, CheckCircle, XCircle, AlertCircle, Plus } from "lucide-react";
-import { useNavigate } from "react-router";
+import { Calendar, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 
 import { ApiError } from "../services/apiClient";
 import {
@@ -55,7 +54,6 @@ function statusLabel(status: BackendAttendanceStatus | null): "present" | "excus
 }
 
 export function Attendance() {
-  const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -149,13 +147,6 @@ export function Attendance() {
           <h1 className="text-3xl font-semibold text-zinc-900 mb-2">Điểm danh</h1>
           <p className="text-zinc-600">Quản lý buổi học và điểm danh</p>
         </div>
-        <button
-          onClick={() => navigate("/sessions")}
-          className="flex items-center gap-2 px-4 py-3 bg-white text-black rounded-lg font-medium hover:bg-zinc-200 transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Thêm buổi học
-        </button>
       </div>
 
       {requestError && (

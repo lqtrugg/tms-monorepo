@@ -326,9 +326,44 @@ export async function listMessages(teacherId: number, filters: {
     ]),
   );
 
+  const failedRecipients = await AppDataSource.getRepository(DiscordMessageRecipient)
+    .createQueryBuilder('recipient')
+    .leftJoin(Student, 'student', 'student.id = recipient.student_id AND student.teacher_id = recipient.teacher_id')
+    .select('recipient.discord_message_id', 'message_id')
+    .addSelect('recipient.student_id', 'student_id')
+    .addSelect('student.full_name', 'student_name')
+    .addSelect('recipient.error_detail', 'error_detail')
+    .where('recipient.teacher_id = :teacherId', { teacherId })
+    .andWhere('recipient.discord_message_id IN (:...messageIds)', { messageIds })
+    .andWhere('recipient.status = :status', { status: DiscordSendStatus.Failed })
+    .orderBy('student.full_name', 'ASC')
+    .getRawMany<{
+      message_id: string;
+      student_id: string;
+      student_name: string | null;
+      error_detail: string | null;
+    }>();
+  const failuresByMessageId = new Map<number, Array<{
+    student_id: number;
+    student_name: string;
+    error: string;
+  }>>();
+
+  failedRecipients.forEach((recipient) => {
+    const messageId = Number(recipient.message_id);
+    const failures = failuresByMessageId.get(messageId) ?? [];
+    failures.push({
+      student_id: Number(recipient.student_id),
+      student_name: recipient.student_name ?? `Học sinh #${recipient.student_id}`,
+      error: recipient.error_detail ?? 'unknown delivery error',
+    });
+    failuresByMessageId.set(messageId, failures);
+  });
+
   return messages.map((message) => ({
     ...message,
     recipients: countMap.get(message.id) ?? { total: 0, sent: 0, failed: 0 },
+    failures: failuresByMessageId.get(message.id) ?? [],
   }));
 }
 
@@ -501,6 +536,13 @@ export async function sendBulkDm(teacherId: number, input: {
       recipients_total: recipients.length,
       sent: sentCount,
       failed: recipients.length - sentCount,
+      failures: deliveryResults
+        .filter((result) => result.status === DiscordSendStatus.Failed)
+        .map((result) => ({
+          student_id: result.student_id,
+          student_name: studentById.get(result.student_id)?.full_name ?? `Học sinh #${result.student_id}`,
+          error: result.error_detail ?? 'unknown delivery error',
+        })),
     };
   });
 }

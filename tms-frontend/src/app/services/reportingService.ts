@@ -42,7 +42,7 @@ export interface StudentLearningProfile {
     class_name: string;
     gym_link: string;
     gym_id: string | null;
-    expires_at: string | null;
+    closed_at: string | null;
     solved_count: number;
     total_problems: number;
     last_pulled_at: string | null;

@@ -29,6 +29,24 @@ function parseAmount(value: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function escapeCsvCell(value: string | number): string {
+  const text = String(value);
+  return /[",\n\r]/.test(text) ? `"${text.replaceAll("\"", "\"\"")}"` : text;
+}
+
+function downloadCsv(filename: string, rows: Array<Array<string | number>>): void {
+  const csv = rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
+  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function Reports() {
   const [startDate, setStartDate] = useState("2026-04-01");
   const [endDate, setEndDate] = useState("2026-04-30");
@@ -147,6 +165,41 @@ export function Reports() {
     void loadReport();
   }, [startDate, endDate, includeUnpaid, selectedClasses.join(",")]);
 
+  const handleExportReport = () => {
+    const selectedClassLabel = selectedClasses.includes("all")
+      ? "Tất cả"
+      : classOptions
+        .filter((cls) => selectedClasses.includes(String(cls.id)))
+        .map((cls) => cls.name)
+        .join("; ");
+
+    downloadCsv(`bao-cao-${startDate}-${endDate}.csv`, [
+      ["Báo cáo thống kê"],
+      ["Từ ngày", startDate],
+      ["Đến ngày", endDate],
+      ["Lớp", selectedClassLabel],
+      ["Bao gồm khoản chưa thu", includeUnpaid ? "Có" : "Không"],
+      [],
+      ["Chỉ số", "Giá trị"],
+      ["Tổng thu", summary.totalPayments],
+      ["Học phí phát sinh", summary.totalFees],
+      ["Hoàn trả", summary.totalRefunds],
+      ["Chưa thu", summary.totalUnpaid],
+      ["Doanh thu ròng", summary.netRevenue],
+      ["Doanh thu dự kiến", summary.expectedRevenue],
+      ["Nợ học sinh active", debtBreakdown.unpaidDebt],
+      ["Nợ cần đòi pending", debtBreakdown.pendingDebt],
+      [],
+      ["Lớp", "Số học sinh", "Học phí mỗi buổi", "Doanh thu ước tính"],
+      ...classStats.map((cls) => [
+        cls.class_name,
+        cls.student_count,
+        cls.fee_per_session,
+        cls.fee_per_session * cls.student_count * 12,
+      ]),
+    ]);
+  };
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
@@ -154,7 +207,11 @@ export function Reports() {
           <h1 className="text-3xl font-semibold text-zinc-900 mb-2">Báo cáo thống kê</h1>
           <p className="text-zinc-600">Phân tích doanh thu và hiệu suất</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-3 bg-white text-black rounded-lg font-medium hover:bg-zinc-200 transition-colors">
+        <button
+          onClick={handleExportReport}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-3 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 transition-colors disabled:opacity-60"
+        >
           <Download className="w-5 h-5" />
           Xuất báo cáo
         </button>

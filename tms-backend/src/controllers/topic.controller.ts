@@ -12,6 +12,7 @@ import {
 } from '../helpers/service.helpers.js';
 import {
   addTopicProblem,
+  closeTopic,
   createTopic,
   getTopicStandingMatrix,
   listTopics,
@@ -34,13 +35,13 @@ function getTeacherId(req: Request): number {
   return teacher.id;
 }
 
-function parseTopicStatus(value: unknown): 'active' | 'expired' | undefined {
+function parseTopicStatus(value: unknown): 'active' | 'closed' | undefined {
   if (value === undefined) {
     return undefined;
   }
 
-  if (value !== 'active' && value !== 'expired') {
-    throw new ServiceError('status must be one of: active, expired', 400);
+  if (value !== 'active' && value !== 'closed') {
+    throw new ServiceError('status must be one of: active, closed', 400);
   }
 
   return value;
@@ -96,11 +97,22 @@ topicRouter.post('/topics', async (req, res, next) => {
     const topic = await createTopic(teacherId, {
       class_id: parsePositiveInteger(body.class_id, 'class_id'),
       gym_link: parseRequiredString(body.gym_link, 'gym_link'),
-      expires_at: body.expires_at === undefined ? null : parseDateTime(body.expires_at, 'expires_at'),
       pull_interval_minutes: parseOptionalInteger(body.pull_interval_minutes, 'pull_interval_minutes'),
     });
 
     res.status(201).json({ topic });
+  } catch (error) {
+    next(error);
+  }
+});
+
+topicRouter.post('/topics/:topicId/close', async (req, res, next) => {
+  try {
+    const teacherId = getTeacherId(req);
+    const topicId = parsePositiveInteger(req.params.topicId, 'topic_id');
+    const topic = await closeTopic(teacherId, topicId);
+
+    res.json({ topic });
   } catch (error) {
     next(error);
   }

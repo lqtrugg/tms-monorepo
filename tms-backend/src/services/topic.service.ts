@@ -10,14 +10,10 @@ import {
   type CodeforcesCredentials,
 } from './codeforces-api.service.js';
 
-type TopicStatusFilter = 'active' | 'expired';
+type TopicStatusFilter = 'active' | 'closed';
 
 function normalizeTopicStatus(topic: Topic): TopicStatusFilter {
-  if (!topic.expires_at) {
-    return 'active';
-  }
-
-  return topic.expires_at.getTime() < Date.now() ? 'expired' : 'active';
+  return topic.closed_at ? 'closed' : 'active';
 }
 
 async function syncGymMetadata(
@@ -103,7 +99,6 @@ export async function listTopics(teacherId: number, filters: {
 export async function createTopic(teacherId: number, input: {
   class_id: number;
   gym_link: string;
-  expires_at?: Date | null;
   pull_interval_minutes?: number;
 }) {
   return AppDataSource.transaction(async (manager) => {
@@ -134,12 +129,21 @@ export async function createTopic(teacherId: number, input: {
       title: gymMetadata.title,
       gym_link: parsedGymLink.toString(),
       gym_id: gymMetadata.gym_id,
-      expires_at: input.expires_at ?? null,
+      closed_at: null,
       pull_interval_minutes: input.pull_interval_minutes ?? 60,
       last_pulled_at: null,
     });
 
     return topicRepo.save(topic);
+  });
+}
+
+export async function closeTopic(teacherId: number, topicId: number) {
+  return AppDataSource.transaction(async (manager) => {
+    const topic = await requireOwnedTopic(manager, teacherId, topicId);
+    topic.closed_at = new Date();
+
+    return manager.getRepository(Topic).save(topic);
   });
 }
 

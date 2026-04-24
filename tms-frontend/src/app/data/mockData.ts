@@ -51,8 +51,7 @@ export interface Topic {
   classId: string;
   name: string;
   gymLink: string;
-  deadline: string;
-  status: 'active' | 'expired';
+  status: 'active' | 'closed';
 }
 
 export const mockStudents: Student[] = [
@@ -170,7 +169,6 @@ export const mockTopics: Topic[] = [
     classId: '1',
     name: 'Graph Theory Basics',
     gymLink: 'https://codeforces.com/gym/123456',
-    deadline: '2026-04-30T23:59:59',
     status: 'active',
   },
   {
@@ -178,7 +176,6 @@ export const mockTopics: Topic[] = [
     classId: '1',
     name: 'Dynamic Programming',
     gymLink: 'https://codeforces.com/gym/123457',
-    deadline: '2026-05-15T23:59:59',
     status: 'active',
   },
   {
@@ -186,7 +183,6 @@ export const mockTopics: Topic[] = [
     classId: '2',
     name: 'Advanced Trees',
     gymLink: 'https://codeforces.com/gym/123458',
-    deadline: '2026-03-30T23:59:59',
-    status: 'expired',
+    status: 'closed',
   },
 ];

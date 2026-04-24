@@ -45,6 +45,10 @@ function parseAmount(value: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function defaultTransactionNotes(type: BackendTransactionType): string {
+  return type === "payment" ? "Thu tiền học phí" : "Hoàn trả học phí";
+}
+
 export function Transactions() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<TransactionFilterType>("all");
@@ -111,7 +115,16 @@ export function Transactions() {
 
   const filteredTransactions = useMemo(
     () => rows.filter((row) => {
-      const matchesSearch = row.studentName.toLowerCase().includes(searchTerm.toLowerCase());
+      const normalizedSearch = searchTerm.trim().toLowerCase();
+      const typeLabel = row.type === "payment" ? "thu tiền" : row.type === "fee" ? "học phí" : "hoàn trả";
+      const searchableText = [
+        row.studentName,
+        row.description,
+        typeLabel,
+        new Date(row.date).toLocaleDateString("vi-VN"),
+        String(Math.abs(row.amount)),
+      ].join(" ").toLowerCase();
+      const matchesSearch = normalizedSearch === "" || searchableText.includes(normalizedSearch);
       const matchesType = filterType === "all" || row.type === filterType;
       return matchesSearch && matchesType;
     }),
@@ -141,7 +154,7 @@ export function Transactions() {
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-3 bg-white text-black rounded-lg font-medium hover:bg-zinc-200 transition-colors"
+          className="flex items-center gap-2 px-4 py-3 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 transition-colors"
         >
           <Plus className="w-5 h-5" />
           Ghi nhận giao dịch
@@ -186,7 +199,7 @@ export function Transactions() {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-600" />
             <input
               type="text"
-              placeholder="Tìm kiếm học sinh..."
+              placeholder="Tìm học sinh, mô tả, loại giao dịch..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-3 bg-zinc-100 border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400"
@@ -310,9 +323,18 @@ function AddTransactionModal({
   const [studentId, setStudentId] = useState("");
   const [amount, setAmount] = useState("");
   const [type, setType] = useState<BackendTransactionType>("payment");
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(defaultTransactionNotes("payment"));
   const [recordedAt, setRecordedAt] = useState(new Date().toISOString().slice(0, 10));
   const [localError, setLocalError] = useState("");
+  const [studentSearch, setStudentSearch] = useState("");
+
+  const visibleStudents = useMemo(() => {
+    const normalizedSearch = studentSearch.trim().toLowerCase();
+    return (normalizedSearch === ""
+      ? students
+      : students.filter((student) => student.name.toLowerCase().includes(normalizedSearch))
+    ).slice(0, 8);
+  }, [students, studentSearch]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -343,27 +365,58 @@ function AddTransactionModal({
   return (
     <div className="fixed inset-0 bg-white/80 flex items-center justify-center p-4 z-50">
       <div className="bg-zinc-100 border border-zinc-200 rounded-xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-semibold text-zinc-900 mb-6">Ghi nhận giao dịch</h2>
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
             <label className="block text-sm text-zinc-600 mb-2">Học sinh</label>
-            <select
-              value={studentId}
-              onChange={(event) => setStudentId(event.target.value)}
-              className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
-            >
-              <option value="">Chọn học sinh</option>
-              {students.map((student) => (
-                <option key={student.id} value={student.id}>{student.name}</option>
-              ))}
-            </select>
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <input
+                type="text"
+                value={studentSearch}
+                onChange={(event) => setStudentSearch(event.target.value)}
+                className="w-full pl-11 pr-4 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                placeholder="Tìm học sinh..."
+              />
+            </div>
+            <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-1">
+              {visibleStudents.map((student) => {
+                const isSelected = String(student.id) === studentId;
+
+                return (
+                  <button
+                    key={student.id}
+                    type="button"
+                    onClick={() => {
+                      setStudentId(String(student.id));
+                      setStudentSearch(student.name);
+                    }}
+                    className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition-colors ${
+                      isSelected
+                        ? "bg-zinc-900 text-white"
+                        : "text-zinc-900 hover:bg-zinc-100"
+                    }`}
+                  >
+                    <span className="font-medium">{student.name}</span>
+                    {isSelected && <span className="text-sm text-zinc-300">Đã chọn</span>}
+                  </button>
+                );
+              })}
+
+              {visibleStudents.length === 0 && (
+                <div className="px-3 py-3 text-sm text-zinc-500">Không tìm thấy học sinh.</div>
+              )}
+            </div>
           </div>
 
           <div>
             <label className="block text-sm text-zinc-600 mb-2">Loại giao dịch</label>
             <select
               value={type}
-              onChange={(event) => setType(event.target.value as BackendTransactionType)}
+              onChange={(event) => {
+                const nextType = event.target.value as BackendTransactionType;
+                setType(nextType);
+                setNotes(defaultTransactionNotes(nextType));
+              }}
               className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
             >
               <option value="payment">Thu tiền</option>
@@ -417,7 +470,7 @@ function AddTransactionModal({
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 px-4 py-3 bg-white text-black rounded-lg hover:bg-zinc-200 transition-colors font-medium"
+              className="flex-1 px-4 py-3 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors font-medium disabled:opacity-60"
             >
               {submitting ? "Đang ghi nhận..." : "Ghi nhận"}
             </button>

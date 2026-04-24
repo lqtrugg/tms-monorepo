@@ -25,6 +25,11 @@ export interface BackendMessageListRow {
     sent: number;
     failed: number;
   };
+  failures: Array<{
+    student_id: number;
+    student_name: string;
+    error: string;
+  }>;
 }
 
 export async function listDiscordServers(): Promise<BackendDiscordServer[]> {
@@ -72,6 +77,11 @@ export async function sendBulkDm(payload: {
     recipients_total: number;
     sent: number;
     failed: number;
+    failures: Array<{
+      student_id: number;
+      student_name: string;
+      error: string;
+    }>;
   }>("/discord/messages/bulk-dm", {
     method: "POST",
     body: JSON.stringify(payload),

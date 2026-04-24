@@ -11,6 +11,8 @@ import {
   LogOut,
   MessageSquare,
   Shield,
+  UserCircle,
+  BadgeCheck,
 } from "lucide-react";
 
 import { clearAuthSession, getAccessToken, getStoredTeacher } from "../services/authStorage";
@@ -67,14 +69,21 @@ export function Layout() {
     <div className="flex h-screen bg-zinc-50 text-zinc-900">
       <aside className="w-64 bg-zinc-900 border-r border-zinc-800 flex flex-col">
         <div className="p-6 border-b border-zinc-800">
-          <h1 className="text-xl font-semibold text-white">CP Training</h1>
-          <p className="text-sm text-zinc-400 mt-1">Quản lý lập trình thi đấu</p>
-          <div className="mt-4 rounded-lg border border-zinc-700 bg-zinc-800/60 px-3 py-2">
-            <p className="text-xs text-zinc-400">Đăng nhập</p>
-            <p className="text-sm text-white font-medium mt-0.5">{teacher.username}</p>
-            <p className="text-xs text-zinc-400 mt-1">
-              Vai trò: {teacher.role === "sysadmin" ? "System Admin" : "Teacher"}
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-white">
+              <GraduationCap className="h-5 w-5" />
+            </div>
+            <h1 className="text-xl font-semibold text-white">CP Training</h1>
+          </div>
+          <div className="mt-4 rounded-lg border border-zinc-700 bg-zinc-800/60 px-3 py-3">
+            <div className="flex items-center gap-2 text-sm text-white">
+              <UserCircle className="h-4 w-4 text-zinc-400" />
+              <span className="font-medium">{teacher.username}</span>
+            </div>
+            <div className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
+              <BadgeCheck className="h-4 w-4" />
+              <span>{teacher.role === "sysadmin" ? "Admin" : "Teacher"}</span>
+            </div>
           </div>
         </div>
 

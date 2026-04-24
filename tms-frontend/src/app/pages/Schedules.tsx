@@ -108,7 +108,6 @@ function AddScheduleModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white border border-zinc-200 rounded-xl p-6 w-full max-w-md shadow-xl">
-        <h2 className="text-xl font-semibold text-zinc-900 mb-6">Thêm lịch học</h2>
         <form className="space-y-4">
           <div>
             <label className="block text-sm text-zinc-700 mb-2">Lớp</label>

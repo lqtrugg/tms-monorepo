@@ -1,6 +1,6 @@
 import { apiRequest } from "./apiClient";
 
-export type BackendTopicStatus = "active" | "expired";
+export type BackendTopicStatus = "active" | "closed";
 
 export interface BackendTopic {
   id: number;
@@ -9,7 +9,7 @@ export interface BackendTopic {
   title: string;
   gym_link: string;
   gym_id: string | null;
-  expires_at: string | null;
+  closed_at: string | null;
   pull_interval_minutes: number;
   last_pulled_at: string | null;
   created_at: string;
@@ -46,7 +46,7 @@ export interface BackendTopicStandingMatrix {
     class_id: number;
     title: string;
     gym_link: string;
-    expires_at: string | null;
+    closed_at: string | null;
     last_pulled_at: string | null;
     created_at: string;
   };
@@ -86,12 +86,19 @@ export async function listTopics(filters?: {
 export async function createTopic(payload: {
   class_id: number;
   gym_link: string;
-  expires_at?: string | null;
   pull_interval_minutes?: number;
 }): Promise<BackendTopic> {
   const data = await apiRequest<{ topic: BackendTopic }>("/topics", {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+
+  return data.topic;
+}
+
+export async function closeTopic(topicId: number): Promise<BackendTopic> {
+  const data = await apiRequest<{ topic: BackendTopic }>(`/topics/${topicId}/close`, {
+    method: "POST",
   });
 
   return data.topic;
