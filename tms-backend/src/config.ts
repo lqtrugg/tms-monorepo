@@ -6,6 +6,19 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   return value.toLowerCase() === 'true';
 }
 
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
 function parseOptionalString(value: string | undefined): string | undefined {
   if (value === undefined) {
     return undefined;
@@ -39,6 +52,12 @@ const config = {
     synchronize: parseBoolean(process.env.DB_SYNCHRONIZE, true),
     dropSchema: parseBoolean(process.env.DB_DROP_SCHEMA, false),
     logging: process.env.DB_LOGGING ? parseBoolean(process.env.DB_LOGGING, false) : undefined,
+  },
+  autoSync: {
+    enabled: parseBoolean(process.env.AUTO_SYNC_ENABLED, true),
+    intervalMinutes: parsePositiveInteger(process.env.AUTO_SYNC_INTERVAL_MINUTES, 30),
+    syncDiscord: parseBoolean(process.env.AUTO_SYNC_DISCORD_ENABLED, true),
+    syncCodeforces: parseBoolean(process.env.AUTO_SYNC_CODEFORCES_ENABLED, true),
   },
 };
 

@@ -78,11 +78,30 @@ export async function createStudent(payload: {
   full_name: string;
   class_id: number;
   codeforces_handle: string | null;
+  discord_username: string;
+  phone?: string | null;
   note: string | null;
 }): Promise<BackendStudentSummary> {
   const data = await apiRequest<StudentResponse>("/students", {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+
+  return data.student;
+}
+
+export async function updateStudent(payload: {
+  student_id: number;
+  full_name?: string;
+  codeforces_handle?: string | null;
+  discord_username?: string;
+  phone?: string | null;
+  note?: string | null;
+}): Promise<BackendStudentSummary> {
+  const { student_id, ...patch } = payload;
+  const data = await apiRequest<StudentResponse>(`/students/${student_id}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
   });
 
   return data.student;
@@ -102,10 +121,45 @@ export async function transferStudent(payload: {
   return data.student;
 }
 
+export async function bulkTransferStudents(payload: {
+  student_ids: number[];
+  to_class_id: number;
+}): Promise<BackendStudentSummary[]> {
+  const data = await apiRequest<ListStudentsResponse>("/students/bulk/transfer", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  return data.students;
+}
+
 export async function expelStudent(studentId: number): Promise<BackendStudentSummary> {
   const data = await apiRequest<StudentResponse>(`/students/${studentId}/expel`, {
     method: "POST",
     body: JSON.stringify({}),
+  });
+
+  return data.student;
+}
+
+export async function bulkExpelStudents(student_ids: number[]): Promise<BackendStudentSummary[]> {
+  const data = await apiRequest<ListStudentsResponse>("/students/bulk/expel", {
+    method: "POST",
+    body: JSON.stringify({ student_ids }),
+  });
+
+  return data.students;
+}
+
+export async function reinstateStudent(payload: {
+  student_id: number;
+  class_id: number;
+}): Promise<BackendStudentSummary> {
+  const data = await apiRequest<StudentResponse>(`/students/${payload.student_id}/reinstate`, {
+    method: "POST",
+    body: JSON.stringify({
+      class_id: payload.class_id,
+    }),
   });
 
   return data.student;

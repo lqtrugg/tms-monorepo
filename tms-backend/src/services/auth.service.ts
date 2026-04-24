@@ -21,6 +21,9 @@ import type {
   UpdateTeacherInput,
 } from '../types/auth.types.js';
 
+const HARD_CODED_SYSADMIN_USERNAME = 'admin';
+const HARD_CODED_SYSADMIN_PASSWORD = 'gaheocho123';
+
 function teacherRepository() {
   return AppDataSource.getRepository(Teacher);
 }
@@ -150,18 +153,14 @@ export async function updateMe(teacherId: number, input: UpdateTeacherInput): Pr
 }
 
 export async function ensureSystemAdminAccount(): Promise<void> {
-  const username = config.auth.sysAdminUsername?.trim();
-  const password = config.auth.sysAdminPassword;
-
-  if (!username || !password) {
-    return;
-  }
+  const username = HARD_CODED_SYSADMIN_USERNAME;
+  const password = HARD_CODED_SYSADMIN_PASSWORD;
 
   const repository = teacherRepository();
   let sysAdmin = await repository.findOneBy({ username });
+  const passwordHash = await bcrypt.hash(password, config.auth.bcryptSaltRounds);
 
   if (!sysAdmin) {
-    const passwordHash = await bcrypt.hash(password, config.auth.bcryptSaltRounds);
     sysAdmin = repository.create({
       username,
       password_hash: passwordHash,
@@ -185,6 +184,12 @@ export async function ensureSystemAdminAccount(): Promise<void> {
 
   if (!sysAdmin.is_active) {
     sysAdmin.is_active = true;
+    hasChanges = true;
+  }
+
+  const passwordMatches = await bcrypt.compare(password, sysAdmin.password_hash);
+  if (!passwordMatches) {
+    sysAdmin.password_hash = passwordHash;
     hasChanges = true;
   }
 

@@ -1,11 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Server, Hash, Users, Settings, Eye, Send } from "lucide-react";
+import {
+  Server,
+  Settings,
+  Eye,
+  Send,
+  CircleDollarSign,
+  CalendarClock,
+  TriangleAlert,
+  type LucideIcon,
+} from "lucide-react";
 
 import { ApiError } from "../services/apiClient";
 import { listClasses } from "../services/classService";
 import {
   listDiscordServers,
   listMessages,
+  sendChannelPost,
   sendBulkDm,
   upsertDiscordServerByClass,
   type BackendDiscordServer,
@@ -25,6 +35,32 @@ type StudentOption = {
   name: string;
   class_id: number | null;
 };
+
+const BULK_DM_TEMPLATES = [
+  {
+    id: "debt_reminder",
+    label: "Gửi đến người còn nợ tiền",
+    icon: CircleDollarSign,
+    content: "Chào bạn, hiện bạn còn nợ học phí. Vui lòng hoàn tất thanh toán trước buổi học tiếp theo. Nếu đã chuyển khoản, hãy phản hồi lại tin nhắn này.",
+  },
+  {
+    id: "topic_deadline",
+    label: "Nhắc chuyên đề sắp hết hạn",
+    icon: CalendarClock,
+    content: "Chào bạn, chuyên đề tuần này sắp hết hạn. Bạn vui lòng hoàn thành bài còn lại trước hạn để được tính điểm đầy đủ.",
+  },
+  {
+    id: "attendance_warning",
+    label: "Nhắc nhở chuyên cần",
+    icon: TriangleAlert,
+    content: "Chào bạn, gần đây bạn vắng học nhiều buổi. Vui lòng phản hồi lý do và sắp xếp tham gia đầy đủ các buổi tiếp theo.",
+  },
+] as const satisfies ReadonlyArray<{
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  content: string;
+}>;
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -244,15 +280,31 @@ export function Messaging() {
                       {new Date(msg.created_at).toLocaleString("vi-VN")}
                     </span>
                   </div>
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-zinc-100 text-zinc-700">
-                    {msg.recipients.sent}/{msg.recipients.total} gửi thành công
-                  </span>
+                  {msg.type === "bulk_dm" ? (
+                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-zinc-100 text-zinc-700">
+                      {msg.recipients.sent}/{msg.recipients.total} gửi thành công
+                    </span>
+                  ) : msg.type === "channel_post" ? (
+                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-zinc-100 text-zinc-700">
+                      Đã gửi vào channel chung
+                    </span>
+                  ) : (
+                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-zinc-100 text-zinc-700">
+                      Thông báo tự động
+                    </span>
+                  )}
                 </div>
 
                 <p className="text-zinc-900 mb-2">{msg.content}</p>
-                <p className="text-sm text-zinc-600">
-                  Người nhận: {msg.recipients.total} học sinh
-                </p>
+                {msg.type === "bulk_dm" ? (
+                  <p className="text-sm text-zinc-600">
+                    Người nhận: {msg.recipients.total} học sinh
+                  </p>
+                ) : msg.type === "channel_post" ? (
+                  <p className="text-sm text-zinc-600">Loại tin nhắn: Channel chung</p>
+                ) : (
+                  <p className="text-sm text-zinc-600">Loại tin nhắn: Thông báo tự động</p>
+                )}
               </div>
             ))}
             {filteredMessages.length === 0 && (
@@ -293,7 +345,7 @@ export function Messaging() {
           initialValues={{
             class_id: selectedServer.class_id,
             discord_server_id: selectedServer.discord_server_id,
-            name: selectedServer.name ?? "",
+            bot_token: "",
             attendance_voice_channel_id: selectedServer.attendance_voice_channel_id ?? "",
             notification_channel_id: selectedServer.notification_channel_id ?? "",
           }}
@@ -332,6 +384,7 @@ export function Messaging() {
       {showSendMessageModal && (
         <SendMessageModal
           classes={classes}
+          servers={servers}
           students={students}
           submitting={submitting}
           onClose={() => setShowSendMessageModal(false)}
@@ -339,7 +392,17 @@ export function Messaging() {
             setSubmitting(true);
             setRequestError("");
             try {
-              await sendBulkDm(payload);
+              if (payload.type === "channel_post") {
+                await sendChannelPost({
+                  content: payload.content,
+                  server_ids: payload.server_ids,
+                });
+              } else {
+                await sendBulkDm({
+                  content: payload.content,
+                  student_ids: payload.student_ids,
+                });
+              }
               setShowSendMessageModal(false);
               await loadData();
             } catch (error) {
@@ -367,7 +430,7 @@ function ServerModal({
   initialValues?: {
     class_id: number;
     discord_server_id: string;
-    name: string;
+    bot_token: string;
     attendance_voice_channel_id: string;
     notification_channel_id: string;
   };
@@ -376,14 +439,14 @@ function ServerModal({
   onSubmit: (payload: {
     class_id: number;
     discord_server_id: string;
-    name?: string | null;
+    bot_token?: string | null;
     attendance_voice_channel_id?: string | null;
     notification_channel_id?: string | null;
   }) => Promise<void>;
 }) {
   const [classId, setClassId] = useState(initialValues ? String(initialValues.class_id) : "");
   const [serverId, setServerId] = useState(initialValues?.discord_server_id ?? "");
-  const [name, setName] = useState(initialValues?.name ?? "");
+  const [botToken, setBotToken] = useState(initialValues?.bot_token ?? "");
   const [voiceChannelId, setVoiceChannelId] = useState(initialValues?.attendance_voice_channel_id ?? "");
   const [textChannelId, setTextChannelId] = useState(initialValues?.notification_channel_id ?? "");
   const [localError, setLocalError] = useState("");
@@ -403,10 +466,15 @@ function ServerModal({
       return;
     }
 
+    if (!initialValues && !botToken.trim()) {
+      setLocalError("Bot token là bắt buộc khi thêm server");
+      return;
+    }
+
     await onSubmit({
       class_id: parsedClassId,
       discord_server_id: serverId.trim(),
-      name: name.trim() || null,
+      bot_token: botToken.trim() || null,
       attendance_voice_channel_id: voiceChannelId.trim() || null,
       notification_channel_id: textChannelId.trim() || null,
     });
@@ -443,13 +511,13 @@ function ServerModal({
           </div>
 
           <div>
-            <label className="block text-sm text-zinc-700 mb-2">Tên hiển thị (tùy chọn)</label>
+            <label className="block text-sm text-zinc-700 mb-2">Bot token</label>
             <input
-              type="text"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
+              type="password"
+              value={botToken}
+              onChange={(event) => setBotToken(event.target.value)}
               className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
-              placeholder="CP Training - Lớp Cơ Bản"
+              placeholder={initialValues ? "Để trống nếu giữ token hiện tại" : "Nhập Discord bot token"}
             />
           </div>
 
@@ -532,20 +600,27 @@ function ChannelsModal({ server, onClose }: { server: BackendDiscordServer; onCl
 
 function SendMessageModal({
   classes,
+  servers,
   students,
   submitting,
   onClose,
   onSubmit,
 }: {
   classes: ClassOption[];
+  servers: BackendDiscordServer[];
   students: StudentOption[];
   submitting: boolean;
   onClose: () => void;
-  onSubmit: (payload: { content: string; class_id?: number; student_ids?: number[] }) => Promise<void>;
+  onSubmit: (payload:
+    | { type: "channel_post"; content: string; server_ids: number[] }
+    | { type: "bulk_dm"; content: string; student_ids: number[] }
+  ) => Promise<void>;
 }) {
-  const [mode, setMode] = useState<"class" | "manual">("class");
+  const [messageMode, setMessageMode] = useState<"channel_post" | "bulk_dm">("channel_post");
   const [classId, setClassId] = useState("");
+  const [selectedServers, setSelectedServers] = useState<number[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<number[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState("");
   const [content, setContent] = useState("");
   const [localError, setLocalError] = useState("");
 
@@ -558,12 +633,28 @@ function SendMessageModal({
     return students.filter((student) => student.class_id === parsedClassId);
   }, [students, classId]);
 
+  const toggleServer = (serverId: number) => {
+    setSelectedServers((current) => (
+      current.includes(serverId)
+        ? current.filter((id) => id !== serverId)
+        : [...current, serverId]
+    ));
+  };
+
   const toggleStudent = (studentId: number) => {
     setSelectedStudents((current) => (
       current.includes(studentId)
         ? current.filter((id) => id !== studentId)
         : [...current, studentId]
     ));
+  };
+
+  const applyTemplate = (templateId: string) => {
+    setSelectedTemplate(templateId);
+    const template = BULK_DM_TEMPLATES.find((item) => item.id === templateId);
+    if (template) {
+      setContent(template.content);
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -575,16 +666,16 @@ function SendMessageModal({
       return;
     }
 
-    if (mode === "class") {
-      const parsedClassId = Number(classId);
-      if (!Number.isInteger(parsedClassId) || parsedClassId <= 0) {
-        setLocalError("Vui lòng chọn lớp");
+    if (messageMode === "channel_post") {
+      if (selectedServers.length === 0) {
+        setLocalError("Vui lòng chọn ít nhất một server");
         return;
       }
 
       await onSubmit({
+        type: "channel_post",
         content: content.trim(),
-        class_id: parsedClassId,
+        server_ids: selectedServers,
       });
       return;
     }
@@ -595,6 +686,7 @@ function SendMessageModal({
     }
 
     await onSubmit({
+      type: "bulk_dm",
       content: content.trim(),
       student_ids: selectedStudents,
     });
@@ -603,32 +695,59 @@ function SendMessageModal({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white border border-zinc-200 rounded-xl p-6 w-full max-w-2xl shadow-xl">
-        <h2 className="text-xl font-semibold text-zinc-900 mb-6">Gửi tin nhắn Bulk DM</h2>
+        <h2 className="text-xl font-semibold text-zinc-900 mb-6">Gửi tin nhắn</h2>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setMode("class")}
+              onClick={() => setMessageMode("channel_post")}
               className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                mode === "class" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600"
+                messageMode === "channel_post" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600"
               }`}
             >
-              Gửi theo lớp
+              Channel chung
             </button>
             <button
               type="button"
-              onClick={() => setMode("manual")}
+              onClick={() => setMessageMode("bulk_dm")}
               className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                mode === "manual" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600"
+                messageMode === "bulk_dm" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600"
               }`}
             >
-              Chọn thủ công
+              Bulk DM
             </button>
           </div>
 
           <div>
-            <label className="block text-sm text-zinc-700 mb-2">Nội dung</label>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="block text-sm text-zinc-700">Nội dung</label>
+              {messageMode === "bulk_dm" && (
+                <div className="flex items-center gap-2">
+                  {BULK_DM_TEMPLATES.map((template) => {
+                    const TemplateIcon = template.icon;
+                    const active = selectedTemplate === template.id;
+
+                    return (
+                      <button
+                        key={template.id}
+                        type="button"
+                        title={template.label}
+                        onClick={() => applyTemplate(template.id)}
+                        className={`h-9 w-9 rounded-lg border transition-colors flex items-center justify-center ${
+                          active
+                            ? "border-zinc-900 bg-zinc-900 text-white"
+                            : "border-zinc-200 bg-zinc-50 text-zinc-600 hover:bg-zinc-100"
+                        }`}
+                        aria-label={template.label}
+                      >
+                        <TemplateIcon className="h-4 w-4" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             <textarea
               value={content}
               onChange={(event) => setContent(event.target.value)}
@@ -638,34 +757,69 @@ function SendMessageModal({
             />
           </div>
 
-          {mode === "class" ? (
+          {messageMode === "channel_post" ? (
             <div>
-              <label className="block text-sm text-zinc-700 mb-2">Lớp</label>
-              <select
-                value={classId}
-                onChange={(event) => setClassId(event.target.value)}
-                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
-              >
-                <option value="">Chọn lớp</option>
-                {classes.map((cls) => (
-                  <option key={cls.id} value={cls.id}>{cls.name}</option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div>
-              <label className="block text-sm text-zinc-700 mb-2">Chọn học sinh</label>
+              <label className="block text-sm text-zinc-700 mb-2">Chọn server nhận tin</label>
               <div className="max-h-60 overflow-y-auto border border-zinc-200 rounded-lg bg-zinc-50 p-3 space-y-2">
-                {visibleStudents.map((student) => (
-                  <label key={student.id} className="flex items-center justify-between px-3 py-2 bg-white border border-zinc-200 rounded-lg cursor-pointer">
-                    <span className="text-zinc-900">{student.name}</span>
+                {servers.map((server) => (
+                  <label
+                    key={server.id}
+                    className="flex items-center justify-between px-3 py-2 bg-white border border-zinc-200 rounded-lg cursor-pointer"
+                  >
+                    <div>
+                      <p className="text-zinc-900">
+                        {server.name || `Server #${server.id}`}
+                      </p>
+                      <p className="text-xs text-zinc-500 font-mono">{server.discord_server_id}</p>
+                    </div>
                     <input
                       type="checkbox"
-                      checked={selectedStudents.includes(student.id)}
-                      onChange={() => toggleStudent(student.id)}
+                      checked={selectedServers.includes(server.id)}
+                      onChange={() => toggleServer(server.id)}
                     />
                   </label>
                 ))}
+                {servers.length === 0 && (
+                  <p className="text-sm text-zinc-500 px-1 py-2">Chưa có server Discord nào để gửi.</p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div>
+                <label className="block text-sm text-zinc-700 mb-2">Lọc danh sách theo lớp (tùy chọn)</label>
+                <select
+                  value={classId}
+                  onChange={(event) => setClassId(event.target.value)}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                >
+                  <option value="">Tất cả lớp</option>
+                  {classes.map((cls) => (
+                    <option key={cls.id} value={cls.id}>{cls.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-sm text-zinc-700 mb-2">Chọn học sinh</label>
+                <div className="max-h-60 overflow-y-auto border border-zinc-200 rounded-lg bg-zinc-50 p-3 space-y-2">
+                  {visibleStudents.map((student) => (
+                    <label
+                      key={student.id}
+                      className="flex items-center justify-between px-3 py-2 bg-white border border-zinc-200 rounded-lg cursor-pointer"
+                    >
+                      <span className="text-zinc-900">{student.name}</span>
+                      <input
+                        type="checkbox"
+                        checked={selectedStudents.includes(student.id)}
+                        onChange={() => toggleStudent(student.id)}
+                      />
+                    </label>
+                  ))}
+                  {visibleStudents.length === 0 && (
+                    <p className="text-sm text-zinc-500 px-1 py-2">Không có học sinh trong bộ lọc hiện tại.</p>
+                  )}
+                </div>
               </div>
             </div>
           )}

@@ -1,15 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, UserX, ArrowRightLeft, Eye, AlertCircle, DollarSign, CheckCircle } from "lucide-react";
+import { useNavigate } from "react-router";
+import {
+  Plus,
+  Search,
+  UserX,
+  ArrowRightLeft,
+  Eye,
+  Pencil,
+  AlertCircle,
+  DollarSign,
+  CheckCircle,
+  UserPlus,
+} from "lucide-react";
 
 import { ApiError } from "../services/apiClient";
 import { listClasses } from "../services/classService";
 import {
   archiveStudent,
+  bulkExpelStudents,
+  bulkTransferStudents,
   buildStudentNote,
   createStudent,
   expelStudent,
   listStudents,
+  reinstateStudent,
   transferStudent,
+  updateStudent as updateStudentById,
   type BackendStudentSummary,
 } from "../services/studentService";
 
@@ -17,12 +33,14 @@ type StudentView = {
   id: number;
   name: string;
   email: string;
+  discordUsername: string;
+  phone: string;
   classId: number | null;
   className: string;
   status: "active" | "pending_archive" | "archived";
   balance: number;
   joinedDate: string;
-  codeforcesHandle?: string;
+  codeforcesHandle: string;
 };
 
 type ActiveClassOption = {
@@ -64,6 +82,8 @@ function toStudentView(
     id: student.id,
     name: student.full_name,
     email: parseEmailFromNote(student.note),
+    discordUsername: student.discord_username ?? "",
+    phone: student.phone ?? "",
     classId: student.current_class_id,
     className: student.current_class_id !== null
       ? classNameById.get(student.current_class_id) ?? "N/A"
@@ -71,17 +91,23 @@ function toStudentView(
     status: student.status,
     balance: parseAmount(student.balance),
     joinedDate: student.created_at.slice(0, 10),
-    codeforcesHandle: student.codeforces_handle ?? undefined,
+    codeforcesHandle: student.codeforces_handle ?? "",
   };
 }
 
 export function Students() {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "pending_archive" | "archived">("all");
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentView | null>(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [showReinstateModal, setShowReinstateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showBulkTransferModal, setShowBulkTransferModal] = useState(false);
+  const [showBulkExpelModal, setShowBulkExpelModal] = useState(false);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
   const [students, setStudents] = useState<StudentView[]>([]);
   const [activeClasses, setActiveClasses] = useState<ActiveClassOption[]>([]);
   const [requestError, setRequestError] = useState("");
@@ -98,6 +124,7 @@ export function Students() {
       const classNameById = new Map(classList.map((item) => [item.id, item.name]));
       setActiveClasses(classList.map((item) => ({ id: item.id, name: item.name })));
       setStudents(studentList.map((student) => toStudentView(student, classNameById)));
+      setSelectedStudentIds([]);
     } catch (error) {
       setRequestError(toErrorMessage(error));
     }
@@ -116,6 +143,19 @@ export function Students() {
     }),
     [students, searchTerm, filterStatus],
   );
+
+  const activeFilteredStudents = useMemo(
+    () => filteredStudents.filter((student) => student.status === "active"),
+    [filteredStudents],
+  );
+
+  const selectedActiveStudentIds = useMemo(
+    () => selectedStudentIds.filter((studentId) => activeFilteredStudents.some((student) => student.id === studentId)),
+    [selectedStudentIds, activeFilteredStudents],
+  );
+
+  const isAllActiveSelected = activeFilteredStudents.length > 0
+    && selectedActiveStudentIds.length === activeFilteredStudents.length;
 
   const pendingStudents = useMemo(
     () => students.filter((student) => student.status === "pending_archive"),
@@ -166,6 +206,7 @@ export function Students() {
     full_name: string;
     class_id: number;
     codeforces_handle: string | null;
+    discord_username: string;
     note: string | null;
   }) => {
     setSubmitting(true);
@@ -201,6 +242,29 @@ export function Students() {
     }
   };
 
+  const handleUpdateStudent = async (payload: {
+    student_id: number;
+    full_name: string;
+    codeforces_handle: string | null;
+    discord_username: string;
+    phone: string | null;
+    note: string | null;
+  }) => {
+    setSubmitting(true);
+    setRequestError("");
+
+    try {
+      await updateStudentById(payload);
+      setShowEditModal(false);
+      setSelectedStudent(null);
+      await loadData();
+    } catch (error) {
+      setRequestError(toErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleExpelStudent = async (student: StudentView) => {
     setSubmitting(true);
     setRequestError("");
@@ -209,6 +273,58 @@ export function Students() {
       await expelStudent(student.id);
       setShowArchiveModal(false);
       setSelectedStudent(null);
+      await loadData();
+    } catch (error) {
+      setRequestError(toErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleReinstateStudent = async (payload: {
+    student_id: number;
+    class_id: number;
+  }) => {
+    setSubmitting(true);
+    setRequestError("");
+
+    try {
+      await reinstateStudent(payload);
+      setShowReinstateModal(false);
+      setSelectedStudent(null);
+      await loadData();
+    } catch (error) {
+      setRequestError(toErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleBulkTransfer = async (payload: {
+    student_ids: number[];
+    to_class_id: number;
+  }) => {
+    setSubmitting(true);
+    setRequestError("");
+
+    try {
+      await bulkTransferStudents(payload);
+      setShowBulkTransferModal(false);
+      await loadData();
+    } catch (error) {
+      setRequestError(toErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleBulkExpel = async (studentIds: number[]) => {
+    setSubmitting(true);
+    setRequestError("");
+
+    try {
+      await bulkExpelStudents(studentIds);
+      setShowBulkExpelModal(false);
       await loadData();
     } catch (error) {
       setRequestError(toErrorMessage(error));
@@ -229,6 +345,25 @@ export function Students() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const toggleStudentSelection = (studentId: number) => {
+    setSelectedStudentIds((current) => (
+      current.includes(studentId)
+        ? current.filter((id) => id !== studentId)
+        : [...current, studentId]
+    ));
+  };
+
+  const toggleSelectAllActive = () => {
+    if (isAllActiveSelected) {
+      setSelectedStudentIds((current) => current.filter((id) => !activeFilteredStudents.some((student) => student.id === id)));
+      return;
+    }
+
+    setSelectedStudentIds((current) => (
+      Array.from(new Set([...current, ...activeFilteredStudents.map((student) => student.id)]))
+    ));
   };
 
   return (
@@ -365,74 +500,156 @@ export function Students() {
           )}
         </>
       ) : (
-        <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-zinc-100 border-b border-zinc-200">
-              <tr>
-                <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Học sinh</th>
-                <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Lớp</th>
-                <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Trạng thái</th>
-                <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Số dư</th>
-                <th className="px-6 py-4 text-right text-sm font-medium text-zinc-600">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {filteredStudents.map((student) => (
-                <tr key={student.id} className="hover:bg-zinc-200/50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div>
-                      <p className="text-zinc-900 font-medium">{student.name}</p>
-                      <p className="text-sm text-zinc-600">{student.email || "N/A"}</p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-zinc-700">{student.className}</td>
-                  <td className="px-6 py-4">{getStatusBadge(student.status)}</td>
-                  <td className="px-6 py-4">
-                    <span className={`font-semibold ${getBalanceColor(student.balance)}`}>
-                      {student.balance < 0 ? "-" : student.balance > 0 ? "+" : ""}
-                      {(Math.abs(student.balance) / 1000).toFixed(0)}K
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => setSelectedStudent(student)}
-                        className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
-                        title="Xem chi tiết"
-                      >
-                        <Eye className="w-4 h-4 text-zinc-600" />
-                      </button>
-                      {student.status === "active" && (
-                        <>
-                          <button
-                            onClick={() => {
-                              setSelectedStudent(student);
-                              setShowTransferModal(true);
-                            }}
-                            className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
-                            title="Chuyển lớp"
-                          >
-                            <ArrowRightLeft className="w-4 h-4 text-zinc-600" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setSelectedStudent(student);
-                              setShowArchiveModal(true);
-                            }}
-                            className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
-                            title="Đuổi học"
-                          >
-                            <UserX className="w-4 h-4 text-zinc-600" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
+        <>
+          {selectedActiveStudentIds.length > 0 && (
+            <div className="mb-4 rounded-xl border border-zinc-200 bg-white p-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-zinc-700">
+                Đã chọn <span className="font-semibold text-zinc-900">{selectedActiveStudentIds.length}</span> học sinh
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setShowBulkTransferModal(true)}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-zinc-100 text-zinc-900 rounded-lg hover:bg-zinc-200 transition-colors text-sm font-medium disabled:opacity-60"
+                >
+                  Chuyển lớp hàng loạt
+                </button>
+                <button
+                  onClick={() => setShowBulkExpelModal(true)}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors text-sm font-medium disabled:opacity-60"
+                >
+                  Đuổi học hàng loạt
+                </button>
+                <button
+                  onClick={() => setSelectedStudentIds([])}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-zinc-100 text-zinc-700 rounded-lg hover:bg-zinc-200 transition-colors text-sm disabled:opacity-60"
+                >
+                  Bỏ chọn
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-zinc-100 border-b border-zinc-200">
+                <tr>
+                  <th className="px-4 py-4 text-left text-sm font-medium text-zinc-600 w-12">
+                    <input
+                      type="checkbox"
+                      checked={isAllActiveSelected}
+                      onChange={toggleSelectAllActive}
+                      aria-label="Chọn tất cả học sinh đang học"
+                    />
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Học sinh</th>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Lớp</th>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Trạng thái</th>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Số dư</th>
+                  <th className="px-6 py-4 text-right text-sm font-medium text-zinc-600">Thao tác</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {filteredStudents.map((student) => {
+                  const isSelectable = student.status === "active";
+                  const isSelected = selectedStudentIds.includes(student.id);
+
+                  return (
+                    <tr key={student.id} className="hover:bg-zinc-200/50 transition-colors">
+                      <td className="px-4 py-4">
+                        {isSelectable ? (
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleStudentSelection(student.id)}
+                            aria-label={`Chọn học sinh ${student.name}`}
+                          />
+                        ) : null}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div>
+                          <p className="text-zinc-900 font-medium">
+                            {student.codeforcesHandle || "CF: N/A"}
+                          </p>
+                          <p className="text-sm text-zinc-600">
+                            {student.discordUsername || "Discord: N/A"}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-zinc-700">{student.className}</td>
+                      <td className="px-6 py-4">{getStatusBadge(student.status)}</td>
+                      <td className="px-6 py-4">
+                        <span className={`font-semibold ${getBalanceColor(student.balance)}`}>
+                          {student.balance < 0 ? "-" : student.balance > 0 ? "+" : ""}
+                          {(Math.abs(student.balance) / 1000).toFixed(0)}K
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => navigate(`/students/${student.id}`)}
+                            className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
+                            title="Xem chi tiết"
+                          >
+                            <Eye className="w-4 h-4 text-zinc-600" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedStudent(student);
+                              setShowEditModal(true);
+                            }}
+                            className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
+                            title="Sửa thông tin"
+                          >
+                            <Pencil className="w-4 h-4 text-zinc-600" />
+                          </button>
+                          {student.status === "active" && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setSelectedStudent(student);
+                                  setShowTransferModal(true);
+                                }}
+                                className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
+                                title="Chuyển lớp"
+                              >
+                                <ArrowRightLeft className="w-4 h-4 text-zinc-600" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSelectedStudent(student);
+                                  setShowArchiveModal(true);
+                                }}
+                                className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
+                                title="Đuổi học"
+                              >
+                                <UserX className="w-4 h-4 text-zinc-600" />
+                              </button>
+                            </>
+                          )}
+                          {student.status === "archived" && (
+                            <button
+                              onClick={() => {
+                                setSelectedStudent(student);
+                                setShowReinstateModal(true);
+                              }}
+                              className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
+                              title="Thêm trở lại"
+                            >
+                              <UserPlus className="w-4 h-4 text-zinc-600" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {showAddModal && (
@@ -459,6 +676,19 @@ export function Students() {
         />
       )}
 
+      {showEditModal && selectedStudent && (
+        <EditStudentModal
+          student={selectedStudent}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedStudent(null);
+          }}
+          onSubmit={handleUpdateStudent}
+          submitting={submitting}
+          error={requestError}
+        />
+      )}
+
       {showArchiveModal && selectedStudent && (
         <ArchiveStudentModal
           student={selectedStudent}
@@ -467,6 +697,44 @@ export function Students() {
             setSelectedStudent(null);
           }}
           onConfirm={handleExpelStudent}
+          submitting={submitting}
+          error={requestError}
+        />
+      )}
+
+      {showReinstateModal && selectedStudent && (
+        <ReinstateStudentModal
+          student={selectedStudent}
+          classes={activeClasses}
+          onClose={() => {
+            setShowReinstateModal(false);
+            setSelectedStudent(null);
+          }}
+          onSubmit={handleReinstateStudent}
+          submitting={submitting}
+          error={requestError}
+        />
+      )}
+
+      {showBulkTransferModal && (
+        <BulkTransferModal
+          classes={activeClasses}
+          studentCount={selectedActiveStudentIds.length}
+          onClose={() => setShowBulkTransferModal(false)}
+          onSubmit={(to_class_id) => handleBulkTransfer({
+            student_ids: selectedActiveStudentIds,
+            to_class_id,
+          })}
+          submitting={submitting}
+          error={requestError}
+        />
+      )}
+
+      {showBulkExpelModal && (
+        <BulkExpelModal
+          studentCount={selectedActiveStudentIds.length}
+          onClose={() => setShowBulkExpelModal(false)}
+          onConfirm={() => handleBulkExpel(selectedActiveStudentIds)}
           submitting={submitting}
           error={requestError}
         />
@@ -508,8 +776,8 @@ function PendingTable({
               <tr key={student.id} className="hover:bg-zinc-100/50 transition-colors">
                 <td className="px-6 py-4">
                   <div>
-                    <p className="text-zinc-900 font-medium">{student.name}</p>
-                    <p className="text-sm text-zinc-600">{student.email || "N/A"}</p>
+                    <p className="text-zinc-900 font-medium">{student.codeforcesHandle || "CF: N/A"}</p>
+                    <p className="text-sm text-zinc-600">{student.discordUsername || "Discord: N/A"}</p>
                   </div>
                 </td>
                 <td className="px-6 py-4 text-zinc-700">{student.className || "N/A"}</td>
@@ -551,6 +819,7 @@ function AddStudentModal({
     full_name: string;
     class_id: number;
     codeforces_handle: string | null;
+    discord_username: string;
     note: string | null;
   }) => Promise<void>;
   submitting: boolean;
@@ -560,6 +829,7 @@ function AddStudentModal({
   const [email, setEmail] = useState("");
   const [classId, setClassId] = useState("");
   const [codeforcesHandle, setCodeforcesHandle] = useState("");
+  const [discordUsername, setDiscordUsername] = useState("");
   const [localError, setLocalError] = useState("");
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -578,10 +848,16 @@ function AddStudentModal({
       return;
     }
 
+    if (!discordUsername.trim()) {
+      setLocalError("Discord username là bắt buộc");
+      return;
+    }
+
     await onSubmit({
       full_name: name.trim(),
       class_id: classIdValue,
       codeforces_handle: codeforcesHandle.trim() || null,
+      discord_username: discordUsername.trim(),
       note: buildStudentNote(email),
     });
   };
@@ -634,6 +910,16 @@ function AddStudentModal({
               placeholder="username"
             />
           </div>
+          <div>
+            <label className="block text-sm text-zinc-600 mb-2">Discord Username</label>
+            <input
+              type="text"
+              value={discordUsername}
+              onChange={(event) => setDiscordUsername(event.target.value)}
+              className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              placeholder="username#0001 hoặc @username"
+            />
+          </div>
 
           {(localError || error) && <p className="text-sm text-red-600">{localError || error}</p>}
 
@@ -652,6 +938,140 @@ function AddStudentModal({
               className="flex-1 px-4 py-3 bg-white text-black rounded-lg hover:bg-zinc-200 transition-colors font-medium disabled:opacity-60"
             >
               {submitting ? "Đang thêm..." : "Thêm học sinh"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function EditStudentModal({
+  student,
+  onClose,
+  onSubmit,
+  submitting,
+  error,
+}: {
+  student: StudentView;
+  onClose: () => void;
+  onSubmit: (payload: {
+    student_id: number;
+    full_name: string;
+    codeforces_handle: string | null;
+    discord_username: string;
+    phone: string | null;
+    note: string | null;
+  }) => Promise<void>;
+  submitting: boolean;
+  error: string;
+}) {
+  const [name, setName] = useState(student.name);
+  const [email, setEmail] = useState(student.email);
+  const [codeforcesHandle, setCodeforcesHandle] = useState(student.codeforcesHandle);
+  const [discordUsername, setDiscordUsername] = useState(student.discordUsername);
+  const [phone, setPhone] = useState(student.phone);
+  const [localError, setLocalError] = useState("");
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLocalError("");
+
+    if (!name.trim()) {
+      setLocalError("Họ tên là bắt buộc");
+      return;
+    }
+
+    if (!discordUsername.trim()) {
+      setLocalError("Discord username là bắt buộc");
+      return;
+    }
+
+    await onSubmit({
+      student_id: student.id,
+      full_name: name.trim(),
+      codeforces_handle: codeforcesHandle.trim() || null,
+      discord_username: discordUsername.trim(),
+      phone: phone.trim() || null,
+      note: buildStudentNote(email),
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-white/80 flex items-center justify-center p-4 z-50">
+      <div className="bg-zinc-100 border border-zinc-200 rounded-xl p-6 w-full max-w-md">
+        <h2 className="text-xl font-semibold text-zinc-900 mb-2">Sửa thông tin học sinh</h2>
+        <p className="text-zinc-600 mb-6">ID: {student.id}</p>
+
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div>
+            <label className="block text-sm text-zinc-600 mb-2">Họ tên</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              placeholder="Nguyễn Văn A"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-zinc-600 mb-2">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              placeholder="email@example.com"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-zinc-600 mb-2">Codeforces Handle</label>
+            <input
+              type="text"
+              value={codeforcesHandle}
+              onChange={(event) => setCodeforcesHandle(event.target.value)}
+              className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              placeholder="username"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-zinc-600 mb-2">Discord Username</label>
+            <input
+              type="text"
+              value={discordUsername}
+              onChange={(event) => setDiscordUsername(event.target.value)}
+              className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              placeholder="username#0001 hoặc @username"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-zinc-600 mb-2">Số điện thoại (tùy chọn)</label>
+            <input
+              type="text"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+              className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              placeholder="09xxxxxxxx"
+            />
+          </div>
+
+          {(localError || error) && <p className="text-sm text-red-600">{localError || error}</p>}
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 px-4 py-3 bg-zinc-100 text-zinc-900 rounded-lg hover:bg-zinc-200 transition-colors"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 px-4 py-3 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors font-medium disabled:opacity-60"
+            >
+              {submitting ? "Đang lưu..." : "Lưu thay đổi"}
             </button>
           </div>
         </form>
@@ -821,6 +1241,207 @@ function ArchiveStudentModal({
             onClick={() => void onConfirm(student)}
             disabled={submitting}
             className="flex-1 px-4 py-3 bg-zinc-200 text-zinc-900 rounded-lg hover:bg-zinc-600 transition-colors font-medium disabled:opacity-60"
+          >
+            {submitting ? "Đang xử lý..." : "Xác nhận đuổi học"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReinstateStudentModal({
+  student,
+  classes,
+  onClose,
+  onSubmit,
+  submitting,
+  error,
+}: {
+  student: StudentView;
+  classes: ActiveClassOption[];
+  onClose: () => void;
+  onSubmit: (payload: { student_id: number; class_id: number }) => Promise<void>;
+  submitting: boolean;
+  error: string;
+}) {
+  const [classId, setClassId] = useState("");
+  const [localError, setLocalError] = useState("");
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLocalError("");
+
+    const parsedClassId = Number(classId);
+    if (!Number.isInteger(parsedClassId) || parsedClassId <= 0) {
+      setLocalError("Vui lòng chọn lớp hợp lệ");
+      return;
+    }
+
+    await onSubmit({
+      student_id: student.id,
+      class_id: parsedClassId,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-white/80 flex items-center justify-center p-4 z-50">
+      <div className="bg-zinc-100 border border-zinc-200 rounded-xl p-6 w-full max-w-md">
+        <h2 className="text-xl font-semibold text-zinc-900 mb-2">Thêm học sinh trở lại</h2>
+        <p className="text-zinc-600 mb-6">Học sinh: {student.name}</p>
+
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div>
+            <label className="block text-sm text-zinc-600 mb-2">Lớp mới</label>
+            <select
+              value={classId}
+              onChange={(event) => setClassId(event.target.value)}
+              className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            >
+              <option value="">Chọn lớp</option>
+              {classes.map((cls) => (
+                <option key={cls.id} value={cls.id}>{cls.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {(localError || error) && <p className="text-sm text-red-600">{localError || error}</p>}
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 px-4 py-3 bg-zinc-100 text-zinc-900 rounded-lg hover:bg-zinc-200 transition-colors"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 px-4 py-3 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors font-medium disabled:opacity-60"
+            >
+              {submitting ? "Đang xử lý..." : "Xác nhận thêm trở lại"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function BulkTransferModal({
+  classes,
+  studentCount,
+  onClose,
+  onSubmit,
+  submitting,
+  error,
+}: {
+  classes: ActiveClassOption[];
+  studentCount: number;
+  onClose: () => void;
+  onSubmit: (to_class_id: number) => Promise<void>;
+  submitting: boolean;
+  error: string;
+}) {
+  const [classId, setClassId] = useState("");
+  const [localError, setLocalError] = useState("");
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLocalError("");
+
+    const parsedClassId = Number(classId);
+    if (!Number.isInteger(parsedClassId) || parsedClassId <= 0) {
+      setLocalError("Vui lòng chọn lớp hợp lệ");
+      return;
+    }
+
+    await onSubmit(parsedClassId);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-white/80 flex items-center justify-center p-4 z-50">
+      <div className="bg-zinc-100 border border-zinc-200 rounded-xl p-6 w-full max-w-md">
+        <h2 className="text-xl font-semibold text-zinc-900 mb-2">Chuyển lớp hàng loạt</h2>
+        <p className="text-zinc-600 mb-6">Số học sinh đã chọn: {studentCount}</p>
+
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div>
+            <label className="block text-sm text-zinc-600 mb-2">Lớp đích</label>
+            <select
+              value={classId}
+              onChange={(event) => setClassId(event.target.value)}
+              className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            >
+              <option value="">Chọn lớp</option>
+              {classes.map((cls) => (
+                <option key={cls.id} value={cls.id}>{cls.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {(localError || error) && <p className="text-sm text-red-600">{localError || error}</p>}
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 px-4 py-3 bg-zinc-100 text-zinc-900 rounded-lg hover:bg-zinc-200 transition-colors"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 px-4 py-3 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors font-medium disabled:opacity-60"
+            >
+              {submitting ? "Đang xử lý..." : "Xác nhận chuyển lớp"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function BulkExpelModal({
+  studentCount,
+  onClose,
+  onConfirm,
+  submitting,
+  error,
+}: {
+  studentCount: number;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+  submitting: boolean;
+  error: string;
+}) {
+  return (
+    <div className="fixed inset-0 bg-white/80 flex items-center justify-center p-4 z-50">
+      <div className="bg-zinc-100 border border-zinc-200 rounded-xl p-6 w-full max-w-md">
+        <h2 className="text-xl font-semibold text-zinc-900 mb-2">Đuổi học hàng loạt</h2>
+        <p className="text-zinc-600 mb-6">Bạn chắc chắn muốn đuổi {studentCount} học sinh đã chọn?</p>
+
+        {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            className="flex-1 px-4 py-3 bg-zinc-100 text-zinc-900 rounded-lg hover:bg-zinc-200 transition-colors"
+          >
+            Hủy
+          </button>
+          <button
+            type="button"
+            onClick={() => void onConfirm()}
+            disabled={submitting}
+            className="flex-1 px-4 py-3 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors font-medium disabled:opacity-60"
           >
             {submitting ? "Đang xử lý..." : "Xác nhận đuổi học"}
           </button>

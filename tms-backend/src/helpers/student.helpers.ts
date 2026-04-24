@@ -2,12 +2,16 @@ import { PendingArchiveReason, Student, StudentStatus } from '../entities/index.
 import { StudentServiceError } from '../errors/student.error.js';
 import type {
   ArchivePendingStudentInput,
+  BulkExpelStudentsInput,
+  BulkTransferStudentsInput,
   CreateStudentInput,
   ExpelStudentInput,
+  ReinstateStudentInput,
   StudentBalanceSnapshot,
   StudentListFilters,
   StudentSummary,
   TransferStudentInput,
+  UpdateStudentInput,
 } from '../types/student.types.js';
 
 function asRecord(value: unknown, fieldName: string): Record<string, unknown> {
@@ -26,6 +30,21 @@ function parsePositiveInteger(value: unknown, fieldName: string): number {
   }
 
   return numericValue;
+}
+
+function parsePositiveIntegerArray(value: unknown, fieldName: string): number[] {
+  if (!Array.isArray(value)) {
+    throw new StudentServiceError(`${fieldName} must be an array`, 400);
+  }
+
+  const parsedValues = value.map((item) => parsePositiveInteger(item, fieldName));
+  const uniqueValues = Array.from(new Set(parsedValues));
+
+  if (uniqueValues.length === 0) {
+    throw new StudentServiceError(`${fieldName} must include at least one student`, 400);
+  }
+
+  return uniqueValues;
 }
 
 function parseString(value: unknown, fieldName: string): string {
@@ -109,18 +128,71 @@ export function parseStudentListFilters(value: unknown): StudentListFilters {
 export function parseCreateStudentInput(value: unknown): CreateStudentInput {
   const body = asRecord(value, 'body');
   const fullName = parseString(body.full_name, 'full_name');
+  const discordUsername = parseString(body.discord_username, 'discord_username');
 
   if (!fullName) {
     throw new StudentServiceError('full_name is required', 400);
+  }
+
+  if (!discordUsername) {
+    throw new StudentServiceError('discord_username is required', 400);
   }
 
   return {
     full_name: fullName,
     class_id: parsePositiveInteger(body.class_id, 'class_id'),
     codeforces_handle: parseNullableString(body.codeforces_handle, 'codeforces_handle'),
-    discord_username: parseNullableString(body.discord_username, 'discord_username'),
+    discord_username: discordUsername,
     phone: parseNullableString(body.phone, 'phone'),
     note: parseNullableString(body.note, 'note'),
+    enrolled_at: body.enrolled_at === undefined ? new Date() : parseDateTime(body.enrolled_at, 'enrolled_at'),
+  };
+}
+
+export function parseUpdateStudentInput(value: unknown): UpdateStudentInput {
+  const body = asRecord(value, 'body');
+  const patch: UpdateStudentInput = {};
+
+  if (body.full_name !== undefined) {
+    const fullName = parseString(body.full_name, 'full_name');
+    if (!fullName) {
+      throw new StudentServiceError('full_name cannot be empty', 400);
+    }
+    patch.full_name = fullName;
+  }
+
+  if (body.codeforces_handle !== undefined) {
+    patch.codeforces_handle = parseNullableString(body.codeforces_handle, 'codeforces_handle');
+  }
+
+  if (body.discord_username !== undefined) {
+    const discordUsername = parseString(body.discord_username, 'discord_username');
+    if (!discordUsername) {
+      throw new StudentServiceError('discord_username cannot be empty', 400);
+    }
+    patch.discord_username = discordUsername;
+  }
+
+  if (body.phone !== undefined) {
+    patch.phone = parseNullableString(body.phone, 'phone');
+  }
+
+  if (body.note !== undefined) {
+    patch.note = parseNullableString(body.note, 'note');
+  }
+
+  if (Object.keys(patch).length === 0) {
+    throw new StudentServiceError('at least one field is required', 400);
+  }
+
+  return patch;
+}
+
+export function parseReinstateStudentInput(value: unknown): ReinstateStudentInput {
+  const body = asRecord(value, 'body');
+
+  return {
+    class_id: parsePositiveInteger(body.class_id, 'class_id'),
     enrolled_at: body.enrolled_at === undefined ? new Date() : parseDateTime(body.enrolled_at, 'enrolled_at'),
   };
 }
@@ -145,6 +217,32 @@ export function parseExpelStudentInput(value: unknown): ExpelStudentInput {
   const body = asRecord(value, 'body');
 
   return {
+    expelled_at: body.expelled_at === undefined ? new Date() : parseDateTime(body.expelled_at, 'expelled_at'),
+  };
+}
+
+export function parseBulkTransferStudentsInput(value: unknown): BulkTransferStudentsInput {
+  const body = asRecord(value, 'body');
+  const toClassIdRaw = body.to_class_id ?? body.class_id;
+
+  if (toClassIdRaw === undefined) {
+    throw new StudentServiceError('to_class_id is required', 400);
+  }
+
+  return {
+    student_ids: parsePositiveIntegerArray(body.student_ids, 'student_ids'),
+    to_class_id: parsePositiveInteger(toClassIdRaw, 'to_class_id'),
+    transferred_at: body.transferred_at === undefined
+      ? new Date()
+      : parseDateTime(body.transferred_at, 'transferred_at'),
+  };
+}
+
+export function parseBulkExpelStudentsInput(value: unknown): BulkExpelStudentsInput {
+  const body = asRecord(value, 'body');
+
+  return {
+    student_ids: parsePositiveIntegerArray(body.student_ids, 'student_ids'),
     expelled_at: body.expelled_at === undefined ? new Date() : parseDateTime(body.expelled_at, 'expelled_at'),
   };
 }

@@ -10,6 +10,10 @@ import { Teacher } from './teacher.entity.js';
 })
 @Index('idx_students_teacher_id', ['teacher_id'])
 @Index('idx_students_status', ['status'])
+@Index('uq_students_codeforces_handle', ['codeforces_handle'], {
+  unique: true,
+  where: 'codeforces_handle IS NOT NULL',
+})
 @Check(
   'chk_students_pending_archive_reason',
   "(status = 'pending_archive' AND pending_archive_reason IS NOT NULL) OR (status <> 'pending_archive' AND pending_archive_reason IS NULL)",

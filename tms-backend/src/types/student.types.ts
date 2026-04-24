@@ -11,9 +11,22 @@ export type CreateStudentInput = {
   full_name: string;
   class_id: number;
   codeforces_handle: string | null;
-  discord_username: string | null;
+  discord_username: string;
   phone: string | null;
   note: string | null;
+  enrolled_at: Date;
+};
+
+export type UpdateStudentInput = {
+  full_name?: string;
+  codeforces_handle?: string | null;
+  discord_username?: string;
+  phone?: string | null;
+  note?: string | null;
+};
+
+export type ReinstateStudentInput = {
+  class_id: number;
   enrolled_at: Date;
 };
 
@@ -22,7 +35,18 @@ export type TransferStudentInput = {
   transferred_at: Date;
 };
 
+export type BulkTransferStudentsInput = {
+  student_ids: number[];
+  to_class_id: number;
+  transferred_at: Date;
+};
+
 export type ExpelStudentInput = {
+  expelled_at: Date;
+};
+
+export type BulkExpelStudentsInput = {
+  student_ids: number[];
   expelled_at: Date;
 };
 

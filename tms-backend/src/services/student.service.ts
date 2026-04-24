@@ -16,12 +16,16 @@ import { StudentServiceError } from '../errors/student.error.js';
 import { toStudentSummary } from '../helpers/student.helpers.js';
 import type {
   ArchivePendingStudentInput,
+  BulkExpelStudentsInput,
+  BulkTransferStudentsInput,
   CreateStudentInput,
   ExpelStudentInput,
+  ReinstateStudentInput,
   StudentBalanceSnapshot,
   StudentListFilters,
   StudentSummary,
   TransferStudentInput,
+  UpdateStudentInput,
 } from '../types/student.types.js';
 
 function parseAmountToBigInt(value: string | null | undefined): bigint {
@@ -30,6 +34,15 @@ function parseAmountToBigInt(value: string | null | undefined): bigint {
   }
 
   return BigInt(value);
+}
+
+function normalizeCodeforcesHandle(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
 }
 
 function createZeroBalanceSnapshot(): StudentBalanceSnapshot {
@@ -74,6 +87,36 @@ async function requireActiveClass(manager: EntityManager, teacherId: number, cla
   }
 
   return classEntity;
+}
+
+async function ensureUniqueCodeforcesHandle(
+  manager: EntityManager,
+  codeforcesHandle: string | null,
+  excludeStudentId?: number,
+): Promise<void> {
+  const normalizedHandle = normalizeCodeforcesHandle(codeforcesHandle);
+
+  if (!normalizedHandle) {
+    return;
+  }
+
+  const queryBuilder = manager
+    .getRepository(Student)
+    .createQueryBuilder('student')
+    .where('student.codeforces_handle IS NOT NULL')
+    .andWhere('LOWER(student.codeforces_handle) = LOWER(:handle)', {
+      handle: normalizedHandle,
+    });
+
+  if (excludeStudentId !== undefined) {
+    queryBuilder.andWhere('student.id <> :excludeStudentId', { excludeStudentId });
+  }
+
+  const duplicated = await queryBuilder.getExists();
+
+  if (duplicated) {
+    throw new StudentServiceError('codeforces_handle already exists', 409);
+  }
 }
 
 async function getActiveEnrollment(
@@ -195,6 +238,12 @@ function ensurePendingArchiveStudent(student: Student): void {
   }
 }
 
+function ensureArchivedStudent(student: Student): void {
+  if (student.status !== StudentStatus.Archived) {
+    throw new StudentServiceError('student is not archived', 409);
+  }
+}
+
 export async function listStudents(teacherId: number, filters: StudentListFilters): Promise<StudentSummary[]> {
   if (filters.class_id !== undefined) {
     await requireOwnedClass(AppDataSource.manager, teacherId, filters.class_id);
@@ -291,6 +340,8 @@ export async function getStudentById(teacherId: number, studentId: number): Prom
 export async function createStudent(teacherId: number, input: CreateStudentInput): Promise<StudentSummary> {
   return AppDataSource.transaction(async (manager) => {
     await requireActiveClass(manager, teacherId, input.class_id);
+    const normalizedCodeforcesHandle = normalizeCodeforcesHandle(input.codeforces_handle);
+    await ensureUniqueCodeforcesHandle(manager, normalizedCodeforcesHandle);
 
     const studentRepo = manager.getRepository(Student);
     const enrollmentRepo = manager.getRepository(Enrollment);
@@ -298,8 +349,8 @@ export async function createStudent(teacherId: number, input: CreateStudentInput
     const student = studentRepo.create({
       teacher_id: teacherId,
       full_name: input.full_name,
-      codeforces_handle: input.codeforces_handle,
-      discord_username: input.discord_username,
+      codeforces_handle: normalizedCodeforcesHandle,
+      discord_username: input.discord_username.trim(),
       phone: input.phone,
       note: input.note,
       status: StudentStatus.Active,
@@ -327,53 +378,171 @@ export async function createStudent(teacherId: number, input: CreateStudentInput
   });
 }
 
+export async function updateStudent(
+  teacherId: number,
+  studentId: number,
+  input: UpdateStudentInput,
+): Promise<StudentSummary> {
+  return AppDataSource.transaction(async (manager) => {
+    const studentRepo = manager.getRepository(Student);
+    const student = await requireOwnedStudent(manager, teacherId, studentId);
+
+    if (input.full_name !== undefined) {
+      student.full_name = input.full_name;
+    }
+
+    if (input.codeforces_handle !== undefined) {
+      const normalizedCodeforcesHandle = normalizeCodeforcesHandle(input.codeforces_handle);
+      await ensureUniqueCodeforcesHandle(manager, normalizedCodeforcesHandle, student.id);
+      student.codeforces_handle = normalizedCodeforcesHandle;
+    }
+
+    if (input.discord_username !== undefined) {
+      student.discord_username = input.discord_username;
+    }
+
+    if (input.phone !== undefined) {
+      student.phone = input.phone;
+    }
+
+    if (input.note !== undefined) {
+      student.note = input.note;
+    }
+
+    const savedStudent = await studentRepo.save(student);
+    const activeEnrollment = await getActiveEnrollment(manager, teacherId, studentId);
+    const balanceSnapshot = await loadBalanceSnapshotForStudent(manager, teacherId, studentId);
+
+    return toStudentSummary(savedStudent, {
+      current_class_id: activeEnrollment?.class_id ?? null,
+      current_enrollment_id: activeEnrollment?.id ?? null,
+      balance_snapshot: balanceSnapshot,
+    });
+  });
+}
+
+async function transferStudentInManager(
+  manager: EntityManager,
+  teacherId: number,
+  studentId: number,
+  input: TransferStudentInput,
+): Promise<StudentSummary> {
+  const studentRepo = manager.getRepository(Student);
+  const enrollmentRepo = manager.getRepository(Enrollment);
+
+  const student = await requireOwnedStudent(manager, teacherId, studentId);
+  ensureActiveStudent(student);
+
+  await requireActiveClass(manager, teacherId, input.to_class_id);
+  const activeEnrollment = await requireActiveEnrollment(manager, teacherId, studentId);
+
+  if (activeEnrollment.class_id === input.to_class_id) {
+    throw new StudentServiceError('student is already enrolled in this class', 409);
+  }
+
+  if (input.transferred_at <= activeEnrollment.enrolled_at) {
+    throw new StudentServiceError('transferred_at must be later than current enrollment start time', 400);
+  }
+
+  const balanceSnapshot = await loadBalanceSnapshotForStudent(manager, teacherId, student.id);
+  if (parseAmountToBigInt(balanceSnapshot.balance) < 0n) {
+    throw new StudentServiceError('student has unpaid debt and cannot be transferred', 409);
+  }
+
+  activeEnrollment.unenrolled_at = input.transferred_at;
+  await enrollmentRepo.save(activeEnrollment);
+
+  const nextEnrollment = enrollmentRepo.create({
+    teacher_id: teacherId,
+    student_id: student.id,
+    class_id: input.to_class_id,
+    enrolled_at: input.transferred_at,
+    unenrolled_at: null,
+  });
+  const savedNextEnrollment = await enrollmentRepo.save(nextEnrollment);
+
+  const savedStudent = await studentRepo.save(student);
+
+  return toStudentSummary(savedStudent, {
+    current_class_id: savedNextEnrollment.class_id,
+    current_enrollment_id: savedNextEnrollment.id,
+    balance_snapshot: balanceSnapshot,
+  });
+}
+
 export async function transferStudent(
   teacherId: number,
   studentId: number,
   input: TransferStudentInput,
 ): Promise<StudentSummary> {
+  return AppDataSource.transaction((manager) => transferStudentInManager(manager, teacherId, studentId, input));
+}
+
+export async function bulkTransferStudents(
+  teacherId: number,
+  input: BulkTransferStudentsInput,
+): Promise<StudentSummary[]> {
   return AppDataSource.transaction(async (manager) => {
-    const studentRepo = manager.getRepository(Student);
-    const enrollmentRepo = manager.getRepository(Enrollment);
+    const studentIds = Array.from(new Set(input.student_ids));
+    const result: StudentSummary[] = [];
 
-    const student = await requireOwnedStudent(manager, teacherId, studentId);
-    ensureActiveStudent(student);
-
-    await requireActiveClass(manager, teacherId, input.to_class_id);
-    const activeEnrollment = await requireActiveEnrollment(manager, teacherId, studentId);
-
-    if (activeEnrollment.class_id === input.to_class_id) {
-      throw new StudentServiceError('student is already enrolled in this class', 409);
+    for (const studentId of studentIds) {
+      const student = await transferStudentInManager(manager, teacherId, studentId, {
+        to_class_id: input.to_class_id,
+        transferred_at: input.transferred_at,
+      });
+      result.push(student);
     }
 
-    if (input.transferred_at <= activeEnrollment.enrolled_at) {
-      throw new StudentServiceError('transferred_at must be later than current enrollment start time', 400);
-    }
+    return result;
+  });
+}
 
-    const balanceSnapshot = await loadBalanceSnapshotForStudent(manager, teacherId, student.id);
-    if (parseAmountToBigInt(balanceSnapshot.balance) < 0n) {
-      throw new StudentServiceError('student has unpaid debt and cannot be transferred', 409);
-    }
+async function expelStudentInManager(
+  manager: EntityManager,
+  teacherId: number,
+  studentId: number,
+  input: ExpelStudentInput,
+): Promise<StudentSummary> {
+  const studentRepo = manager.getRepository(Student);
+  const enrollmentRepo = manager.getRepository(Enrollment);
 
-    activeEnrollment.unenrolled_at = input.transferred_at;
+  const student = await requireOwnedStudent(manager, teacherId, studentId);
+  ensureActiveStudent(student);
+
+  const activeEnrollment = await getActiveEnrollment(manager, teacherId, studentId);
+  if (activeEnrollment && input.expelled_at <= activeEnrollment.enrolled_at) {
+    throw new StudentServiceError('expelled_at must be later than current enrollment start time', 400);
+  }
+
+  const balanceSnapshot = await loadBalanceSnapshotForStudent(manager, teacherId, student.id);
+  const balanceAmount = parseAmountToBigInt(balanceSnapshot.balance);
+
+  if (activeEnrollment) {
+    activeEnrollment.unenrolled_at = input.expelled_at;
     await enrollmentRepo.save(activeEnrollment);
+  }
 
-    const nextEnrollment = enrollmentRepo.create({
-      teacher_id: teacherId,
-      student_id: student.id,
-      class_id: input.to_class_id,
-      enrolled_at: input.transferred_at,
-      unenrolled_at: null,
-    });
-    const savedNextEnrollment = await enrollmentRepo.save(nextEnrollment);
+  if (balanceAmount < 0n) {
+    student.status = StudentStatus.PendingArchive;
+    student.pending_archive_reason = PendingArchiveReason.NeedsCollection;
+    student.archived_at = null;
+  } else if (balanceAmount > 0n) {
+    student.status = StudentStatus.PendingArchive;
+    student.pending_archive_reason = PendingArchiveReason.NeedsRefund;
+    student.archived_at = null;
+  } else {
+    student.status = StudentStatus.Archived;
+    student.pending_archive_reason = null;
+    student.archived_at = input.expelled_at;
+  }
 
-    const savedStudent = await studentRepo.save(student);
+  const savedStudent = await studentRepo.save(student);
 
-    return toStudentSummary(savedStudent, {
-      current_class_id: savedNextEnrollment.class_id,
-      current_enrollment_id: savedNextEnrollment.id,
-      balance_snapshot: balanceSnapshot,
-    });
+  return toStudentSummary(savedStudent, {
+    current_class_id: null,
+    current_enrollment_id: null,
+    balance_snapshot: balanceSnapshot,
   });
 }
 
@@ -382,45 +551,71 @@ export async function expelStudent(
   studentId: number,
   input: ExpelStudentInput,
 ): Promise<StudentSummary> {
+  return AppDataSource.transaction((manager) => expelStudentInManager(manager, teacherId, studentId, input));
+}
+
+export async function bulkExpelStudents(
+  teacherId: number,
+  input: BulkExpelStudentsInput,
+): Promise<StudentSummary[]> {
+  return AppDataSource.transaction(async (manager) => {
+    const studentIds = Array.from(new Set(input.student_ids));
+    const result: StudentSummary[] = [];
+
+    for (const studentId of studentIds) {
+      const student = await expelStudentInManager(manager, teacherId, studentId, {
+        expelled_at: input.expelled_at,
+      });
+      result.push(student);
+    }
+
+    return result;
+  });
+}
+
+export async function reinstateStudent(
+  teacherId: number,
+  studentId: number,
+  input: ReinstateStudentInput,
+): Promise<StudentSummary> {
   return AppDataSource.transaction(async (manager) => {
     const studentRepo = manager.getRepository(Student);
     const enrollmentRepo = manager.getRepository(Enrollment);
 
     const student = await requireOwnedStudent(manager, teacherId, studentId);
-    ensureActiveStudent(student);
+    ensureArchivedStudent(student);
+    await requireActiveClass(manager, teacherId, input.class_id);
 
-    const activeEnrollment = await getActiveEnrollment(manager, teacherId, studentId);
-    if (activeEnrollment && input.expelled_at <= activeEnrollment.enrolled_at) {
-      throw new StudentServiceError('expelled_at must be later than current enrollment start time', 400);
+    const activeEnrollment = await getActiveEnrollment(manager, teacherId, student.id);
+    if (activeEnrollment) {
+      throw new StudentServiceError('student already has an active enrollment', 409);
     }
+
+    if (student.archived_at && input.enrolled_at <= student.archived_at) {
+      throw new StudentServiceError('enrolled_at must be later than archived_at', 400);
+    }
+
+    await ensureUniqueCodeforcesHandle(manager, student.codeforces_handle, student.id);
 
     const balanceSnapshot = await loadBalanceSnapshotForStudent(manager, teacherId, student.id);
-    const balanceAmount = parseAmountToBigInt(balanceSnapshot.balance);
 
-    if (activeEnrollment) {
-      activeEnrollment.unenrolled_at = input.expelled_at;
-      await enrollmentRepo.save(activeEnrollment);
-    }
-
-    if (balanceAmount < 0n) {
-      student.status = StudentStatus.PendingArchive;
-      student.pending_archive_reason = PendingArchiveReason.NeedsCollection;
-      student.archived_at = null;
-    } else if (balanceAmount > 0n) {
-      student.status = StudentStatus.PendingArchive;
-      student.pending_archive_reason = PendingArchiveReason.NeedsRefund;
-      student.archived_at = null;
-    } else {
-      student.status = StudentStatus.Archived;
-      student.pending_archive_reason = null;
-      student.archived_at = input.expelled_at;
-    }
-
+    student.status = StudentStatus.Active;
+    student.pending_archive_reason = null;
+    student.archived_at = null;
     const savedStudent = await studentRepo.save(student);
 
+    const enrollment = enrollmentRepo.create({
+      teacher_id: teacherId,
+      student_id: student.id,
+      class_id: input.class_id,
+      enrolled_at: input.enrolled_at,
+      unenrolled_at: null,
+    });
+    const savedEnrollment = await enrollmentRepo.save(enrollment);
+
     return toStudentSummary(savedStudent, {
-      current_class_id: null,
-      current_enrollment_id: null,
+      current_class_id: savedEnrollment.class_id,
+      current_enrollment_id: savedEnrollment.id,
       balance_snapshot: balanceSnapshot,
     });
   });

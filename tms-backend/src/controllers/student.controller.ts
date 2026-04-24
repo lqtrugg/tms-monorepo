@@ -4,20 +4,28 @@ import passport from 'passport';
 import { Teacher, TeacherRole } from '../entities/index.js';
 import { StudentServiceError } from '../errors/student.error.js';
 import {
+  parseBulkExpelStudentsInput,
+  parseBulkTransferStudentsInput,
   parseArchivePendingStudentInput,
   parseCreateStudentInput,
   parseExpelStudentInput,
   parseIdParam,
+  parseReinstateStudentInput,
   parseStudentListFilters,
   parseTransferStudentInput,
+  parseUpdateStudentInput,
 } from '../helpers/student.helpers.js';
 import {
   archivePendingStudent,
+  bulkExpelStudents,
+  bulkTransferStudents,
   createStudent,
   expelStudent,
   getStudentById,
   listStudents,
+  reinstateStudent,
   transferStudent,
+  updateStudent,
 } from '../services/student.service.js';
 import { requireRoles } from '../middlewares/rbac.middleware.js';
 
@@ -69,11 +77,48 @@ studentRouter.post('/students', async (req, res, next) => {
   }
 });
 
+studentRouter.post('/students/bulk/transfer', async (req, res, next) => {
+  try {
+    const teacherId = getTeacherId(req);
+    const payload = parseBulkTransferStudentsInput(req.body);
+    const students = await bulkTransferStudents(teacherId, payload);
+
+    res.json({ students });
+  } catch (error) {
+    next(error);
+  }
+});
+
+studentRouter.post('/students/bulk/expel', async (req, res, next) => {
+  try {
+    const teacherId = getTeacherId(req);
+    const payload = parseBulkExpelStudentsInput(req.body);
+    const students = await bulkExpelStudents(teacherId, payload);
+
+    res.json({ students });
+  } catch (error) {
+    next(error);
+  }
+});
+
 studentRouter.get('/students/:studentId', async (req, res, next) => {
   try {
     const teacherId = getTeacherId(req);
     const studentId = parseIdParam(req.params.studentId, 'student_id');
     const student = await getStudentById(teacherId, studentId);
+
+    res.json({ student });
+  } catch (error) {
+    next(error);
+  }
+});
+
+studentRouter.patch('/students/:studentId', async (req, res, next) => {
+  try {
+    const teacherId = getTeacherId(req);
+    const studentId = parseIdParam(req.params.studentId, 'student_id');
+    const payload = parseUpdateStudentInput(req.body);
+    const student = await updateStudent(teacherId, studentId, payload);
 
     res.json({ student });
   } catch (error) {
@@ -100,6 +145,19 @@ studentRouter.post('/students/:studentId/expel', async (req, res, next) => {
     const studentId = parseIdParam(req.params.studentId, 'student_id');
     const payload = parseExpelStudentInput(req.body);
     const student = await expelStudent(teacherId, studentId, payload);
+
+    res.json({ student });
+  } catch (error) {
+    next(error);
+  }
+});
+
+studentRouter.post('/students/:studentId/reinstate', async (req, res, next) => {
+  try {
+    const teacherId = getTeacherId(req);
+    const studentId = parseIdParam(req.params.studentId, 'student_id');
+    const payload = parseReinstateStudentInput(req.body);
+    const student = await reinstateStudent(teacherId, studentId, payload);
 
     res.json({ student });
   } catch (error) {

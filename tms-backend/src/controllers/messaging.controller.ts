@@ -13,6 +13,7 @@ import {
 import {
   listDiscordServers,
   listMessages,
+  sendChannelPost,
   sendBulkDm,
   upsertDiscordServerByClass,
 } from '../services/messaging.service.js';
@@ -52,6 +53,14 @@ function parseMessageType(value: unknown): DiscordMessageType | undefined {
   return value;
 }
 
+function parseNullableOptionalString(value: unknown, fieldName: string): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  return parseOptionalString(value, fieldName) ?? null;
+}
+
 messagingRouter.get('/discord/servers', async (req, res, next) => {
   try {
     const teacherId = getTeacherId(req);
@@ -70,9 +79,9 @@ messagingRouter.put('/classes/:classId/discord-server', async (req, res, next) =
     const body = asRecord(req.body, 'body');
     const server = await upsertDiscordServerByClass(teacherId, classId, {
       discord_server_id: parseRequiredString(body.discord_server_id, 'discord_server_id'),
-      name: parseOptionalString(body.name, 'name') ?? null,
-      attendance_voice_channel_id: parseOptionalString(body.attendance_voice_channel_id, 'attendance_voice_channel_id') ?? null,
-      notification_channel_id: parseOptionalString(body.notification_channel_id, 'notification_channel_id') ?? null,
+      bot_token: parseNullableOptionalString(body.bot_token, 'bot_token'),
+      attendance_voice_channel_id: parseNullableOptionalString(body.attendance_voice_channel_id, 'attendance_voice_channel_id'),
+      notification_channel_id: parseNullableOptionalString(body.notification_channel_id, 'notification_channel_id'),
     });
 
     res.json({ server });
@@ -103,6 +112,21 @@ messagingRouter.post('/discord/messages/bulk-dm', async (req, res, next) => {
       content: parseRequiredString(body.content, 'content'),
       class_id: body.class_id === undefined ? undefined : parsePositiveInteger(body.class_id, 'class_id'),
       student_ids: parseIntegerArrayFromBody(body.student_ids, 'student_ids'),
+    });
+
+    res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+messagingRouter.post('/discord/messages/channel-post', async (req, res, next) => {
+  try {
+    const teacherId = getTeacherId(req);
+    const body = asRecord(req.body, 'body');
+    const result = await sendChannelPost(teacherId, {
+      content: parseRequiredString(body.content, 'content'),
+      server_ids: parseIntegerArrayFromBody(body.server_ids, 'server_ids') ?? [],
     });
 
     res.status(201).json(result);

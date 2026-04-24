@@ -95,9 +95,7 @@ topicRouter.post('/topics', async (req, res, next) => {
     const body = asRecord(req.body, 'body');
     const topic = await createTopic(teacherId, {
       class_id: parsePositiveInteger(body.class_id, 'class_id'),
-      title: parseRequiredString(body.title, 'title'),
       gym_link: parseRequiredString(body.gym_link, 'gym_link'),
-      gym_id: parseOptionalString(body.gym_id, 'gym_id') ?? null,
       expires_at: body.expires_at === undefined ? null : parseDateTime(body.expires_at, 'expires_at'),
       pull_interval_minutes: parseOptionalInteger(body.pull_interval_minutes, 'pull_interval_minutes'),
     });

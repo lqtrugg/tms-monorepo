@@ -85,9 +85,7 @@ export async function listTopics(filters?: {
 
 export async function createTopic(payload: {
   class_id: number;
-  title: string;
   gym_link: string;
-  gym_id?: string | null;
   expires_at?: string | null;
   pull_interval_minutes?: number;
 }): Promise<BackendTopic> {

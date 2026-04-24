@@ -1,8 +1,14 @@
 import { EntityManager, In, IsNull } from 'typeorm';
 
 import { AppDataSource } from '../data-source.js';
-import { Class, ClassStatus, Enrollment, Student, Topic, TopicProblem, TopicStanding } from '../entities/index.js';
+import { Class, ClassStatus, Enrollment, Student, Teacher, Topic, TopicProblem, TopicStanding } from '../entities/index.js';
 import { ServiceError } from '../errors/service.error.js';
+import {
+  extractGymIdFromLink,
+  fetchCodeforcesGymMetadata,
+  resolveCodeforcesCredentials,
+  type CodeforcesCredentials,
+} from './codeforces-api.service.js';
 
 type TopicStatusFilter = 'active' | 'expired';
 
@@ -12,6 +18,19 @@ function normalizeTopicStatus(topic: Topic): TopicStatusFilter {
   }
 
   return topic.expires_at.getTime() < Date.now() ? 'expired' : 'active';
+}
+
+async function syncGymMetadata(
+  gymLink: string,
+  credentials: CodeforcesCredentials | null,
+): Promise<{ gym_id: string; title: string }> {
+  const gymId = extractGymIdFromLink(gymLink);
+
+  if (!gymId) {
+    throw new ServiceError('gym_link must contain a valid gym id', 400);
+  }
+
+  return fetchCodeforcesGymMetadata(gymId, credentials);
 }
 
 async function requireOwnedClass(manager: EntityManager, teacherId: number, classId: number): Promise<Class> {
@@ -38,6 +57,21 @@ async function requireOwnedTopic(manager: EntityManager, teacherId: number, topi
   }
 
   return topic;
+}
+
+async function getTeacherCodeforcesCredentials(
+  manager: EntityManager,
+  teacherId: number,
+): Promise<CodeforcesCredentials | null> {
+  const teacher = await manager.getRepository(Teacher).findOneBy({
+    id: teacherId,
+  });
+
+  if (!teacher) {
+    throw new ServiceError('teacher not found', 404);
+  }
+
+  return resolveCodeforcesCredentials(teacher.codeforces_api_key, teacher.codeforces_api_secret);
 }
 
 export async function listTopics(teacherId: number, filters: {
@@ -68,9 +102,7 @@ export async function listTopics(teacherId: number, filters: {
 
 export async function createTopic(teacherId: number, input: {
   class_id: number;
-  title: string;
   gym_link: string;
-  gym_id?: string | null;
   expires_at?: Date | null;
   pull_interval_minutes?: number;
 }) {
@@ -80,13 +112,28 @@ export async function createTopic(teacherId: number, input: {
       throw new ServiceError('class is archived', 409);
     }
 
+    const gymLink = input.gym_link.trim();
+    let parsedGymLink: URL;
+    try {
+      parsedGymLink = new URL(gymLink);
+    } catch {
+      throw new ServiceError('gym_link must be a valid URL', 400);
+    }
+
+    if (parsedGymLink.protocol !== 'http:' && parsedGymLink.protocol !== 'https:') {
+      throw new ServiceError('gym_link must start with http:// or https://', 400);
+    }
+
+    const codeforcesCredentials = await getTeacherCodeforcesCredentials(manager, teacherId);
+    const gymMetadata = await syncGymMetadata(parsedGymLink.toString(), codeforcesCredentials);
+
     const topicRepo = manager.getRepository(Topic);
     const topic = topicRepo.create({
       teacher_id: teacherId,
       class_id: input.class_id,
-      title: input.title.trim(),
-      gym_link: input.gym_link.trim(),
-      gym_id: input.gym_id ?? null,
+      title: gymMetadata.title,
+      gym_link: parsedGymLink.toString(),
+      gym_id: gymMetadata.gym_id,
       expires_at: input.expires_at ?? null,
       pull_interval_minutes: input.pull_interval_minutes ?? 60,
       last_pulled_at: null,

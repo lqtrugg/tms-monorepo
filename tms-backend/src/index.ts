@@ -13,6 +13,7 @@ import { topicRouter } from './controllers/topic.controller.js';
 import { AppDataSource, initializeDatabase } from './data-source.js';
 import { ensureSystemAdminAccount } from './services/auth.service.js';
 import { configurePassport } from './services/auth.passport.js';
+import { startAutoSyncScheduler, stopAutoSyncScheduler } from './services/auto-sync.service.js';
 
 const app = express();
 const passport = configurePassport();
@@ -47,6 +48,14 @@ async function main(): Promise<void> {
   await initializeDatabase();
   await ensureSystemAdminAccount();
 
+  if (config.autoSync.enabled) {
+    startAutoSyncScheduler({
+      intervalMinutes: config.autoSync.intervalMinutes,
+      syncDiscord: config.autoSync.syncDiscord,
+      syncCodeforces: config.autoSync.syncCodeforces,
+    });
+  }
+
   const server = config.host ? app.listen(config.port, config.host) : app.listen(config.port);
 
   server.on('listening', () => {
@@ -63,6 +72,7 @@ async function main(): Promise<void> {
 
   const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
     console.log(`Received ${signal}, shutting down backend server`);
+    stopAutoSyncScheduler();
 
     server.close(async () => {
       if (AppDataSource.isInitialized) {

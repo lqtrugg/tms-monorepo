@@ -219,24 +219,6 @@ export function Dashboard() {
         </div>
       )}
 
-      <div className="mb-6 bg-white border border-zinc-200 rounded-xl p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-sm text-zinc-600 mb-1">Tài khoản hiện tại</p>
-            <p className="text-lg font-semibold text-zinc-900">{account?.username ?? "..."}</p>
-            <p className="text-sm text-zinc-600">
-              Codeforces: {account?.codeforces_handle ?? "Chưa cập nhật"}
-            </p>
-          </div>
-          <button
-            onClick={() => setShowAccountModal(true)}
-            className="px-4 py-2 bg-zinc-100 text-zinc-700 rounded-lg hover:bg-zinc-200 transition-colors"
-          >
-            Cập nhật thông tin
-          </button>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {stats.map((stat) => {
           const Icon = stat.icon;

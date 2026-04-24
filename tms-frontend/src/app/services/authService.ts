@@ -34,7 +34,7 @@ export async function login(payload: {
 export async function register(payload: {
   username: string;
   password: string;
-  codeforces_handle: string;
+  codeforces_handle?: string | null;
   codeforces_api_key?: string | null;
   codeforces_api_secret?: string | null;
 }): Promise<AuthResponse> {

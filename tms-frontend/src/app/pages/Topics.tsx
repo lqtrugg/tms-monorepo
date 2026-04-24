@@ -23,16 +23,6 @@ function toErrorMessage(error: unknown): string {
   return "Đã có lỗi xảy ra";
 }
 
-function extractGymId(gymLink: string): string | null {
-  const match = /\/gym\/(\d+)/i.exec(gymLink);
-  return match ? match[1] : null;
-}
-
-function inferTopicTitle(gymLink: string): string {
-  const gymId = extractGymId(gymLink);
-  return gymId ? `GYM ${gymId}` : "Chuyên đề mới";
-}
-
 export function Topics() {
   const navigate = useNavigate();
   const [showAddModal, setShowAddModal] = useState(false);
@@ -237,9 +227,7 @@ export function Topics() {
             try {
               await createTopic({
                 class_id: payload.class_id,
-                title: inferTopicTitle(payload.gym_link),
                 gym_link: payload.gym_link,
-                gym_id: extractGymId(payload.gym_link),
               });
               setShowAddModal(false);
               await loadData();

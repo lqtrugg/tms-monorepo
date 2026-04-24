@@ -1,7 +1,6 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import passport from 'passport';
 
-import config from '../config.js';
 import { Teacher } from '../entities/index.js';
 import { AuthError } from '../errors/auth.error.js';
 import { login, me, register, updateMe } from '../services/auth.service.js';
@@ -19,10 +18,6 @@ function handleAuthError(error: unknown, _req: Request, res: Response, next: Nex
 
 authRouter.post('/register', async (req, res, next) => {
   try {
-    if (!config.auth.allowPublicRegistration) {
-      throw new AuthError('registration is disabled', 403);
-    }
-
     const authResponse = await register(req.body);
     res.status(201).json(authResponse);
   } catch (error) {

@@ -31,6 +31,9 @@ export class DiscordServer {
   @Column({ type: 'varchar', length: 255, nullable: true })
   name!: string | null;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  bot_token!: string | null;
+
   @Column({ type: 'varchar', length: 50, nullable: true })
   attendance_voice_channel_id!: string | null;
 
