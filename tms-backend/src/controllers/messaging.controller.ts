@@ -11,6 +11,7 @@ import {
   parseRequiredString,
 } from '../helpers/service.helpers.js';
 import {
+  deleteDiscordServer,
   listDiscordServers,
   listMessages,
   sendChannelPost,
@@ -85,6 +86,18 @@ messagingRouter.put('/classes/:classId/discord-server', async (req, res, next) =
     });
 
     res.json({ server });
+  } catch (error) {
+    next(error);
+  }
+});
+
+messagingRouter.delete('/classes/:classId/discord-server', async (req, res, next) => {
+  try {
+    const teacherId = getTeacherId(req);
+    const classId = parsePositiveInteger(req.params.classId, 'class_id');
+    const result = await deleteDiscordServer(teacherId, classId);
+
+    res.json(result);
   } catch (error) {
     next(error);
   }

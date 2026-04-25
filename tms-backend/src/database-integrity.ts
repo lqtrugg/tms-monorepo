@@ -47,4 +47,47 @@ export async function installDatabaseIntegrityRules(dataSource: DataSource): Pro
     FOR EACH ROW
     EXECUTE FUNCTION enforce_transaction_refund_balance();
   `);
+
+  // ── Integrity Rule: Sessions cannot have the same scheduled_at within a class ──
+  await dataSource.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_sessions_no_duplicate
+    ON sessions (teacher_id, class_id, scheduled_at)
+    WHERE status <> 'cancelled';
+  `);
+
+  // ── Integrity Rule: Active students must have at least one active enrollment ──
+  await dataSource.query(`
+    CREATE OR REPLACE FUNCTION enforce_active_student_has_enrollment()
+    RETURNS trigger AS $$
+    DECLARE
+      enrollment_count integer;
+    BEGIN
+      IF NEW.status = 'active' THEN
+        SELECT COUNT(*) INTO enrollment_count
+        FROM enrollments
+        WHERE teacher_id = NEW.teacher_id
+          AND student_id = NEW.id
+          AND unenrolled_at IS NULL;
+
+        IF enrollment_count = 0 THEN
+          RAISE EXCEPTION 'Học sinh đang học phải có ít nhất một lớp đang enroll'
+            USING ERRCODE = '23514',
+              CONSTRAINT = 'chk_active_student_must_have_class';
+        END IF;
+      END IF;
+
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+  `);
+
+  await dataSource.query('DROP TRIGGER IF EXISTS trg_active_student_has_enrollment ON students');
+
+  await dataSource.query(`
+    CREATE CONSTRAINT TRIGGER trg_active_student_has_enrollment
+    AFTER INSERT OR UPDATE OF status ON students
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+    EXECUTE FUNCTION enforce_active_student_has_enrollment();
+  `);
 }

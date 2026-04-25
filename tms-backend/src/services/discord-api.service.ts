@@ -188,7 +188,7 @@ async function discordApiRequest(
   path: string,
   botToken: string,
   options?: {
-    method?: 'GET' | 'POST';
+    method?: 'GET' | 'POST' | 'DELETE' | 'PUT';
     body?: Record<string, unknown>;
   },
 ): Promise<Response> {
@@ -575,5 +575,70 @@ export async function sendDiscordDirectMessage(input: {
   return {
     dmChannelId,
     messageId: sent.messageId,
+  };
+}
+
+export async function kickGuildMember(input: {
+  guildId: string;
+  userId: string;
+  botToken: string;
+}): Promise<void> {
+  const response = await discordApiRequest(
+    `/guilds/${encodeURIComponent(input.guildId)}/members/${encodeURIComponent(input.userId)}`,
+    input.botToken,
+    { method: 'DELETE' },
+  );
+
+  if (response.status === 204 || response.status === 200) {
+    return;
+  }
+
+  if (response.status === 404) {
+    // Member not in guild, treat as success
+    return;
+  }
+
+  const errorMessage = await getDiscordErrorMessage(response);
+  throw new ServiceError(
+    errorMessage ?? `failed to kick member (HTTP ${response.status})`,
+    502,
+  );
+}
+
+export async function createGuildInvite(input: {
+  channelId: string;
+  botToken: string;
+  maxAge?: number;
+  maxUses?: number;
+}): Promise<{ code: string; url: string }> {
+  const response = await discordApiRequest(
+    `/channels/${encodeURIComponent(input.channelId)}/invites`,
+    input.botToken,
+    {
+      method: 'POST',
+      body: {
+        max_age: input.maxAge ?? 86400,
+        max_uses: input.maxUses ?? 1,
+        unique: true,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const errorMessage = await getDiscordErrorMessage(response);
+    throw new ServiceError(
+      errorMessage ?? `failed to create invite (HTTP ${response.status})`,
+      502,
+    );
+  }
+
+  const payload = await parseJsonSafe(response) as { code?: string } | null;
+  if (!payload?.code) {
+    throw new ServiceError('discord invite response is invalid', 502);
+  }
+
+  return {
+    code: payload.code,
+    url: `https://discord.gg/${payload.code}`,
   };
 }

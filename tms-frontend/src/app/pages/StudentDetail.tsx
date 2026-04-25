@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router";
-import { ArrowLeft, Mail, GraduationCap, DollarSign, BookOpen, ExternalLink } from "lucide-react";
+import { ArrowLeft, Mail, GraduationCap, DollarSign, BookOpen, ExternalLink, Receipt } from "lucide-react";
 
 import { ApiError } from "../services/apiClient";
 import { listClasses } from "../services/classService";
-import { listTransactions } from "../services/financeService";
+import { listFeeRecords, listTransactions, type BackendFeeRecord } from "../services/financeService";
 import { getStudentLearningProfile, type StudentLearningProfile } from "../services/reportingService";
 import { getStudent, type BackendStudentSummary } from "../services/studentService";
 
@@ -51,6 +51,10 @@ export function StudentDetail() {
     }>
   >([]);
   const [learningTopics, setLearningTopics] = useState<StudentLearningProfile["topics"]>([]);
+  const [feeRecords, setFeeRecords] = useState<BackendFeeRecord[]>([]);
+  const [financeTab, setFinanceTab] = useState<"transactions" | "fee_records">("transactions");
+  const [feeRecordsPage, setFeeRecordsPage] = useState(1);
+  const FEE_RECORDS_PER_PAGE = 20;
 
   useEffect(() => {
     const studentId = Number(id);
@@ -65,11 +69,12 @@ export function StudentDetail() {
       setRequestError("");
 
       try {
-        const [studentData, classes, txList, learningProfile] = await Promise.all([
+        const [studentData, classes, txList, learningProfile, feeRecordList] = await Promise.all([
           getStudent(studentId),
           listClasses(),
           listTransactions({ student_id: studentId }),
           getStudentLearningProfile(studentId),
+          listFeeRecords({ student_id: studentId }),
         ]);
 
         setStudent(studentData);
@@ -87,6 +92,7 @@ export function StudentDetail() {
           })),
         );
         setLearningTopics(learningProfile.topics);
+        setFeeRecords(feeRecordList);
       } catch (error) {
         setRequestError(toErrorMessage(error));
       } finally {
@@ -267,34 +273,108 @@ export function StudentDetail() {
         )}
       </div>
 
-      <div className="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
-        <h2 className="text-xl font-semibold text-zinc-900 mb-4">Lịch sử giao dịch</h2>
+      <div className="bg-white border border-zinc-200 rounded-xl shadow-sm">
+        <div className="flex border-b border-zinc-200">
+          <button
+            onClick={() => setFinanceTab("transactions")}
+            className={`flex-1 px-6 py-4 font-medium text-sm transition-colors ${financeTab === "transactions" ? "text-zinc-900 border-b-2 border-zinc-900" : "text-zinc-500 hover:text-zinc-700"}`}
+          >
+            <DollarSign className="w-4 h-4 inline mr-2" />
+            Giao dịch ({transactions.length})
+          </button>
+          <button
+            onClick={() => setFinanceTab("fee_records")}
+            className={`flex-1 px-6 py-4 font-medium text-sm transition-colors ${financeTab === "fee_records" ? "text-zinc-900 border-b-2 border-zinc-900" : "text-zinc-500 hover:text-zinc-700"}`}
+          >
+            <Receipt className="w-4 h-4 inline mr-2" />
+            Học phí phát sinh ({feeRecords.length})
+          </button>
+        </div>
 
-        {transactions.length > 0 ? (
-          <div className="space-y-3">
-            {transactions.map((tx) => (
-              <div key={tx.id} className="flex items-center justify-between p-4 bg-zinc-50 rounded-lg border border-zinc-200">
-                <div>
-                  <p className="text-zinc-900 font-medium">{tx.notes || "Giao dịch tài chính"}</p>
-                  <p className="text-sm text-zinc-600">
-                    {new Date(tx.recorded_at).toLocaleDateString("vi-VN")}
-                  </p>
+        <div className="p-6">
+          {financeTab === "transactions" && (
+            <>
+              {transactions.length > 0 ? (
+                <div className="space-y-3">
+                  {transactions.map((tx) => (
+                    <div key={tx.id} className="flex items-center justify-between p-4 bg-zinc-50 rounded-lg border border-zinc-200">
+                      <div>
+                        <p className="text-zinc-900 font-medium">{tx.notes || "Giao dịch tài chính"}</p>
+                        <p className="text-sm text-zinc-600">
+                          {new Date(tx.recorded_at).toLocaleDateString("vi-VN")}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className={`font-semibold ${tx.type === "payment" ? "text-zinc-900" : "text-zinc-600"}`}>
+                          {tx.type === "payment" ? "+" : "-"}
+                          {(Math.abs(tx.amount) / 1000).toFixed(0)}K
+                        </span>
+                        <p className="text-xs text-zinc-500 mt-1">
+                          {tx.type === "payment" ? "Thu tiền" : "Hoàn trả"}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="text-right">
-                  <span className={`font-semibold ${tx.type === "payment" ? "text-zinc-900" : "text-zinc-600"}`}>
-                    {tx.type === "payment" ? "+" : "-"}
-                    {(Math.abs(tx.amount) / 1000).toFixed(0)}K
-                  </span>
-                  <p className="text-xs text-zinc-500 mt-1">
-                    {tx.type === "payment" ? "Thu tiền" : "Hoàn trả"}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-zinc-500 text-center py-8">Chưa có giao dịch nào</p>
-        )}
+              ) : (
+                <p className="text-zinc-500 text-center py-8">Chưa có giao dịch nào</p>
+              )}
+            </>
+          )}
+
+          {financeTab === "fee_records" && (
+            <>
+              {feeRecords.length > 0 ? (
+                <>
+                  <div className="overflow-hidden rounded-lg border border-zinc-200">
+                    <table className="w-full text-sm">
+                      <thead className="bg-zinc-50 border-b border-zinc-200">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-medium text-zinc-600">Ngày</th>
+                          <th className="px-4 py-3 text-left font-medium text-zinc-600">Session ID</th>
+                          <th className="px-4 py-3 text-right font-medium text-zinc-600">Số tiền</th>
+                          <th className="px-4 py-3 text-center font-medium text-zinc-600">Trạng thái</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100">
+                        {feeRecords.slice(0, feeRecordsPage * FEE_RECORDS_PER_PAGE).map((fr) => (
+                          <tr key={fr.id} className="hover:bg-zinc-50 transition-colors">
+                            <td className="px-4 py-3 text-zinc-900">
+                              {new Date(fr.created_at).toLocaleDateString("vi-VN")}
+                            </td>
+                            <td className="px-4 py-3 text-zinc-600 font-mono text-xs">#{fr.session_id}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-zinc-900">
+                              {(parseAmount(fr.amount) / 1000).toFixed(0)}K
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                fr.status === "active"
+                                  ? "bg-zinc-900 text-white"
+                                  : "bg-zinc-200 text-zinc-500 line-through"
+                              }`}>
+                                {fr.status === "active" ? "Có hiệu lực" : "Đã huỷ"}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {feeRecords.length > feeRecordsPage * FEE_RECORDS_PER_PAGE && (
+                    <button
+                      onClick={() => setFeeRecordsPage((p) => p + 1)}
+                      className="mt-4 w-full py-3 bg-zinc-100 text-zinc-700 rounded-lg hover:bg-zinc-200 transition-colors text-sm font-medium"
+                    >
+                      Xem thêm ({feeRecords.length - feeRecordsPage * FEE_RECORDS_PER_PAGE} còn lại)
+                    </button>
+                  )}
+                </>
+              ) : (
+                <p className="text-zinc-500 text-center py-8">Chưa có học phí phát sinh nào</p>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

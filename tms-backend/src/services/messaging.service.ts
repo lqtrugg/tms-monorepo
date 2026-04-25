@@ -217,6 +217,24 @@ export async function listDiscordServers(teacherId: number) {
   }));
 }
 
+export async function deleteDiscordServer(teacherId: number, classId: number) {
+  await requireOwnedClass(teacherId, classId);
+
+  const repo = AppDataSource.getRepository(DiscordServer);
+  const existing = await repo.findOneBy({
+    teacher_id: teacherId,
+    class_id: classId,
+  });
+
+  if (!existing) {
+    throw new ServiceError('discord server not found for this class', 404);
+  }
+
+  await repo.remove(existing);
+
+  return { removed: true };
+}
+
 export async function upsertDiscordServerByClass(teacherId: number, classId: number, input: {
   discord_server_id: string;
   bot_token?: string | null;

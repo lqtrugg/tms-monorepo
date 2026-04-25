@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 import { Calendar, Plus, Trash2 } from "lucide-react";
 
 import { ApiError } from "../services/apiClient";
@@ -66,20 +67,32 @@ function toSessionCards(sessions: BackendSession[], classes: BackendClass[]): Se
 }
 
 export function Sessions() {
+  const navigate = useNavigate();
   const [showAddModal, setShowAddModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState<SessionStatusFilter>('all');
   const [classes, setClasses] = useState<BackendClass[]>([]);
   const [sessions, setSessions] = useState<SessionCard[]>([]);
   const [requestError, setRequestError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showAllSessions, setShowAllSessions] = useState(false);
 
   const loadData = async (): Promise<void> => {
     setRequestError("");
 
     try {
+      const dateFilters: { from?: string; to?: string } = {};
+      if (!showAllSessions) {
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const sevenDaysLater = new Date(startOfToday.getTime() + 7 * 24 * 60 * 60 * 1000);
+        sevenDaysLater.setHours(23, 59, 59, 999);
+        dateFilters.from = startOfToday.toISOString();
+        dateFilters.to = sevenDaysLater.toISOString();
+      }
+
       const [classList, sessionList] = await Promise.all([
         listClasses(),
-        listSessions(),
+        listSessions({ ...dateFilters }),
       ]);
 
       setClasses(classList);
@@ -91,7 +104,7 @@ export function Sessions() {
 
   useEffect(() => {
     void loadData();
-  }, []);
+  }, [showAllSessions]);
 
   const filteredSessions = useMemo(
     () => (filterStatus === 'all' ? sessions : sessions.filter((session) => session.status === filterStatus)),
@@ -156,15 +169,29 @@ export function Sessions() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-semibold text-zinc-900 mb-2">Buổi học</h1>
-          <p className="text-zinc-600">Quản lý các buổi học cụ thể</p>
+          <p className="text-zinc-600">
+            {showAllSessions ? "Tất cả buổi học" : "Buổi học trong 7 ngày tới"}
+          </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-3 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Thêm buổi học
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowAllSessions(!showAllSessions)}
+            className={`px-4 py-3 rounded-lg font-medium transition-colors ${
+              showAllSessions
+                ? "bg-zinc-200 text-zinc-900"
+                : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+            }`}
+          >
+            {showAllSessions ? "7 ngày tới" : "Xem tất cả"}
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-4 py-3 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            Thêm buổi học
+          </button>
+        </div>
       </div>
 
       {requestError && (
@@ -201,7 +228,14 @@ export function Sessions() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredSessions.map((session) => (
-          <div key={session.id} className="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm">
+          <div
+            key={session.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate(`/attendance/${session.id}`)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/attendance/${session.id}`); } }}
+            className="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm cursor-pointer transition-colors hover:border-zinc-300 hover:bg-zinc-50"
+          >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-zinc-600" />
@@ -229,7 +263,7 @@ export function Sessions() {
             {(session.status === 'scheduled' || session.status === 'in_progress') && (
               <button
                 className="w-full px-4 py-2 bg-zinc-100 text-zinc-700 rounded-lg hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-60"
-                onClick={() => void handleCancelSession(session.id)}
+                onClick={(e) => { e.stopPropagation(); void handleCancelSession(session.id); }}
                 disabled={submitting}
               >
                 <Trash2 className="w-4 h-4" />

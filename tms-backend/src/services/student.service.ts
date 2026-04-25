@@ -4,6 +4,7 @@ import { AppDataSource } from '../data-source.js';
 import {
   Class,
   ClassStatus,
+  DiscordServer,
   Enrollment,
   FeeRecord,
   FeeRecordStatus,
@@ -27,6 +28,12 @@ import type {
   TransferStudentInput,
   UpdateStudentInput,
 } from '../types/student.types.js';
+import {
+  createGuildInvite,
+  kickGuildMember,
+  searchDiscordGuildMembers,
+  sendDiscordDirectMessage,
+} from './discord-api.service.js';
 
 function parseAmountToBigInt(value: string | null | undefined): bigint {
   if (!value) {
@@ -444,11 +451,6 @@ async function transferStudentInManager(
     throw new StudentServiceError('transferred_at must be later than current enrollment start time', 400);
   }
 
-  const balanceSnapshot = await loadBalanceSnapshotForStudent(manager, teacherId, student.id);
-  if (parseAmountToBigInt(balanceSnapshot.balance) < 0n) {
-    throw new StudentServiceError('student has unpaid debt and cannot be transferred', 409);
-  }
-
   activeEnrollment.unenrolled_at = input.transferred_at;
   await enrollmentRepo.save(activeEnrollment);
 
@@ -461,6 +463,7 @@ async function transferStudentInManager(
   });
   const savedNextEnrollment = await enrollmentRepo.save(nextEnrollment);
 
+  const balanceSnapshot = await loadBalanceSnapshotForStudent(manager, teacherId, student.id);
   const savedStudent = await studentRepo.save(student);
 
   return toStudentSummary(savedStudent, {
@@ -475,7 +478,12 @@ export async function transferStudent(
   studentId: number,
   input: TransferStudentInput,
 ): Promise<StudentSummary> {
-  return AppDataSource.transaction((manager) => transferStudentInManager(manager, teacherId, studentId, input));
+  const result = await AppDataSource.transaction((manager) => transferStudentInManager(manager, teacherId, studentId, input));
+
+  // Fire-and-forget Discord kick from old class + invite to new class
+  void handleDiscordTransfer(teacherId, studentId, input.to_class_id).catch(() => {});
+
+  return result;
 }
 
 export async function bulkTransferStudents(
@@ -551,7 +559,12 @@ export async function expelStudent(
   studentId: number,
   input: ExpelStudentInput,
 ): Promise<StudentSummary> {
-  return AppDataSource.transaction((manager) => expelStudentInManager(manager, teacherId, studentId, input));
+  const result = await AppDataSource.transaction((manager) => expelStudentInManager(manager, teacherId, studentId, input));
+
+  // Fire-and-forget Discord kick from current class
+  void handleDiscordKick(teacherId, studentId).catch(() => {});
+
+  return result;
 }
 
 export async function bulkExpelStudents(
@@ -663,3 +676,150 @@ export async function archivePendingStudent(
     });
   });
 }
+
+// ── Discord automation helpers ──
+
+async function resolveDiscordUserId(
+  server: DiscordServer,
+  discordUsername: string,
+): Promise<string | null> {
+  if (!server.bot_token || !discordUsername) {
+    return null;
+  }
+
+  const query = discordUsername.trim().replace(/^@/, '');
+  try {
+    const members = await searchDiscordGuildMembers({
+      guildId: server.discord_server_id,
+      query,
+      botToken: server.bot_token,
+      limit: 10,
+    });
+
+    const normalized = query.toLowerCase();
+    const match = members.find(
+      (m) =>
+        m.username?.toLowerCase() === normalized
+        || m.global_name?.toLowerCase() === normalized
+        || m.nick?.toLowerCase() === normalized,
+    );
+    return match?.user_id ?? (members.length === 1 ? members[0].user_id : null);
+  } catch {
+    return null;
+  }
+}
+
+async function handleDiscordKick(teacherId: number, studentId: number): Promise<void> {
+  const student = await AppDataSource.getRepository(Student).findOneBy({
+    id: studentId,
+    teacher_id: teacherId,
+  });
+  if (!student?.discord_username) {
+    return;
+  }
+
+  // Find the most recently unenrolled enrollment to determine old class
+  const lastEnrollment = await AppDataSource.getRepository(Enrollment).findOne({
+    where: { teacher_id: teacherId, student_id: studentId },
+    order: { id: 'DESC' },
+  });
+  if (!lastEnrollment) {
+    return;
+  }
+
+  const server = await AppDataSource.getRepository(DiscordServer).findOneBy({
+    teacher_id: teacherId,
+    class_id: lastEnrollment.class_id,
+  });
+  if (!server?.bot_token) {
+    return;
+  }
+
+  const userId = await resolveDiscordUserId(server, student.discord_username);
+  if (!userId) {
+    return;
+  }
+
+  await kickGuildMember({
+    guildId: server.discord_server_id,
+    userId,
+    botToken: server.bot_token,
+  });
+}
+
+async function handleDiscordTransfer(
+  teacherId: number,
+  studentId: number,
+  newClassId: number,
+): Promise<void> {
+  const student = await AppDataSource.getRepository(Student).findOneBy({
+    id: studentId,
+    teacher_id: teacherId,
+  });
+  if (!student?.discord_username) {
+    return;
+  }
+
+  // Kick from old class (second-to-last enrollment)
+  const enrollments = await AppDataSource.getRepository(Enrollment).find({
+    where: { teacher_id: teacherId, student_id: studentId },
+    order: { id: 'DESC' },
+    take: 2,
+  });
+
+  const oldEnrollment = enrollments.length >= 2 ? enrollments[1] : null;
+  if (oldEnrollment) {
+    const oldServer = await AppDataSource.getRepository(DiscordServer).findOneBy({
+      teacher_id: teacherId,
+      class_id: oldEnrollment.class_id,
+    });
+    if (oldServer?.bot_token) {
+      const userId = await resolveDiscordUserId(oldServer, student.discord_username);
+      if (userId) {
+        try {
+          await kickGuildMember({
+            guildId: oldServer.discord_server_id,
+            userId,
+            botToken: oldServer.bot_token,
+          });
+        } catch {
+          // Kick failure is non-critical
+        }
+      }
+    }
+  }
+
+  // Invite to new class Discord
+  const newServer = await AppDataSource.getRepository(DiscordServer).findOneBy({
+    teacher_id: teacherId,
+    class_id: newClassId,
+  });
+  if (!newServer?.bot_token) {
+    return;
+  }
+
+  // Use notification channel or attendance channel to create invite
+  const channelId = newServer.notification_channel_id ?? newServer.attendance_voice_channel_id;
+  if (!channelId) {
+    return;
+  }
+
+  try {
+    const invite = await createGuildInvite({
+      channelId,
+      botToken: newServer.bot_token,
+      maxAge: 86400 * 7,
+      maxUses: 1,
+    });
+
+    // DM the invite link to the student
+    await sendDiscordDirectMessage({
+      botToken: newServer.bot_token,
+      recipientUserId: (await resolveDiscordUserId(newServer, student.discord_username)) ?? '',
+      content: `Bạn đã được chuyển lớp. Vui lòng tham gia server Discord mới: ${invite.url}`,
+    });
+  } catch {
+    // Invite/DM failure is non-critical
+  }
+}
+

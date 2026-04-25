@@ -10,6 +10,7 @@ import {
   Search,
   ListChecks,
   X,
+  Trash2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -18,6 +19,7 @@ import { listClasses, listSessions } from "../services/classService";
 import { listSessionAttendance } from "../services/attendanceService";
 import { listStudentBalances } from "../services/financeService";
 import {
+  deleteDiscordServer,
   listDiscordServers,
   listMessages,
   sendChannelPost,
@@ -292,6 +294,26 @@ export function Messaging() {
                           >
                             <Eye className="w-3.5 h-3.5" />
                             Xem channels
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Xóa server cấu hình cho lớp ${classNameById.get(server.class_id) ?? server.class_id}?`)) return;
+                              setSubmitting(true);
+                              setRequestError("");
+                              try {
+                                await deleteDiscordServer(server.class_id);
+                                await loadData();
+                              } catch (error) {
+                                setRequestError(toErrorMessage(error));
+                              } finally {
+                                setSubmitting(false);
+                              }
+                            }}
+                            disabled={submitting}
+                            className="px-3 py-1.5 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors text-sm flex items-center gap-1 disabled:opacity-60"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Xóa
                           </button>
                         </div>
                       </div>

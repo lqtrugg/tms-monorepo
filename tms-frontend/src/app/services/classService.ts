@@ -184,9 +184,11 @@ export async function deleteClassSchedule(classId: number, scheduleId: number): 
 export async function listSessions(filters?: {
   class_id?: number;
   status?: BackendSessionStatus;
+  from?: string;
+  to?: string;
 }): Promise<BackendSession[]> {
   const data = await apiRequest<{ sessions: RawBackendSession[] }>(
-    `/sessions${buildQuery({ class_id: filters?.class_id, status: filters?.status })}`,
+    `/sessions${buildQuery({ class_id: filters?.class_id, status: filters?.status, from: filters?.from, to: filters?.to })}`,
   );
 
   return data.sessions.map(normalizeBackendSession);

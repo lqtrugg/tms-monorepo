@@ -1,4 +1,4 @@
-import { Between, EntityManager, In, MoreThanOrEqual } from 'typeorm';
+import { Between, EntityManager, In, IsNull, MoreThanOrEqual } from 'typeorm';
 
 import { AppDataSource } from '../data-source.js';
 import {
@@ -6,10 +6,12 @@ import {
   ClassSchedule,
   ClassStatus,
   CodeforcesGroup,
+  Enrollment,
   FeeRecord,
   FeeRecordStatus,
   Session,
   SessionStatus,
+  Topic,
 } from '../entities/index.js';
 import { ClassServiceError } from '../errors/class.error.js';
 import { combineDateAndTime } from '../helpers/class.helpers.js';
@@ -251,6 +253,36 @@ export async function archiveClass(teacherId: number, classId: number): Promise<
 
     if (classEntity.status === ClassStatus.Archived) {
       return classEntity;
+    }
+
+    const activeEnrollmentCount = await manager.getRepository(Enrollment).count({
+      where: {
+        teacher_id: teacherId,
+        class_id: classId,
+        unenrolled_at: IsNull(),
+      },
+    });
+
+    if (activeEnrollmentCount > 0) {
+      throw new ClassServiceError(
+        `Không thể đóng lớp: còn ${activeEnrollmentCount} học sinh đang học trong lớp`,
+        409,
+      );
+    }
+
+    const activeTopicCount = await manager.getRepository(Topic).count({
+      where: {
+        teacher_id: teacherId,
+        class_id: classId,
+        closed_at: IsNull(),
+      },
+    });
+
+    if (activeTopicCount > 0) {
+      throw new ClassServiceError(
+        `Không thể đóng lớp: còn ${activeTopicCount} chuyên đề chưa đóng`,
+        409,
+      );
     }
 
     const archivedAt = new Date();

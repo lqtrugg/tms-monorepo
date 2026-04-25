@@ -518,7 +518,7 @@ export function Students() {
                   disabled={submitting}
                   className="px-4 py-2 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors text-sm font-medium disabled:opacity-60"
                 >
-                  Đuổi học hàng loạt
+                  Cho nghỉ học hàng loạt
                 </button>
                 <button
                   onClick={() => setSelectedStudentIds([])}
@@ -620,7 +620,7 @@ export function Students() {
                                   setShowArchiveModal(true);
                                 }}
                                 className="p-2 hover:bg-zinc-200 rounded-lg transition-colors"
-                                title="Đuổi học"
+                                title="Cho nghỉ học"
                               >
                                 <UserX className="w-4 h-4 text-zinc-600" />
                               </button>
@@ -1228,7 +1228,7 @@ function ArchiveStudentModal({
   return (
     <div className="fixed inset-0 bg-white/80 flex items-center justify-center p-4 z-50">
       <div className="bg-zinc-100 border border-zinc-200 rounded-xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-semibold text-zinc-900 mb-2">Đuổi học</h2>
+        <h2 className="text-xl font-semibold text-zinc-900 mb-2">Cho nghỉ học</h2>
         <p className="text-zinc-600 mb-6">Học sinh: {student.name}</p>
 
         <div className="bg-zinc-100 border border-zinc-700 rounded-lg p-4 mb-6">
@@ -1281,7 +1281,7 @@ function ArchiveStudentModal({
             disabled={submitting}
             className="flex-1 px-4 py-3 bg-zinc-200 text-zinc-900 rounded-lg hover:bg-zinc-600 transition-colors font-medium disabled:opacity-60"
           >
-            {submitting ? "Đang xử lý..." : "Xác nhận đuổi học"}
+            {submitting ? "Đang xử lý..." : "Xác nhận cho nghỉ học"}
           </button>
         </div>
       </div>
@@ -1461,8 +1461,8 @@ function BulkExpelModal({
   return (
     <div className="fixed inset-0 bg-white/80 flex items-center justify-center p-4 z-50">
       <div className="bg-zinc-100 border border-zinc-200 rounded-xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-semibold text-zinc-900 mb-2">Đuổi học hàng loạt</h2>
-        <p className="text-zinc-600 mb-6">Bạn chắc chắn muốn đuổi {studentCount} học sinh đã chọn?</p>
+        <h2 className="text-xl font-semibold text-zinc-900 mb-2">Cho nghỉ học hàng loạt</h2>
+        <p className="text-zinc-600 mb-6">Bạn chắc chắn muốn cho {studentCount} học sinh đã chọn nghỉ học?</p>
 
         {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
 
@@ -1481,7 +1481,7 @@ function BulkExpelModal({
             disabled={submitting}
             className="flex-1 px-4 py-3 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors font-medium disabled:opacity-60"
           >
-            {submitting ? "Đang xử lý..." : "Xác nhận đuổi học"}
+            {submitting ? "Đang xử lý..." : "Xác nhận cho nghỉ học"}
           </button>
         </div>
       </div>

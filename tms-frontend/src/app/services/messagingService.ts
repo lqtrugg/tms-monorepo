@@ -54,6 +54,12 @@ export async function upsertDiscordServerByClass(
   return data.server;
 }
 
+export async function deleteDiscordServer(classId: number): Promise<void> {
+  await apiRequest<{ removed: boolean }>(`/classes/${classId}/discord-server`, {
+    method: "DELETE",
+  });
+}
+
 export async function listMessages(type?: BackendDiscordMessageType): Promise<BackendMessageListRow[]> {
   const query = type ? `?type=${encodeURIComponent(type)}` : "";
   const data = await apiRequest<{ messages: BackendMessageListRow[] }>(`/discord/messages${query}`);
