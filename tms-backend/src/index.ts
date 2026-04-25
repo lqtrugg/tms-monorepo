@@ -14,6 +14,8 @@ import { AppDataSource, initializeDatabase } from './data-source.js';
 import { ensureSystemAdminAccount } from './services/auth.service.js';
 import { configurePassport } from './services/auth.passport.js';
 import { startAutoSyncScheduler, stopAutoSyncScheduler } from './services/auto-sync.service.js';
+import { startSessionStatusSync, stopSessionStatusSync } from './services/session-status-sync.service.js';
+import { startVoiceAttendanceSync, stopVoiceAttendanceSync } from './services/voice-attendance-sync.service.js';
 
 const app = express();
 const passport = configurePassport();
@@ -56,6 +58,14 @@ async function main(): Promise<void> {
     });
   }
 
+  if (config.sessionStatusSync.enabled) {
+    startSessionStatusSync(config.sessionStatusSync.intervalSeconds * 1000);
+  }
+
+  if (config.voiceAttendanceSync.enabled) {
+    startVoiceAttendanceSync(config.voiceAttendanceSync.intervalSeconds * 1000);
+  }
+
   const server = config.host ? app.listen(config.port, config.host) : app.listen(config.port);
 
   server.on('listening', () => {
@@ -73,6 +83,8 @@ async function main(): Promise<void> {
   const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
     console.log(`Received ${signal}, shutting down backend server`);
     stopAutoSyncScheduler();
+    stopSessionStatusSync();
+    stopVoiceAttendanceSync();
 
     server.close(async () => {
       if (AppDataSource.isInitialized) {

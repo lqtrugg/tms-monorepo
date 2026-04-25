@@ -20,6 +20,8 @@ type UpsertAttendanceInput = {
   notes?: string | null;
 };
 
+type UpsertAttendanceSource = AttendanceSource.Bot | AttendanceSource.Manual;
+
 function requireOwnedSession(manager: EntityManager, teacherId: number, sessionId: number): Promise<Session> {
   return manager.getRepository(Session).findOneBy({
     id: sessionId,
@@ -177,6 +179,33 @@ export async function upsertSessionAttendance(
   studentId: number,
   input: UpsertAttendanceInput,
 ) {
+  return upsertSessionAttendanceWithSource(teacherId, sessionId, studentId, input, AttendanceSource.Manual);
+}
+
+export async function upsertBotSessionAttendance(
+  teacherId: number,
+  sessionId: number,
+  studentId: number,
+): Promise<Attendance | null> {
+  return upsertSessionAttendanceWithSource(
+    teacherId,
+    sessionId,
+    studentId,
+    {
+      status: AttendanceStatus.Present,
+      notes: null,
+    },
+    AttendanceSource.Bot,
+  );
+}
+
+async function upsertSessionAttendanceWithSource(
+  teacherId: number,
+  sessionId: number,
+  studentId: number,
+  input: UpsertAttendanceInput,
+  source: UpsertAttendanceSource,
+) {
   return AppDataSource.transaction(async (manager) => {
     const session = await requireOwnedSession(manager, teacherId, sessionId);
     const classEntity = await requireOwnedClass(manager, teacherId, session.class_id);
@@ -212,20 +241,32 @@ export async function upsertSessionAttendance(
       student_id: studentId,
     });
 
+    if (source === AttendanceSource.Bot && attendance?.source === AttendanceSource.Manual) {
+      return null;
+    }
+
+    if (
+      source === AttendanceSource.Bot
+      && attendance?.source === AttendanceSource.Bot
+      && attendance.status === input.status
+    ) {
+      return attendance;
+    }
+
     if (!attendance) {
       attendance = attendanceRepo.create({
         teacher_id: teacherId,
         session_id: sessionId,
         student_id: studentId,
         status: input.status,
-        source: AttendanceSource.Manual,
-        overridden_at: new Date(),
+        source,
+        overridden_at: source === AttendanceSource.Manual ? new Date() : null,
         notes: input.notes ?? null,
       });
     } else {
       attendance.status = input.status;
-      attendance.source = AttendanceSource.Manual;
-      attendance.overridden_at = new Date();
+      attendance.source = source;
+      attendance.overridden_at = source === AttendanceSource.Manual ? new Date() : null;
       if (input.notes !== undefined) {
         attendance.notes = input.notes;
       }

@@ -59,6 +59,14 @@ const config = {
     syncDiscord: parseBoolean(process.env.AUTO_SYNC_DISCORD_ENABLED, true),
     syncCodeforces: parseBoolean(process.env.AUTO_SYNC_CODEFORCES_ENABLED, true),
   },
+  voiceAttendanceSync: {
+    enabled: parseBoolean(process.env.VOICE_ATTENDANCE_SYNC_ENABLED, true),
+    intervalSeconds: parsePositiveInteger(process.env.VOICE_ATTENDANCE_SYNC_INTERVAL_SECONDS, 15),
+  },
+  sessionStatusSync: {
+    enabled: parseBoolean(process.env.SESSION_STATUS_SYNC_ENABLED, true),
+    intervalSeconds: parsePositiveInteger(process.env.SESSION_STATUS_SYNC_INTERVAL_SECONDS, 15),
+  },
 };
 
 export default config;

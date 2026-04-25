@@ -38,6 +38,7 @@ export enum PendingArchiveReason {
 
 export enum SessionStatus {
   Scheduled = 'scheduled',
+  InProgress = 'in_progress',
   Completed = 'completed',
   Cancelled = 'cancelled',
 }

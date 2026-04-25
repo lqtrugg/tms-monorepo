@@ -11,6 +11,7 @@ import {
   resetSessionAttendance,
   upsertSessionAttendance,
 } from '../services/attendance.service.js';
+import { syncVoiceAttendanceForSession } from '../services/voice-attendance-sync.service.js';
 
 export const attendanceRouter = Router();
 
@@ -61,6 +62,18 @@ attendanceRouter.get('/sessions/:sessionId/attendance', async (req, res, next) =
     const data = await listSessionAttendance(teacherId, sessionId);
 
     res.json(data);
+  } catch (error) {
+    next(error);
+  }
+});
+
+attendanceRouter.post('/sessions/:sessionId/attendance/sync', async (req, res, next) => {
+  try {
+    const teacherId = getTeacherId(req);
+    const sessionId = parsePositiveInteger(req.params.sessionId, 'session_id');
+    const result = await syncVoiceAttendanceForSession(teacherId, sessionId);
+
+    res.json(result);
   } catch (error) {
     next(error);
   }

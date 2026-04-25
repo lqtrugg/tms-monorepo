@@ -5,13 +5,13 @@ import { Link, useNavigate, useParams } from "react-router";
 import { ApiError } from "../services/apiClient";
 import {
   listSessionAttendance,
+  syncSessionAttendance,
   type BackendAttendanceSource,
   type BackendAttendanceStatus,
   type SessionAttendanceRow,
   upsertAttendance,
 } from "../services/attendanceService";
 import {
-  cancelSession,
   listClasses,
   listSessions,
   type BackendClass,
@@ -76,6 +76,10 @@ function statusBadge(status: BackendSessionStatus) {
     return "bg-emerald-50 text-emerald-700 border-emerald-200";
   }
 
+  if (status === "in_progress") {
+    return "bg-amber-50 text-amber-700 border-amber-200";
+  }
+
   if (status === "scheduled") {
     return "bg-sky-50 text-sky-700 border-sky-200";
   }
@@ -88,11 +92,35 @@ function statusText(status: BackendSessionStatus): string {
     return "completed";
   }
 
+  if (status === "in_progress") {
+    return "đang diễn ra";
+  }
+
   if (status === "cancelled") {
     return "cancelled";
   }
 
   return "scheduled";
+}
+
+function StatusIcon({ status }: { status: BackendSessionStatus }) {
+  const iconClassName = "h-4 w-4";
+  const label = statusText(status);
+  const icon = status === "completed"
+    ? <CheckCircle2 className={iconClassName} />
+    : status === "cancelled"
+      ? <XCircle className={iconClassName} />
+      : <Clock className={iconClassName} />;
+
+  return (
+    <span
+      aria-label={label}
+      title={label}
+      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border ${statusBadge(status)}`}
+    >
+      {icon}
+    </span>
+  );
 }
 
 function sourceText(source: BackendAttendanceSource | null): string {
@@ -164,7 +192,6 @@ function AttendanceList() {
   const [classes, setClasses] = useState<BackendClass[]>([]);
   const [sessions, setSessions] = useState<SessionWithAttendance[]>([]);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [requestError, setRequestError] = useState("");
 
   const loadData = async (): Promise<void> => {
@@ -186,25 +213,6 @@ function AttendanceList() {
     void loadData();
   }, [selectedDate, selectedClassId]);
 
-  const handleCancelSession = async (sessionId: number, className: string) => {
-    const confirmed = window.confirm(`Huỷ buổi học của ${className}? Toàn bộ fee_records của buổi này sẽ bị huỷ.`);
-    if (!confirmed) {
-      return;
-    }
-
-    setSubmitting(true);
-    setRequestError("");
-
-    try {
-      await cancelSession(sessionId);
-      await loadData();
-    } catch (error) {
-      setRequestError(toErrorMessage(error));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -214,37 +222,35 @@ function AttendanceList() {
 
       <RequestError message={requestError} />
 
-      <div className="mb-6 rounded-xl border border-zinc-200 bg-white p-6">
-        <div className="grid gap-4 md:grid-cols-[minmax(220px,280px)_minmax(220px,320px)]">
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-zinc-700">Ngày</span>
-            <div className="flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-zinc-500" />
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(event) => setSelectedDate(event.target.value)}
-                className="h-10 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
-              />
-            </div>
-          </label>
+      <div className="mb-6 flex w-full flex-wrap items-end gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 md:w-fit">
+        <label className="block w-full sm:w-64">
+          <span className="mb-1 block text-xs font-medium text-zinc-600">Ngày</span>
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 shrink-0 text-zinc-500" />
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(event) => setSelectedDate(event.target.value)}
+              className="h-9 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            />
+          </div>
+        </label>
 
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-zinc-700">Lớp</span>
-            <select
-              value={selectedClassId}
-              onChange={(event) => setSelectedClassId(event.target.value)}
-              className="h-10 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
-            >
-              <option value="all">Tất cả lớp</option>
-              {classes.map((classItem) => (
-                <option key={classItem.id} value={classItem.id}>
-                  {classItem.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <label className="block w-full sm:w-64">
+          <span className="mb-1 block text-xs font-medium text-zinc-600">Lớp</span>
+          <select
+            value={selectedClassId}
+            onChange={(event) => setSelectedClassId(event.target.value)}
+            className="h-9 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+          >
+            <option value="all">Tất cả lớp</option>
+            {classes.map((classItem) => (
+              <option key={classItem.id} value={classItem.id}>
+                {classItem.name}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {loading ? (
@@ -259,7 +265,6 @@ function AttendanceList() {
         <div className="grid gap-4">
           {sessions.map((row) => {
             const presentCount = row.attendance.filter((item) => item.attendance_status === "present").length;
-            const canCancel = row.session.status === "scheduled" || row.session.status === "completed";
 
             return (
               <div
@@ -295,19 +300,6 @@ function AttendanceList() {
                     </div>
                   </div>
 
-                  {canCancel && (
-                    <button
-                      type="button"
-                      className="h-10 rounded-lg border border-red-200 bg-red-50 px-4 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-60"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void handleCancelSession(row.session.id, row.className);
-                      }}
-                      disabled={submitting}
-                    >
-                      Huỷ buổi học
-                    </button>
-                  )}
                 </div>
               </div>
             );
@@ -326,6 +318,7 @@ function AttendanceDetail() {
   const [attendance, setAttendance] = useState<SessionAttendanceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingStudentId, setSavingStudentId] = useState<number | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const [requestError, setRequestError] = useState("");
 
   const loadData = async (): Promise<void> => {
@@ -368,6 +361,24 @@ function AttendanceDetail() {
   const latestBotPull: string | null = null;
 
   const readonly = session?.status === "cancelled";
+
+  const handleSync = async () => {
+    if (!session || readonly) {
+      return;
+    }
+
+    setSyncing(true);
+    setRequestError("");
+
+    try {
+      await syncSessionAttendance(session.id);
+      await loadData();
+    } catch (error) {
+      setRequestError(toErrorMessage(error));
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const updateRow = async (
     row: SessionAttendanceRow,
@@ -427,8 +438,9 @@ function AttendanceDetail() {
         </Link>
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <h1 className="mb-2 text-3xl font-semibold text-zinc-900">
-              {className} - {formatDate(session.scheduled_at)}
+            <h1 className="mb-2 flex flex-wrap items-center gap-3 text-3xl font-semibold text-zinc-900">
+              <span>{className} - {formatDate(session.scheduled_at)}</span>
+              <StatusIcon status={session.status} />
             </h1>
             {latestBotPull && (
               <p className="text-zinc-600">
@@ -436,9 +448,16 @@ function AttendanceDetail() {
               </p>
             )}
           </div>
-          <span className={`w-fit rounded-full border px-3 py-1 text-sm font-medium ${statusBadge(session.status)}`}>
-            {statusText(session.status)}
-          </span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => void handleSync()}
+              disabled={readonly || syncing}
+              className="h-10 rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Sync
+            </button>
+          </div>
         </div>
       </div>
 

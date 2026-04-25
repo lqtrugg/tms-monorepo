@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Calendar, Trash2 } from "lucide-react";
+import { Calendar, Plus, Trash2 } from "lucide-react";
 
 import { ApiError } from "../services/apiClient";
 import {
@@ -11,7 +11,7 @@ import {
   listSessions,
 } from "../services/classService";
 
-type SessionStatusFilter = 'all' | 'scheduled' | 'completed' | 'cancelled';
+type SessionStatusFilter = 'all' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 
 type SessionCard = {
   id: number;
@@ -107,6 +107,8 @@ export function Sessions() {
     switch (status) {
       case 'scheduled':
         return <span className="px-3 py-1 bg-zinc-900 text-white rounded-full text-sm">Sắp diễn ra</span>;
+      case 'in_progress':
+        return <span className="px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-sm">Đang diễn ra</span>;
       case 'completed':
         return <span className="px-3 py-1 bg-zinc-200 text-zinc-700 rounded-full text-sm">Đã hoàn thành</span>;
       case 'cancelled':
@@ -173,7 +175,7 @@ export function Sessions() {
 
       <div className="bg-white border border-zinc-200 rounded-xl p-4 mb-6">
         <div className="flex gap-2">
-          {(['all', 'scheduled', 'completed', 'cancelled'] as const).map((status) => (
+          {(['all', 'scheduled', 'in_progress', 'completed', 'cancelled'] as const).map((status) => (
             <button
               key={status}
               onClick={() => setFilterStatus(status)}
@@ -183,7 +185,15 @@ export function Sessions() {
                   : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
               }`}
             >
-              {status === 'all' ? 'Tất cả' : status === 'scheduled' ? 'Sắp diễn ra' : status === 'completed' ? 'Đã hoàn thành' : 'Đã hủy'}
+              {status === 'all'
+                ? 'Tất cả'
+                : status === 'scheduled'
+                  ? 'Sắp diễn ra'
+                  : status === 'in_progress'
+                    ? 'Đang diễn ra'
+                    : status === 'completed'
+                      ? 'Đã hoàn thành'
+                      : 'Đã hủy'}
             </button>
           ))}
         </div>
@@ -216,7 +226,7 @@ export function Sessions() {
               </div>
             </div>
 
-            {session.status === 'scheduled' && (
+            {(session.status === 'scheduled' || session.status === 'in_progress') && (
               <button
                 className="w-full px-4 py-2 bg-zinc-100 text-zinc-700 rounded-lg hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-60"
                 onClick={() => void handleCancelSession(session.id)}

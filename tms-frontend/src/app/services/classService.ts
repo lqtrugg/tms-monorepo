@@ -1,7 +1,7 @@
 import { apiRequest } from "./apiClient";
 
 export type BackendClassStatus = "active" | "archived";
-export type BackendSessionStatus = "scheduled" | "completed" | "cancelled";
+export type BackendSessionStatus = "scheduled" | "in_progress" | "completed" | "cancelled";
 
 export interface BackendClass {
   id: number;
@@ -66,6 +66,10 @@ function normalizeSessionStatus(status: string): BackendSessionStatus {
 
   if (normalized === "completed") {
     return "completed";
+  }
+
+  if (normalized === "in_progress") {
+    return "in_progress";
   }
 
   if (normalized === "cancelled") {

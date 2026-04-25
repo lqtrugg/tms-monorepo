@@ -154,7 +154,7 @@ Buổi học cụ thể. Được auto-generate từ `class_schedules`; giáo vi
 Khi huỷ (`status = 'cancelled'`): tất cả `fee_records` gắn với buổi này bị cancelled theo; `attendance` giữ nguyên để lưu lịch sử.
 
 ```sql
-CREATE TYPE session_status AS ENUM ('scheduled', 'completed', 'cancelled');
+CREATE TYPE session_status AS ENUM ('scheduled', 'in_progress', 'completed', 'cancelled');
 
 CREATE TABLE sessions (
     id           SERIAL         PRIMARY KEY,

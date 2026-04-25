@@ -19,7 +19,7 @@ export async function listSessionAttendance(sessionId: number): Promise<{
     id: number;
     class_id: number;
     scheduled_at: string;
-    status: "scheduled" | "completed" | "cancelled";
+    status: "scheduled" | "in_progress" | "completed" | "cancelled";
   };
   attendance: SessionAttendanceRow[];
 }> {
@@ -40,6 +40,14 @@ export async function upsertAttendance(
   );
 
   return data.attendance;
+}
+
+export async function syncSessionAttendance(sessionId: number): Promise<{
+  marked_count: number;
+}> {
+  return apiRequest(`/sessions/${sessionId}/attendance/sync`, {
+    method: "POST",
+  });
 }
 
 export async function listAttendance(filters?: {

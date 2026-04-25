@@ -22,8 +22,32 @@ export const AppDataSource = new DataSource({
   logging: config.database.logging,
 });
 
+async function installPreSynchronizeSchemaPatches(): Promise<void> {
+  const patchDataSource = new DataSource({
+    type: 'postgres',
+    ...connectionOptions,
+  });
+
+  await patchDataSource.initialize();
+
+  try {
+    await patchDataSource.query("ALTER TYPE session_status ADD VALUE IF NOT EXISTS 'in_progress' AFTER 'scheduled'");
+  } catch (error) {
+    const driverError = error as { code?: string };
+    if (driverError.code !== '42704') {
+      throw error;
+    }
+  } finally {
+    await patchDataSource.destroy();
+  }
+}
+
 export async function initializeDatabase(): Promise<DataSource> {
   if (!AppDataSource.isInitialized) {
+    if (config.database.synchronize) {
+      await installPreSynchronizeSchemaPatches();
+    }
+
     await AppDataSource.initialize();
     await installDatabaseIntegrityRules(AppDataSource);
   }

@@ -25,7 +25,7 @@ export interface Session {
   id: string;
   classId: string;
   date: string;
-  status: 'scheduled' | 'completed' | 'cancelled';
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 }
 
 export interface Attendance {

@@ -69,11 +69,12 @@ function parseOptionalSessionStatus(value: unknown): SessionStatus | undefined {
 
   if (
     value !== SessionStatus.Scheduled
+    && value !== SessionStatus.InProgress
     && value !== SessionStatus.Completed
     && value !== SessionStatus.Cancelled
   ) {
     throw new ClassServiceError(
-      `status must be one of: ${SessionStatus.Scheduled}, ${SessionStatus.Completed}, ${SessionStatus.Cancelled}`,
+      `status must be one of: ${SessionStatus.Scheduled}, ${SessionStatus.InProgress}, ${SessionStatus.Completed}, ${SessionStatus.Cancelled}`,
       400,
     );
   }
