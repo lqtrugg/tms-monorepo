@@ -92,6 +92,7 @@ export const router = createBrowserRouter([
       { path: "classes", Component: Classes, loader: requireRoleLoader(["teacher"]) },
       { path: "sessions", Component: Sessions, loader: requireRoleLoader(["teacher"]) },
       { path: "attendance", Component: Attendance, loader: requireRoleLoader(["teacher"]) },
+      { path: "attendance/:session_id", Component: Attendance, loader: requireRoleLoader(["teacher"]) },
       { path: "transactions", Component: Transactions, loader: requireRoleLoader(["teacher"]) },
       { path: "topics", Component: Topics, loader: requireRoleLoader(["teacher"]) },
       { path: "topics/:id/standing", Component: TopicStanding, loader: requireRoleLoader(["teacher"]) },

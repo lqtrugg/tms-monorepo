@@ -201,6 +201,10 @@ export async function upsertSessionAttendance(
       throw new ServiceError('student is not enrolled in class at this session', 409);
     }
 
+    if (session.status === SessionStatus.Cancelled) {
+      throw new ServiceError('cannot update attendance for a cancelled session', 409);
+    }
+
     const attendanceRepo = manager.getRepository(Attendance);
     let attendance = await attendanceRepo.findOneBy({
       teacher_id: teacherId,
@@ -222,7 +226,9 @@ export async function upsertSessionAttendance(
       attendance.status = input.status;
       attendance.source = AttendanceSource.Manual;
       attendance.overridden_at = new Date();
-      attendance.notes = input.notes ?? null;
+      if (input.notes !== undefined) {
+        attendance.notes = input.notes;
+      }
     }
 
     const saved = await attendanceRepo.save(attendance);

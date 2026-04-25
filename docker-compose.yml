@@ -42,7 +42,7 @@ services:
     ports:
       - "${POSTGRES_PORT}:${DB_PORT}"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-data:/var/lib/postgresql/data
     networks:
       - tms-network
 
@@ -61,9 +61,6 @@ services:
     networks:
       - tms-network
     command: npm run dev
-
-volumes:
-  postgres-data:
 
 networks:
   tms-network:

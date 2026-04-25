@@ -467,10 +467,6 @@ export async function cancelSession(teacherId: number, sessionId: number): Promi
       return session;
     }
 
-    if (session.status === SessionStatus.Completed) {
-      throw new ClassServiceError('cannot cancel a completed session', 409);
-    }
-
     const cancelledAt = new Date();
     session.status = SessionStatus.Cancelled;
     session.cancelled_at = cancelledAt;

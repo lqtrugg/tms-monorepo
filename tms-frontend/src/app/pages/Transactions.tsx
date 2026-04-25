@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, DollarSign, TrendingUp, TrendingDown } from "lucide-react";
+import { DollarSign, Pencil, Plus, Search, TrendingUp } from "lucide-react";
 
 import { ApiError } from "../services/apiClient";
 import {
   createTransaction,
   listFeeRecords,
   listTransactions,
+  updateTransaction,
   type BackendTransactionType,
 } from "../services/financeService";
 import { listStudents } from "../services/studentService";
@@ -14,6 +15,7 @@ type TransactionFilterType = "all" | "fee" | "payment" | "refund";
 
 type TransactionRow = {
   id: string;
+  transactionId: number | null;
   studentId: number;
   studentName: string;
   amount: number;
@@ -53,6 +55,7 @@ export function Transactions() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<TransactionFilterType>("all");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<TransactionRow | null>(null);
   const [requestError, setRequestError] = useState("");
   const [rows, setRows] = useState<TransactionRow[]>([]);
   const [students, setStudents] = useState<StudentOption[]>([]);
@@ -80,6 +83,7 @@ export function Transactions() {
 
       const transactionRows: TransactionRow[] = transactionList.map((tx) => ({
         id: `tx-${tx.id}`,
+        transactionId: tx.id,
         studentId: tx.student_id,
         studentName: studentNameById.get(tx.student_id) ?? `Học sinh #${tx.student_id}`,
         amount: parseAmount(tx.amount),
@@ -90,6 +94,7 @@ export function Transactions() {
 
       const feeRows: TransactionRow[] = feeRecords.map((fee) => ({
         id: `fee-${fee.id}`,
+        transactionId: null,
         studentId: fee.student_id,
         studentName: studentNameById.get(fee.student_id) ?? `Học sinh #${fee.student_id}`,
         amount: parseAmount(fee.amount) * -1,
@@ -232,6 +237,7 @@ export function Transactions() {
               <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Loại</th>
               <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Mô tả</th>
               <th className="px-6 py-4 text-right text-sm font-medium text-zinc-600">Số tiền</th>
+              <th className="px-6 py-4 text-right text-sm font-medium text-zinc-600">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100">
@@ -256,11 +262,25 @@ export function Transactions() {
                     {tx.type === "payment" ? "+" : "-"}{(Math.abs(tx.amount) / 1000).toFixed(0)}K
                   </span>
                 </td>
+                <td className="px-6 py-4 text-right">
+                  {tx.transactionId ? (
+                    <button
+                      type="button"
+                      onClick={() => setEditingTransaction(tx)}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-zinc-700 hover:bg-zinc-100"
+                      title="Sửa giao dịch"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <span className="text-sm text-zinc-400">Tự sinh</span>
+                  )}
+                </td>
               </tr>
             ))}
             {filteredTransactions.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-6 py-10 text-center text-zinc-500">Không có giao dịch phù hợp.</td>
+                <td colSpan={6} className="px-6 py-10 text-center text-zinc-500">Không có giao dịch phù hợp.</td>
               </tr>
             )}
           </tbody>
@@ -268,7 +288,8 @@ export function Transactions() {
       </div>
 
       {showAddModal && (
-        <AddTransactionModal
+        <TransactionModal
+          mode="create"
           students={students}
           submitting={submitting}
           onClose={() => setShowAddModal(false)}
@@ -279,6 +300,34 @@ export function Transactions() {
             try {
               await createTransaction(payload);
               setShowAddModal(false);
+              await loadData();
+            } catch (error) {
+              setRequestError(toErrorMessage(error));
+            } finally {
+              setSubmitting(false);
+            }
+          }}
+        />
+      )}
+
+      {editingTransaction && (
+        <TransactionModal
+          mode="edit"
+          initialTransaction={editingTransaction}
+          students={students}
+          submitting={submitting}
+          onClose={() => setEditingTransaction(null)}
+          onSubmit={async (payload) => {
+            if (!editingTransaction.transactionId) {
+              return;
+            }
+
+            setSubmitting(true);
+            setRequestError("");
+
+            try {
+              await updateTransaction(editingTransaction.transactionId, payload);
+              setEditingTransaction(null);
               await loadData();
             } catch (error) {
               setRequestError(toErrorMessage(error));
@@ -303,12 +352,16 @@ function getTypeBadge(type: "payment" | "refund" | "fee") {
   }
 }
 
-function AddTransactionModal({
+function TransactionModal({
+  mode,
+  initialTransaction,
   students,
   submitting,
   onClose,
   onSubmit,
 }: {
+  mode: "create" | "edit";
+  initialTransaction?: TransactionRow;
   students: StudentOption[];
   submitting: boolean;
   onClose: () => void;
@@ -320,13 +373,16 @@ function AddTransactionModal({
     recorded_at: string;
   }) => Promise<void>;
 }) {
-  const [studentId, setStudentId] = useState("");
-  const [amount, setAmount] = useState("");
-  const [type, setType] = useState<BackendTransactionType>("payment");
-  const [notes, setNotes] = useState(defaultTransactionNotes("payment"));
-  const [recordedAt, setRecordedAt] = useState(new Date().toISOString().slice(0, 10));
+  const initialType = initialTransaction?.type === "refund" ? "refund" : "payment";
+  const [studentId, setStudentId] = useState(initialTransaction ? String(initialTransaction.studentId) : "");
+  const [amount, setAmount] = useState(initialTransaction ? String(Math.abs(initialTransaction.amount)) : "");
+  const [type, setType] = useState<BackendTransactionType>(initialType);
+  const [notes, setNotes] = useState(initialTransaction?.description ?? defaultTransactionNotes("payment"));
+  const [recordedAt, setRecordedAt] = useState(
+    initialTransaction ? new Date(initialTransaction.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+  );
   const [localError, setLocalError] = useState("");
-  const [studentSearch, setStudentSearch] = useState("");
+  const [studentSearch, setStudentSearch] = useState(initialTransaction?.studentName ?? "");
 
   const visibleStudents = useMemo(() => {
     const normalizedSearch = studentSearch.trim().toLowerCase();
@@ -366,6 +422,12 @@ function AddTransactionModal({
     <div className="fixed inset-0 bg-white/80 flex items-center justify-center p-4 z-50">
       <div className="bg-zinc-100 border border-zinc-200 rounded-xl p-6 w-full max-w-md">
         <form className="space-y-4" onSubmit={handleSubmit}>
+          <div>
+            <h2 className="text-xl font-semibold text-zinc-900">
+              {mode === "create" ? "Ghi nhận giao dịch" : "Sửa giao dịch"}
+            </h2>
+          </div>
+
           <div>
             <label className="block text-sm text-zinc-600 mb-2">Học sinh</label>
             <div className="relative">
@@ -472,7 +534,7 @@ function AddTransactionModal({
               disabled={submitting}
               className="flex-1 px-4 py-3 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors font-medium disabled:opacity-60"
             >
-              {submitting ? "Đang ghi nhận..." : "Ghi nhận"}
+              {submitting ? "Đang lưu..." : mode === "create" ? "Ghi nhận" : "Lưu thay đổi"}
             </button>
           </div>
         </form>

@@ -18,6 +18,7 @@ import {
   listFeeRecords,
   listStudentBalances,
   listTransactions,
+  updateTransaction,
 } from '../services/finance.service.js';
 import { requireRoles } from '../middlewares/rbac.middleware.js';
 
@@ -115,6 +116,31 @@ financeRouter.post('/finance/transactions', async (req, res, next) => {
     });
 
     res.status(201).json({ transaction });
+  } catch (error) {
+    next(error);
+  }
+});
+
+financeRouter.patch('/finance/transactions/:id', async (req, res, next) => {
+  try {
+    const teacherId = getTeacherId(req);
+    const transactionId = parsePositiveInteger(req.params.id, 'id');
+    const body = asRecord(req.body, 'body');
+    const type = parseTransactionType(body.type);
+
+    if (!type) {
+      throw new ServiceError('type is required', 400);
+    }
+
+    const transaction = await updateTransaction(teacherId, transactionId, {
+      student_id: parsePositiveInteger(body.student_id, 'student_id'),
+      amount: parseRequiredString(body.amount, 'amount'),
+      type,
+      notes: parseOptionalString(body.notes, 'notes') ?? null,
+      recorded_at: body.recorded_at === undefined ? undefined : parseDateTime(body.recorded_at, 'recorded_at'),
+    });
+
+    res.json({ transaction });
   } catch (error) {
     next(error);
   }

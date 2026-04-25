@@ -93,6 +93,21 @@ export async function createTransaction(payload: {
   return data.transaction;
 }
 
+export async function updateTransaction(id: number, payload: {
+  student_id: number;
+  amount: string;
+  type: BackendTransactionType;
+  notes?: string | null;
+  recorded_at?: string;
+}): Promise<BackendTransaction> {
+  const data = await apiRequest<{ transaction: BackendTransaction }>(`/finance/transactions/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+  return data.transaction;
+}
+
 export async function listFeeRecords(filters?: {
   student_id?: number;
   session_id?: number;

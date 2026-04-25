@@ -32,21 +32,52 @@ function isRefundBalanceConstraintError(error: unknown): boolean {
 async function assertRefundDoesNotExceedPayments(
   teacherId: number,
   studentId: number,
-  refundAmount: bigint,
+  candidate: {
+    type: TransactionType;
+    amount: bigint;
+    exclude_transaction_id?: number;
+  },
 ): Promise<void> {
-  const totals = await AppDataSource.getRepository(Transaction)
+  const queryBuilder = AppDataSource.getRepository(Transaction)
     .createQueryBuilder('transaction')
     .select("COALESCE(SUM(CASE WHEN transaction.type = 'payment' THEN transaction.amount ELSE 0 END), 0)", 'payments')
     .addSelect("COALESCE(SUM(CASE WHEN transaction.type = 'refund' THEN ABS(transaction.amount) ELSE 0 END), 0)", 'refunds')
     .where('transaction.teacher_id = :teacherId', { teacherId })
-    .andWhere('transaction.student_id = :studentId', { studentId })
-    .getRawOne<{ payments: string; refunds: string }>();
+    .andWhere('transaction.student_id = :studentId', { studentId });
 
-  const totalPayments = parseAmountToBigInt(totals?.payments);
-  const totalRefunds = parseAmountToBigInt(totals?.refunds);
+  if (candidate.exclude_transaction_id !== undefined) {
+    queryBuilder.andWhere('transaction.id != :transactionId', {
+      transactionId: candidate.exclude_transaction_id,
+    });
+  }
 
-  if (totalRefunds + refundAmount > totalPayments) {
+  const totals = await queryBuilder.getRawOne<{ payments: string; refunds: string }>();
+
+  let totalPayments = parseAmountToBigInt(totals?.payments);
+  let totalRefunds = parseAmountToBigInt(totals?.refunds);
+
+  if (candidate.type === TransactionType.Payment) {
+    totalPayments += candidate.amount;
+  } else {
+    totalRefunds += candidate.amount * -1n;
+  }
+
+  if (totalRefunds > totalPayments) {
     throw new ServiceError('Tổng số tiền hoàn trả không được lớn hơn tổng số tiền đã nhận', 400);
+  }
+}
+
+function validateTransactionAmount(type: TransactionType, amount: bigint): void {
+  if (amount === 0n) {
+    throw new ServiceError('amount must be non-zero', 400);
+  }
+
+  if (type === TransactionType.Payment && amount <= 0n) {
+    throw new ServiceError('payment amount must be positive', 400);
+  }
+
+  if (type === TransactionType.Refund && amount >= 0n) {
+    throw new ServiceError('refund amount must be negative', 400);
   }
 }
 
@@ -119,21 +150,11 @@ export async function createTransaction(teacherId: number, input: {
   }
 
   const amount = parseAmountToBigInt(input.amount);
-  if (amount === 0n) {
-    throw new ServiceError('amount must be non-zero', 400);
-  }
-
-  if (input.type === TransactionType.Payment && amount <= 0n) {
-    throw new ServiceError('payment amount must be positive', 400);
-  }
-
-  if (input.type === TransactionType.Refund && amount >= 0n) {
-    throw new ServiceError('refund amount must be negative', 400);
-  }
-
-  if (input.type === TransactionType.Refund) {
-    await assertRefundDoesNotExceedPayments(teacherId, input.student_id, amount * -1n);
-  }
+  validateTransactionAmount(input.type, amount);
+  await assertRefundDoesNotExceedPayments(teacherId, input.student_id, {
+    type: input.type,
+    amount,
+  });
 
   const transaction = AppDataSource.getRepository(Transaction).create({
     teacher_id: teacherId,
@@ -146,6 +167,57 @@ export async function createTransaction(teacherId: number, input: {
 
   try {
     return await AppDataSource.getRepository(Transaction).save(transaction);
+  } catch (error) {
+    if (isRefundBalanceConstraintError(error)) {
+      throw new ServiceError('Tổng số tiền hoàn trả không được lớn hơn tổng số tiền đã nhận', 400);
+    }
+
+    throw error;
+  }
+}
+
+export async function updateTransaction(teacherId: number, transactionId: number, input: {
+  student_id: number;
+  amount: string;
+  type: TransactionType;
+  notes?: string | null;
+  recorded_at?: Date;
+}) {
+  const transactionRepository = AppDataSource.getRepository(Transaction);
+  const transaction = await transactionRepository.findOneBy({
+    id: transactionId,
+    teacher_id: teacherId,
+  });
+
+  if (!transaction) {
+    throw new ServiceError('transaction not found', 404);
+  }
+
+  const student = await AppDataSource.getRepository(Student).findOneBy({
+    id: input.student_id,
+    teacher_id: teacherId,
+  });
+
+  if (!student) {
+    throw new ServiceError('student not found', 404);
+  }
+
+  const amount = parseAmountToBigInt(input.amount);
+  validateTransactionAmount(input.type, amount);
+  await assertRefundDoesNotExceedPayments(teacherId, input.student_id, {
+    type: input.type,
+    amount,
+    exclude_transaction_id: transactionId,
+  });
+
+  transaction.student_id = input.student_id;
+  transaction.amount = amount.toString();
+  transaction.type = input.type;
+  transaction.notes = input.notes ?? null;
+  transaction.recorded_at = input.recorded_at ?? transaction.recorded_at;
+
+  try {
+    return await transactionRepository.save(transaction);
   } catch (error) {
     if (isRefundBalanceConstraintError(error)) {
       throw new ServiceError('Tổng số tiền hoàn trả không được lớn hơn tổng số tiền đã nhận', 400);

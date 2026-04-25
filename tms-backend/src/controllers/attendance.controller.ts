@@ -46,6 +46,14 @@ function parseAttendanceStatus(value: unknown): AttendanceStatus | undefined {
   return value;
 }
 
+function parseAttendanceNotes(body: Record<string, unknown>): string | null | undefined {
+  if (!Object.prototype.hasOwnProperty.call(body, 'notes')) {
+    return undefined;
+  }
+
+  return parseOptionalString(body.notes, 'notes') ?? null;
+}
+
 attendanceRouter.get('/sessions/:sessionId/attendance', async (req, res, next) => {
   try {
     const teacherId = getTeacherId(req);
@@ -72,7 +80,7 @@ attendanceRouter.put('/sessions/:sessionId/attendance/:studentId', async (req, r
 
     const attendance = await upsertSessionAttendance(teacherId, sessionId, studentId, {
       status,
-      notes: parseOptionalString(body.notes, 'notes') ?? null,
+      notes: parseAttendanceNotes(body),
     });
 
     res.json({ attendance });
