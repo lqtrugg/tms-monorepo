@@ -4,7 +4,7 @@ import { Students } from "./pages/Students";
 import { StudentDetail } from "./pages/StudentDetail";
 import { Classes } from "./pages/Classes";
 import { Sessions } from "./pages/Sessions";
-import { Attendance } from "./pages/Attendance";
+import { SessionDetail } from "./pages/SessionDetail";
 import { Transactions } from "./pages/Transactions";
 import { Topics } from "./pages/Topics";
 import { TopicStanding } from "./pages/TopicStanding";
@@ -91,8 +91,7 @@ export const router = createBrowserRouter([
       { path: "students/:id", Component: StudentDetail, loader: requireRoleLoader(["teacher"]) },
       { path: "classes", Component: Classes, loader: requireRoleLoader(["teacher"]) },
       { path: "sessions", Component: Sessions, loader: requireRoleLoader(["teacher"]) },
-      { path: "attendance", Component: Attendance, loader: requireRoleLoader(["teacher"]) },
-      { path: "attendance/:session_id", Component: Attendance, loader: requireRoleLoader(["teacher"]) },
+      { path: "sessions/:sessionId", Component: SessionDetail, loader: requireRoleLoader(["teacher"]) },
       { path: "transactions", Component: Transactions, loader: requireRoleLoader(["teacher"]) },
       { path: "topics", Component: Topics, loader: requireRoleLoader(["teacher"]) },
       { path: "topics/:id/standing", Component: TopicStanding, loader: requireRoleLoader(["teacher"]) },

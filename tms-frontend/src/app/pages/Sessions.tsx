@@ -232,8 +232,8 @@ export function Sessions() {
             key={session.id}
             role="button"
             tabIndex={0}
-            onClick={() => navigate(`/attendance/${session.id}`)}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/attendance/${session.id}`); } }}
+            onClick={() => navigate(`/sessions/${session.id}`)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/sessions/${session.id}`); } }}
             className="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm cursor-pointer transition-colors hover:border-zinc-300 hover:bg-zinc-50"
           >
             <div className="flex items-start justify-between mb-3">

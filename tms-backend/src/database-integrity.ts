@@ -1,6 +1,7 @@
 import type { DataSource } from 'typeorm';
 
 export async function installDatabaseIntegrityRules(dataSource: DataSource): Promise<void> {
+  // ── R7: Refund balance — total refunds must not exceed total payments per (teacher, student) ──
   await dataSource.query(`
     CREATE OR REPLACE FUNCTION enforce_transaction_refund_balance()
     RETURNS trigger AS $$
@@ -48,14 +49,14 @@ export async function installDatabaseIntegrityRules(dataSource: DataSource): Pro
     EXECUTE FUNCTION enforce_transaction_refund_balance();
   `);
 
-  // ── Integrity Rule: Sessions cannot have the same scheduled_at within a class ──
+  // ── Unique sessions: no duplicate (teacher, class, scheduled_at) for non-cancelled sessions ──
   await dataSource.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS uq_sessions_no_duplicate
     ON sessions (teacher_id, class_id, scheduled_at)
     WHERE status <> 'cancelled';
   `);
 
-  // ── Integrity Rule: Active students must have at least one active enrollment ──
+  // ── R1: Active students must have at least one active enrollment ──
   await dataSource.query(`
     CREATE OR REPLACE FUNCTION enforce_active_student_has_enrollment()
     RETURNS trigger AS $$
@@ -89,5 +90,142 @@ export async function installDatabaseIntegrityRules(dataSource: DataSource): Pro
     DEFERRABLE INITIALLY DEFERRED
     FOR EACH ROW
     EXECUTE FUNCTION enforce_active_student_has_enrollment();
+  `);
+
+  // ── R3: Enrollments cannot be active (unenrolled_at IS NULL) if the class is archived ──
+  await dataSource.query(`
+    CREATE OR REPLACE FUNCTION enforce_no_active_enrollment_in_archived_class()
+    RETURNS trigger AS $$
+    DECLARE
+      class_status text;
+    BEGIN
+      IF NEW.unenrolled_at IS NULL THEN
+        SELECT status INTO class_status
+        FROM classes
+        WHERE id = NEW.class_id;
+
+        IF class_status = 'archived' THEN
+          RAISE EXCEPTION 'Không thể tạo enrollment trong lớp đã đóng'
+            USING ERRCODE = '23514',
+              CONSTRAINT = 'chk_enrollment_class_must_be_active';
+        END IF;
+      END IF;
+
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+  `);
+
+  await dataSource.query('DROP TRIGGER IF EXISTS trg_no_active_enrollment_in_archived_class ON enrollments');
+
+  await dataSource.query(`
+    CREATE CONSTRAINT TRIGGER trg_no_active_enrollment_in_archived_class
+    AFTER INSERT OR UPDATE ON enrollments
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+    EXECUTE FUNCTION enforce_no_active_enrollment_in_archived_class();
+  `);
+
+  // ── R5: Topics must be closed (expires_at IS NOT NULL) when their class is archived ──
+  await dataSource.query(`
+    CREATE OR REPLACE FUNCTION enforce_archive_class_closes_topics()
+    RETURNS trigger AS $$
+    DECLARE
+      open_topic_count integer;
+    BEGIN
+      IF NEW.status = 'archived' THEN
+        SELECT COUNT(*) INTO open_topic_count
+        FROM topics
+        WHERE class_id = NEW.id
+          AND teacher_id = NEW.teacher_id
+          AND expires_at IS NULL;
+
+        IF open_topic_count > 0 THEN
+          RAISE EXCEPTION 'Không thể đóng lớp khi còn % chuyên đề chưa đóng', open_topic_count
+            USING ERRCODE = '23514',
+              CONSTRAINT = 'chk_archived_class_no_open_topics';
+        END IF;
+      END IF;
+
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+  `);
+
+  await dataSource.query('DROP TRIGGER IF EXISTS trg_archive_class_closes_topics ON classes');
+
+  await dataSource.query(`
+    CREATE CONSTRAINT TRIGGER trg_archive_class_closes_topics
+    AFTER UPDATE OF status ON classes
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+    EXECUTE FUNCTION enforce_archive_class_closes_topics();
+  `);
+
+  // ── R12: Class schedules must not exist for archived classes ──
+  await dataSource.query(`
+    CREATE OR REPLACE FUNCTION enforce_no_schedule_on_archived_class()
+    RETURNS trigger AS $$
+    DECLARE
+      class_status text;
+    BEGIN
+      SELECT status INTO class_status
+      FROM classes
+      WHERE id = NEW.class_id;
+
+      IF class_status = 'archived' THEN
+        RAISE EXCEPTION 'Không thể tạo lịch học cho lớp đã đóng'
+          USING ERRCODE = '23514',
+          CONSTRAINT = 'chk_schedule_class_must_be_active';
+      END IF;
+
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+  `);
+
+  await dataSource.query('DROP TRIGGER IF EXISTS trg_no_schedule_on_archived_class ON class_schedules');
+
+  await dataSource.query(`
+    CREATE CONSTRAINT TRIGGER trg_no_schedule_on_archived_class
+    AFTER INSERT OR UPDATE ON class_schedules
+    DEFERRABLE INITIALLY IMMEDIATE
+    FOR EACH ROW
+    EXECUTE FUNCTION enforce_no_schedule_on_archived_class();
+  `);
+
+  // ── R4: Fee records must be cancelled when their session is cancelled ──
+  await dataSource.query(`
+    CREATE OR REPLACE FUNCTION enforce_cancel_fees_on_session_cancel()
+    RETURNS trigger AS $$
+    DECLARE
+      active_fee_count integer;
+    BEGIN
+      IF NEW.status = 'cancelled' AND (OLD.status IS NULL OR OLD.status <> 'cancelled') THEN
+        SELECT COUNT(*) INTO active_fee_count
+        FROM fee_records
+        WHERE session_id = NEW.id
+          AND status = 'active';
+
+        IF active_fee_count > 0 THEN
+          RAISE EXCEPTION 'Không thể huỷ buổi học khi còn % fee_record active chưa huỷ', active_fee_count
+            USING ERRCODE = '23514',
+              CONSTRAINT = 'chk_cancelled_session_no_active_fees';
+        END IF;
+      END IF;
+
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+  `);
+
+  await dataSource.query('DROP TRIGGER IF EXISTS trg_cancel_fees_on_session_cancel ON sessions');
+
+  await dataSource.query(`
+    CREATE CONSTRAINT TRIGGER trg_cancel_fees_on_session_cancel
+    AFTER UPDATE OF status ON sessions
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+    EXECUTE FUNCTION enforce_cancel_fees_on_session_cancel();
   `);
 }

@@ -1,11 +1,20 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { BarChart3, Download, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Download,
+  TrendingUp,
+  DollarSign,
+  Wallet,
+  AlertCircle,
+  Users,
+} from "lucide-react";
 
 import { ApiError } from "../services/apiClient";
 import { listClasses } from "../services/classService";
-import { listStudentBalances } from "../services/financeService";
+import {
+  listStudentBalances,
+  type BackendStudentBalance,
+} from "../services/financeService";
 import { getIncomeReport } from "../services/reportingService";
-import { listStudents } from "../services/studentService";
 
 type ClassOption = {
   id: number;
@@ -29,6 +38,18 @@ function parseAmount(value: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function formatMoneyFull(amount: number): string {
+  return new Intl.NumberFormat("vi-VN").format(amount) + " ₫";
+}
+
+function formatMoneyShort(amount: number): string {
+  if (Math.abs(amount) >= 1_000_000) {
+    return `${(amount / 1_000_000).toFixed(1)}M`;
+  }
+
+  return `${(amount / 1_000).toFixed(0)}K`;
+}
+
 function escapeCsvCell(value: string | number): string {
   const text = String(value);
   return /[",\n\r]/.test(text) ? `"${text.replaceAll("\"", "\"\"")}"` : text;
@@ -47,11 +68,42 @@ function downloadCsv(filename: string, rows: Array<Array<string | number>>): voi
   URL.revokeObjectURL(url);
 }
 
+function getDatePresets(): Array<{ label: string; from: string; to: string }> {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+
+  const startOfMonth = new Date(year, month, 1);
+  const endOfMonth = new Date(year, month + 1, 0);
+
+  const startOfLastMonth = new Date(year, month - 1, 1);
+  const endOfLastMonth = new Date(year, month, 0);
+
+  const startOfYear = new Date(year, 0, 1);
+
+  const fmt = (date: Date) => date.toISOString().slice(0, 10);
+
+  return [
+    { label: "Tháng này", from: fmt(startOfMonth), to: fmt(endOfMonth) },
+    { label: "Tháng trước", from: fmt(startOfLastMonth), to: fmt(endOfLastMonth) },
+    { label: "Từ đầu năm", from: fmt(startOfYear), to: fmt(now) },
+  ];
+}
+
+type DebtStudent = {
+  student_id: number;
+  full_name: string;
+  status: "active" | "pending_archive" | "archived";
+  balance: number;
+  pending_archive_reason: "needs_collection" | "needs_refund" | null;
+};
+
 export function Reports() {
-  const [startDate, setStartDate] = useState("2026-04-01");
-  const [endDate, setEndDate] = useState("2026-04-30");
-  const [selectedClasses, setSelectedClasses] = useState<string[]>(["all"]);
-  const [includeUnpaid, setIncludeUnpaid] = useState(true);
+  const presets = getDatePresets();
+
+  const [startDate, setStartDate] = useState(presets[0].from);
+  const [endDate, setEndDate] = useState(presets[0].to);
+  const [selectedClassId, setSelectedClassId] = useState<string>("all");
   const [classOptions, setClassOptions] = useState<ClassOption[]>([]);
   const [requestError, setRequestError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -59,41 +111,12 @@ export function Reports() {
     totalPayments: 0,
     totalFees: 0,
     totalRefunds: 0,
-    totalUnpaid: 0,
     netRevenue: 0,
-    expectedRevenue: 0,
   });
-  const [classStats, setClassStats] = useState<Array<{
-    class_id: number;
-    class_name: string;
-    student_count: number;
-    fee_per_session: number;
-  }>>([]);
-  const [debtBreakdown, setDebtBreakdown] = useState({
-    unpaidDebt: 0,
-    pendingDebt: 0,
-  });
-
-  const selectedClassIds = useMemo(
-    () => selectedClasses.includes("all") ? [] : selectedClasses.map((id) => Number(id)),
-    [selectedClasses],
-  );
-
-  const handleClassToggle = (classId: string) => {
-    if (classId === "all") {
-      setSelectedClasses(["all"]);
-    } else {
-      const newSelection = selectedClasses.includes("all")
-        ? [classId]
-        : selectedClasses.includes(classId)
-        ? selectedClasses.filter((id) => id !== classId)
-        : [...selectedClasses, classId];
-      setSelectedClasses(newSelection.length === 0 ? ["all"] : newSelection);
-    }
-  };
+  const [allBalances, setAllBalances] = useState<DebtStudent[]>([]);
 
   useEffect(() => {
-    const loadClassOptions = async () => {
+    const loadClasses = async () => {
       try {
         const classes = await listClasses();
         setClassOptions(classes.map((item) => ({ id: item.id, name: item.name })));
@@ -102,7 +125,7 @@ export function Reports() {
       }
     };
 
-    void loadClassOptions();
+    void loadClasses();
   }, []);
 
   const loadReport = async () => {
@@ -110,50 +133,33 @@ export function Reports() {
     setRequestError("");
 
     try {
-      const [incomeReport, balances, students] = await Promise.all([
+      const classIds = selectedClassId !== "all" ? [Number(selectedClassId)] : undefined;
+
+      const [incomeReport, balances] = await Promise.all([
         getIncomeReport({
           from: `${startDate}T00:00:00.000Z`,
           to: `${endDate}T23:59:59.999Z`,
-          class_ids: selectedClassIds.length > 0 ? selectedClassIds : undefined,
-          include_unpaid: includeUnpaid,
+          class_ids: classIds,
         }),
         listStudentBalances({ include_pending_archive: true }),
-        listStudents(),
       ]);
 
-      const studentsById = new Map(students.map((student) => [student.id, student]));
-      const selectedClassIdSet = selectedClassIds.length > 0 ? new Set(selectedClassIds) : null;
-
-      const scopedBalances = selectedClassIdSet
-        ? balances.filter((balance) => {
-          const student = studentsById.get(balance.student_id);
-          return student?.current_class_id !== null && selectedClassIdSet.has(student.current_class_id);
-        })
-        : balances;
-
-      const unpaidDebt = scopedBalances
-        .filter((item) => item.status === "active" && parseAmount(item.balance) < 0)
-        .reduce((sum, item) => sum + Math.abs(parseAmount(item.balance)), 0);
-
-      const pendingDebt = scopedBalances
-        .filter((item) => item.status === "pending_archive" && parseAmount(item.balance) < 0)
-        .reduce((sum, item) => sum + Math.abs(parseAmount(item.balance)), 0);
-
-      setDebtBreakdown({ unpaidDebt, pendingDebt });
-      setClassStats(incomeReport.class_stats.map((row) => ({
-        class_id: row.class_id,
-        class_name: row.class_name,
-        student_count: row.student_count,
-        fee_per_session: parseAmount(row.fee_per_session),
-      })));
       setSummary({
         totalPayments: parseAmount(incomeReport.summary.total_payments),
         totalFees: parseAmount(incomeReport.summary.total_active_fees),
         totalRefunds: parseAmount(incomeReport.summary.total_refunds),
-        totalUnpaid: parseAmount(incomeReport.summary.unpaid_total),
         netRevenue: parseAmount(incomeReport.summary.net_revenue),
-        expectedRevenue: parseAmount(incomeReport.summary.projected_revenue),
       });
+
+      setAllBalances(
+        balances.map((balance: BackendStudentBalance) => ({
+          student_id: balance.student_id,
+          full_name: balance.full_name,
+          status: balance.status,
+          balance: parseAmount(balance.balance),
+          pending_archive_reason: balance.pending_archive_reason,
+        })),
+      );
     } catch (error) {
       setRequestError(toErrorMessage(error));
     } finally {
@@ -163,260 +169,347 @@ export function Reports() {
 
   useEffect(() => {
     void loadReport();
-  }, [startDate, endDate, includeUnpaid, selectedClasses.join(",")]);
+  }, [startDate, endDate, selectedClassId]);
 
-  const handleExportReport = () => {
-    const selectedClassLabel = selectedClasses.includes("all")
-      ? "Tất cả"
-      : classOptions
-        .filter((cls) => selectedClasses.includes(String(cls.id)))
-        .map((cls) => cls.name)
-        .join("; ");
+  const debtStudents = useMemo(
+    () => allBalances
+      .filter((item) => item.balance < 0)
+      .sort((a, b) => a.balance - b.balance),
+    [allBalances],
+  );
 
+  const refundStudents = useMemo(
+    () => allBalances
+      .filter((item) => item.balance > 0)
+      .sort((a, b) => b.balance - a.balance),
+    [allBalances],
+  );
+
+  const totalDebt = useMemo(
+    () => debtStudents.reduce((sum, item) => sum + Math.abs(item.balance), 0),
+    [debtStudents],
+  );
+
+  const totalRefundable = useMemo(
+    () => refundStudents.reduce((sum, item) => sum + item.balance, 0),
+    [refundStudents],
+  );
+
+  const collectionRate = summary.totalFees > 0
+    ? Math.round((summary.totalPayments / summary.totalFees) * 100)
+    : 0;
+
+  const handleExport = () => {
     downloadCsv(`bao-cao-${startDate}-${endDate}.csv`, [
-      ["Báo cáo thống kê"],
+      ["Báo cáo tài chính TMS"],
       ["Từ ngày", startDate],
       ["Đến ngày", endDate],
-      ["Lớp", selectedClassLabel],
-      ["Bao gồm khoản chưa thu", includeUnpaid ? "Có" : "Không"],
       [],
-      ["Chỉ số", "Giá trị"],
+      ["Chỉ số", "Giá trị (VNĐ)"],
       ["Tổng thu", summary.totalPayments],
       ["Học phí phát sinh", summary.totalFees],
       ["Hoàn trả", summary.totalRefunds],
-      ["Chưa thu", summary.totalUnpaid],
       ["Doanh thu ròng", summary.netRevenue],
-      ["Doanh thu dự kiến", summary.expectedRevenue],
-      ["Nợ học sinh active", debtBreakdown.unpaidDebt],
-      ["Nợ cần đòi pending", debtBreakdown.pendingDebt],
+      ["Tỷ lệ thu", `${collectionRate}%`],
       [],
-      ["Lớp", "Số học sinh", "Học phí mỗi buổi", "Doanh thu ước tính"],
-      ...classStats.map((cls) => [
-        cls.class_name,
-        cls.student_count,
-        cls.fee_per_session,
-        cls.fee_per_session * cls.student_count * 12,
-      ]),
+      ["Tổng nợ chưa thu", totalDebt],
+      ["Tổng cần hoàn trả", totalRefundable],
+      [],
+      ["HỌC SINH NỢ"],
+      ["Tên", "Trạng thái", "Số nợ (VNĐ)"],
+      ...debtStudents.map((s) => [s.full_name, s.status, Math.abs(s.balance)]),
+      [],
+      ["HỌC SINH CẦN HOÀN TRẢ"],
+      ["Tên", "Trạng thái", "Số dư (VNĐ)"],
+      ...refundStudents.map((s) => [s.full_name, s.status, s.balance]),
     ]);
   };
 
   return (
     <div className="p-8">
+      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-semibold text-zinc-900 mb-2">Báo cáo thống kê</h1>
-          <p className="text-zinc-600">Phân tích doanh thu và hiệu suất</p>
+          <h1 className="text-3xl font-semibold text-zinc-900 mb-2">Báo cáo tài chính</h1>
+          <p className="text-zinc-600">
+            {loading ? "Đang tải..." : `${new Date(startDate).toLocaleDateString("vi-VN")} — ${new Date(endDate).toLocaleDateString("vi-VN")}`}
+          </p>
         </div>
         <button
-          onClick={handleExportReport}
+          onClick={handleExport}
           disabled={loading}
           className="flex items-center gap-2 px-4 py-3 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 transition-colors disabled:opacity-60"
         >
           <Download className="w-5 h-5" />
-          Xuất báo cáo
+          Xuất CSV
         </button>
       </div>
 
+      {/* Error */}
       {requestError && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {requestError}
         </div>
       )}
 
+      {/* Filters */}
       <div className="bg-white border border-zinc-200 rounded-xl p-6 mb-6">
-        <h2 className="text-lg font-semibold text-zinc-900 mb-4">Tùy chọn lọc</h2>
+        <div className="flex flex-col md:flex-row gap-4">
+          {/* Date presets */}
+          <div className="flex gap-2">
+            {presets.map((preset) => (
+              <button
+                key={preset.label}
+                onClick={() => { setStartDate(preset.from); setEndDate(preset.to); }}
+                className={`px-4 py-3 rounded-lg font-medium transition-colors ${
+                  startDate === preset.from && endDate === preset.to
+                    ? "bg-zinc-200 text-zinc-900"
+                    : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          <div>
-            <label className="block text-sm text-zinc-600 mb-2">Từ ngày</label>
+          {/* Custom date inputs */}
+          <div className="flex gap-2 items-center">
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-4 py-3 bg-zinc-100 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              className="px-3 py-3 bg-zinc-100 border border-zinc-200 rounded-lg text-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
             />
-          </div>
-          <div>
-            <label className="block text-sm text-zinc-600 mb-2">Đến ngày</label>
+            <span className="text-zinc-400">—</span>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-4 py-3 bg-zinc-100 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              className="px-3 py-3 bg-zinc-100 border border-zinc-200 rounded-lg text-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
             />
           </div>
-        </div>
 
-        <div className="mb-6">
-          <label className="block text-sm text-zinc-600 mb-3">Lớp học</label>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => handleClassToggle("all")}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                selectedClasses.includes("all")
-                  ? "bg-zinc-900 text-white"
-                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-100"
-              }`}
+          {/* Class filter */}
+          {classOptions.length > 0 && (
+            <select
+              value={selectedClassId}
+              onChange={(e) => setSelectedClassId(e.target.value)}
+              className="px-4 py-3 bg-zinc-100 border border-zinc-200 rounded-lg text-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
             >
-              Tất cả
-            </button>
-            {classOptions.map((cls) => (
-              <button
-                key={cls.id}
-                onClick={() => handleClassToggle(String(cls.id))}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  selectedClasses.includes(String(cls.id)) && !selectedClasses.includes("all")
-                    ? "bg-zinc-900 text-white"
-                    : "bg-zinc-100 text-zinc-600 hover:bg-zinc-100"
-                }`}
-              >
-                {cls.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={includeUnpaid}
-              onChange={(e) => setIncludeUnpaid(e.target.checked)}
-              className="w-5 h-5 bg-zinc-100 border-2 border-zinc-700 rounded checked:bg-white checked:border-white"
-            />
-            <span className="text-zinc-900">Bao gồm khoản chưa thu</span>
-          </label>
-          <p className="text-sm text-zinc-600 mt-2 ml-8">
-            Khoản chưa thu bao gồm nợ của học sinh active và pending_archive (cần đòi)
-          </p>
+              <option value="all">Tất cả lớp</option>
+              {classOptions.map((cls) => (
+                <option key={cls.id} value={String(cls.id)}>{cls.name}</option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
+      {/* Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <SummaryCard icon={<TrendingUp className="w-5 h-5 text-zinc-900" />} label="Tổng thu" value={`${(summary.totalPayments / 1_000_000).toFixed(1)}M`} description="Đã thu thực tế" />
-        <SummaryCard icon={<DollarSign className="w-5 h-5 text-zinc-700" />} label="Học phí phát sinh" value={`${(summary.totalFees / 1_000_000).toFixed(1)}M`} description="Tổng học phí tính" />
-        <SummaryCard icon={<TrendingDown className="w-5 h-5 text-zinc-600" />} label="Hoàn trả" value={`${(summary.totalRefunds / 1_000_000).toFixed(1)}M`} description="Khoản âm (giảm doanh thu)" />
-        <SummaryCard icon={<BarChart3 className="w-5 h-5 text-zinc-600" />} label="Chưa thu" value={`${(summary.totalUnpaid / 1_000_000).toFixed(1)}M`} description="Active + Pending" />
+        <SummaryCard
+          icon={TrendingUp}
+          iconColor="bg-zinc-100 text-zinc-900"
+          label="Tổng thu"
+          value={formatMoneyShort(summary.totalPayments)}
+          detail={formatMoneyFull(summary.totalPayments)}
+        />
+        <SummaryCard
+          icon={DollarSign}
+          iconColor="bg-zinc-100 text-zinc-600"
+          label="Học phí phát sinh"
+          value={formatMoneyShort(summary.totalFees)}
+          detail={formatMoneyFull(summary.totalFees)}
+        />
+        <SummaryCard
+          icon={Wallet}
+          iconColor="bg-zinc-100 text-zinc-900"
+          label="Doanh thu ròng"
+          value={formatMoneyShort(summary.netRevenue)}
+          detail={formatMoneyFull(summary.netRevenue)}
+        />
+        <SummaryCard
+          icon={Users}
+          iconColor="bg-zinc-100 text-zinc-600"
+          label="Tỷ lệ thu"
+          value={`${collectionRate}%`}
+          detail={`${formatMoneyShort(summary.totalPayments)} / ${formatMoneyShort(summary.totalFees)}`}
+        />
       </div>
 
-      <div className="bg-gradient-to-br from-zinc-900 to-black border border-zinc-200 rounded-xl p-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-semibold text-zinc-900 mb-2">Doanh thu ròng</h2>
-            <p className="text-zinc-600">
-              {includeUnpaid ? "Bao gồm khoản chưa thu" : "Chỉ tính khoản đã thu"}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <RevenueChip label="Tổng thu thực tế" value={`+${(summary.totalPayments / 1_000_000).toFixed(2)}M`} />
-          <RevenueChip label="Tổng hoàn trả" value={`-${(summary.totalRefunds / 1_000_000).toFixed(2)}M`} />
-          {includeUnpaid && <RevenueChip label="Khoản chưa thu" value={`+${(summary.totalUnpaid / 1_000_000).toFixed(2)}M`} />}
-        </div>
-
-        <div className="mt-8 pt-6 border-t border-zinc-200">
-          <div className="flex items-center justify-between">
+      {/* Debt overview cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div className="bg-white border border-zinc-200 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-zinc-100 rounded-lg flex items-center justify-center">
+              <AlertCircle className="w-5 h-5 text-zinc-900" />
+            </div>
             <div>
-              <p className="text-zinc-600 mb-2">
-                {includeUnpaid ? "Doanh thu dự kiến" : "Doanh thu thực tế"}
-              </p>
-              <p className="text-4xl font-bold text-zinc-900">
-                {((includeUnpaid ? summary.expectedRevenue : summary.netRevenue) / 1_000_000).toFixed(2)}M VNĐ
-              </p>
+              <p className="text-zinc-600 text-sm">Học sinh đang nợ</p>
+              <p className="text-2xl font-semibold text-zinc-900">{debtStudents.length}</p>
             </div>
-            <div className="text-right">
-              <p className="text-sm text-zinc-600 mb-1">Giai đoạn</p>
-              <p className="text-zinc-900 font-medium">
-                {new Date(startDate).toLocaleDateString("vi-VN")} - {new Date(endDate).toLocaleDateString("vi-VN")}
-              </p>
+          </div>
+          <div className="text-sm text-zinc-600">
+            Tổng nợ: <span className="text-zinc-900 font-semibold">{formatMoneyFull(totalDebt)}</span>
+          </div>
+        </div>
+
+        <div className="bg-white border border-zinc-200 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-zinc-100 rounded-lg flex items-center justify-center">
+              <DollarSign className="w-5 h-5 text-zinc-600" />
             </div>
+            <div>
+              <p className="text-zinc-600 text-sm">Cần hoàn trả</p>
+              <p className="text-2xl font-semibold text-zinc-900">{refundStudents.length}</p>
+            </div>
+          </div>
+          <div className="text-sm text-zinc-600">
+            Tổng dư: <span className="text-zinc-600 font-semibold">{formatMoneyFull(totalRefundable)}</span>
           </div>
         </div>
       </div>
 
-      {loading && (
-        <p className="mt-6 text-sm text-zinc-500">Đang cập nhật báo cáo...</p>
+      {/* Debt table */}
+      {debtStudents.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-zinc-900 mb-4">Học sinh đang nợ</h2>
+          <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-zinc-100 border-b border-zinc-200">
+                <tr>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Học sinh</th>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Trạng thái</th>
+                  <th className="px-6 py-4 text-right text-sm font-medium text-zinc-600">Số nợ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {debtStudents.map((student) => (
+                  <tr key={student.student_id} className="hover:bg-zinc-100/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <p className="text-zinc-900 font-medium">{student.full_name}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <StudentStatusBadge status={student.status} />
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <span className="text-zinc-700 font-semibold">
+                        -{formatMoneyShort(Math.abs(student.balance))}
+                      </span>
+                      <p className="text-xs text-zinc-500">{formatMoneyFull(Math.abs(student.balance))}</p>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-zinc-50 border-t border-zinc-200">
+                <tr>
+                  <td colSpan={2} className="px-6 py-4 text-sm font-medium text-zinc-600">Tổng cộng</td>
+                  <td className="px-6 py-4 text-right text-zinc-900 font-semibold">
+                    {formatMoneyFull(totalDebt)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-        <div className="bg-white border border-zinc-200 rounded-xl p-6">
-          <h3 className="text-lg font-semibold text-zinc-900 mb-4">Phân tích nợ</h3>
-          <div className="space-y-3">
-            <DebtRow label="Nợ học sinh active" value={`${(debtBreakdown.unpaidDebt / 1000).toFixed(0)}K`} />
-            <DebtRow label="Nợ cần đòi (pending)" value={`${(debtBreakdown.pendingDebt / 1000).toFixed(0)}K`} />
-            <DebtRow
-              label="Tổng nợ"
-              value={`${((debtBreakdown.unpaidDebt + debtBreakdown.pendingDebt) / 1000).toFixed(0)}K`}
-              strong
-            />
+      {/* Refund table */}
+      {refundStudents.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-zinc-900 mb-4">Cần hoàn trả</h2>
+          <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-zinc-100 border-b border-zinc-200">
+                <tr>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Học sinh</th>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Trạng thái</th>
+                  <th className="px-6 py-4 text-right text-sm font-medium text-zinc-600">Số dư</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {refundStudents.map((student) => (
+                  <tr key={student.student_id} className="hover:bg-zinc-100/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <p className="text-zinc-900 font-medium">{student.full_name}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <StudentStatusBadge status={student.status} />
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <span className="text-zinc-600 font-semibold">
+                        +{formatMoneyShort(student.balance)}
+                      </span>
+                      <p className="text-xs text-zinc-500">{formatMoneyFull(student.balance)}</p>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-zinc-50 border-t border-zinc-200">
+                <tr>
+                  <td colSpan={2} className="px-6 py-4 text-sm font-medium text-zinc-600">Tổng cộng</td>
+                  <td className="px-6 py-4 text-right text-zinc-600 font-semibold">
+                    {formatMoneyFull(totalRefundable)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
         </div>
+      )}
 
-        <div className="bg-white border border-zinc-200 rounded-xl p-6">
-          <h3 className="text-lg font-semibold text-zinc-900 mb-4">Thống kê lớp</h3>
-          <div className="space-y-3">
-            {classStats.map((cls) => {
-              const classRevenue = cls.fee_per_session * cls.student_count * 12;
-              return (
-                <div key={cls.class_id} className="flex items-center justify-between p-3 bg-zinc-100 rounded-lg">
-                  <div>
-                    <p className="text-zinc-900 font-medium">{cls.class_name}</p>
-                    <p className="text-sm text-zinc-600">{cls.student_count} học sinh</p>
-                  </div>
-                  <span className="text-zinc-900 font-semibold">
-                    {(classRevenue / 1_000_000).toFixed(1)}M
-                  </span>
-                </div>
-              );
-            })}
-            {classStats.length === 0 && (
-              <p className="text-sm text-zinc-500">Không có dữ liệu lớp học.</p>
-            )}
-          </div>
+      {/* Empty state */}
+      {debtStudents.length === 0 && refundStudents.length === 0 && !loading && (
+        <div className="bg-white border border-zinc-200 rounded-xl p-12 text-center">
+          <Wallet className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
+          <p className="text-zinc-900 font-medium mb-2">Không có khoản nợ hay hoàn trả</p>
+          <p className="text-zinc-600 text-sm">Tất cả học sinh đều có số dư bằng 0</p>
         </div>
-      </div>
+      )}
     </div>
   );
 }
+
+/* ─── Sub-components ─── */
 
 function SummaryCard({
-  icon,
+  icon: Icon,
+  iconColor,
   label,
   value,
-  description,
+  detail,
 }: {
-  icon: ReactNode;
+  icon: React.ComponentType<{ className?: string }>;
+  iconColor: string;
   label: string;
   value: string;
-  description: string;
+  detail: string;
 }) {
   return (
-    <div className="bg-white border border-zinc-200 rounded-xl p-6">
-      <div className="flex items-center gap-3 mb-3">
-        <div className="w-10 h-10 bg-zinc-100 rounded-lg flex items-center justify-center">{icon}</div>
-        <span className="text-zinc-600 text-sm">{label}</span>
+    <div className="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-zinc-600 text-sm mb-2">{label}</p>
+          <p className="text-3xl font-semibold text-zinc-900">{value}</p>
+        </div>
+        <div className={`w-12 h-12 rounded-lg ${iconColor} flex items-center justify-center`}>
+          <Icon className="w-6 h-6" />
+        </div>
       </div>
-      <p className="text-3xl font-semibold text-zinc-900 mb-1">{value}</p>
-      <p className="text-sm text-zinc-600">{description}</p>
+      <p className="text-xs text-zinc-500 mt-2">{detail}</p>
     </div>
   );
 }
 
-function RevenueChip({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-white/50 border border-zinc-200 rounded-xl p-6">
-      <p className="text-zinc-600 text-sm mb-2">{label}</p>
-      <p className="text-2xl font-semibold text-zinc-900">{value}</p>
-    </div>
-  );
-}
-
-function DebtRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className={`flex items-center justify-between p-3 rounded-lg ${strong ? "bg-zinc-100 border-t border-zinc-200" : "bg-zinc-100"}`}>
-      <span className={strong ? "text-zinc-900 font-medium" : "text-zinc-600"}>{label}</span>
-      <span className={strong ? "text-zinc-700 font-bold text-lg" : "text-zinc-700 font-semibold"}>{value}</span>
-    </div>
-  );
+function StudentStatusBadge({ status }: { status: "active" | "pending_archive" | "archived" }) {
+  switch (status) {
+    case "active":
+      return <span className="px-3 py-1 bg-zinc-900 text-white rounded-full text-sm">Đang học</span>;
+    case "pending_archive":
+      return <span className="px-3 py-1 bg-zinc-300 text-zinc-700 rounded-full text-sm">Chờ xử lý</span>;
+    case "archived":
+      return <span className="px-3 py-1 bg-zinc-200 text-zinc-600 rounded-full text-sm">Đã lưu trữ</span>;
+    default:
+      return null;
+  }
 }
