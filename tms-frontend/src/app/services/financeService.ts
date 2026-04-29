@@ -128,6 +128,18 @@ export async function listFeeRecords(filters?: {
   return data.fee_records;
 }
 
+export async function updateFeeRecordStatus(
+  feeRecordId: number,
+  status: BackendFeeRecordStatus,
+): Promise<BackendFeeRecord> {
+  const data = await apiRequest<{ fee_record: BackendFeeRecord }>(`/finance/fee-records/${feeRecordId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+
+  return data.fee_record;
+}
+
 export async function listStudentBalances(filters?: {
   status?: BackendStudentStatus;
   include_pending_archive?: boolean;

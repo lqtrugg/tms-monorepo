@@ -284,20 +284,36 @@ export function parseCreateManualSessionInput(value: unknown): CreateManualSessi
   const body = asRecord(value, 'body');
 
   if (body.scheduled_at !== undefined) {
+    if (body.end_time === undefined) {
+      throw new ClassServiceError('end_time is required', 400);
+    }
+    const scheduledAt = parseDateTime(body.scheduled_at, 'scheduled_at');
+    const startTime = [
+      String(scheduledAt.getHours()).padStart(2, '0'),
+      String(scheduledAt.getMinutes()).padStart(2, '0'),
+      String(scheduledAt.getSeconds()).padStart(2, '0'),
+    ].join(':');
+    const endTime = normalizeTime(body.end_time, 'end_time');
+    assertScheduleTimeRange(startTime, endTime);
+
     return {
-      scheduled_at: parseDateTime(body.scheduled_at, 'scheduled_at'),
+      scheduled_at: scheduledAt,
+      end_time: endTime,
     };
   }
 
-  if (body.scheduled_date === undefined || body.start_time === undefined) {
-    throw new ClassServiceError('either scheduled_at or scheduled_date + start_time is required', 400);
+  if (body.scheduled_date === undefined || body.start_time === undefined || body.end_time === undefined) {
+    throw new ClassServiceError('either scheduled_at + end_time or scheduled_date + start_time + end_time is required', 400);
   }
 
   const dateOnly = normalizeDateOnly(body.scheduled_date, 'scheduled_date');
-  const time = normalizeTime(body.start_time, 'start_time');
+  const startTime = normalizeTime(body.start_time, 'start_time');
+  const endTime = normalizeTime(body.end_time, 'end_time');
+  assertScheduleTimeRange(startTime, endTime);
 
   return {
-    scheduled_at: combineDateAndTime(dateOnly, time),
+    scheduled_at: combineDateAndTime(dateOnly, startTime),
+    end_time: endTime,
   };
 }
 

@@ -4,7 +4,13 @@ import { ArrowLeft, Mail, GraduationCap, DollarSign, BookOpen, ExternalLink, Rec
 
 import { ApiError } from "../services/apiClient";
 import { listClasses } from "../services/classService";
-import { listFeeRecords, listTransactions, type BackendFeeRecord } from "../services/financeService";
+import {
+  listFeeRecords,
+  listTransactions,
+  updateFeeRecordStatus,
+  type BackendFeeRecord,
+  type BackendFeeRecordStatus,
+} from "../services/financeService";
 import { getStudentLearningProfile, type StudentLearningProfile } from "../services/reportingService";
 import { getStudent, type BackendStudentSummary } from "../services/studentService";
 
@@ -54,7 +60,44 @@ export function StudentDetail() {
   const [feeRecords, setFeeRecords] = useState<BackendFeeRecord[]>([]);
   const [financeTab, setFinanceTab] = useState<"transactions" | "fee_records">("transactions");
   const [feeRecordsPage, setFeeRecordsPage] = useState(1);
+  const [savingFeeRecordId, setSavingFeeRecordId] = useState<number | null>(null);
   const FEE_RECORDS_PER_PAGE = 20;
+
+  const loadData = async (studentId: number) => {
+    setLoading(true);
+    setRequestError("");
+
+    try {
+      const [studentData, classes, txList, learningProfile, feeRecordList] = await Promise.all([
+        getStudent(studentId),
+        listClasses(),
+        listTransactions({ student_id: studentId }),
+        getStudentLearningProfile(studentId),
+        listFeeRecords({ student_id: studentId }),
+      ]);
+
+      setStudent(studentData);
+
+      const matchedClass = classes.find((item) => item.id === studentData.current_class_id);
+      setClassName(matchedClass?.name ?? "N/A");
+
+      setTransactions(
+        txList.map((item) => ({
+          id: item.id,
+          type: item.type,
+          amount: parseAmount(item.amount),
+          recorded_at: item.recorded_at,
+          notes: item.notes,
+        })),
+      );
+      setLearningTopics(learningProfile.topics);
+      setFeeRecords(feeRecordList);
+    } catch (error) {
+      setRequestError(toErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const studentId = Number(id);
@@ -64,44 +107,27 @@ export function StudentDetail() {
       return;
     }
 
-    const loadData = async () => {
-      setLoading(true);
-      setRequestError("");
-
-      try {
-        const [studentData, classes, txList, learningProfile, feeRecordList] = await Promise.all([
-          getStudent(studentId),
-          listClasses(),
-          listTransactions({ student_id: studentId }),
-          getStudentLearningProfile(studentId),
-          listFeeRecords({ student_id: studentId }),
-        ]);
-
-        setStudent(studentData);
-
-        const matchedClass = classes.find((item) => item.id === studentData.current_class_id);
-        setClassName(matchedClass?.name ?? "N/A");
-
-        setTransactions(
-          txList.map((item) => ({
-            id: item.id,
-            type: item.type,
-            amount: parseAmount(item.amount),
-            recorded_at: item.recorded_at,
-            notes: item.notes,
-          })),
-        );
-        setLearningTopics(learningProfile.topics);
-        setFeeRecords(feeRecordList);
-      } catch (error) {
-        setRequestError(toErrorMessage(error));
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadData();
+    void loadData(studentId);
   }, [id]);
+
+  const handleUpdateFeeRecordStatus = async (feeRecordId: number, status: BackendFeeRecordStatus) => {
+    const studentId = Number(id);
+    if (!Number.isInteger(studentId) || studentId <= 0) {
+      return;
+    }
+
+    setSavingFeeRecordId(feeRecordId);
+    setRequestError("");
+
+    try {
+      await updateFeeRecordStatus(feeRecordId, status);
+      await loadData(studentId);
+    } catch (error) {
+      setRequestError(toErrorMessage(error));
+    } finally {
+      setSavingFeeRecordId(null);
+    }
+  };
 
   const statusBadge = useMemo(() => {
     if (!student) {
@@ -347,13 +373,21 @@ export function StudentDetail() {
                               {(parseAmount(fr.amount) / 1000).toFixed(0)}K
                             </td>
                             <td className="px-4 py-3 text-center">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                fr.status === "active"
-                                  ? "bg-zinc-900 text-white"
-                                  : "bg-zinc-200 text-zinc-500 line-through"
-                              }`}>
-                                {fr.status === "active" ? "Có hiệu lực" : "Đã huỷ"}
-                              </span>
+                              <select
+                                value={fr.status}
+                                onChange={(event) => {
+                                  void handleUpdateFeeRecordStatus(fr.id, event.target.value as BackendFeeRecordStatus);
+                                }}
+                                disabled={savingFeeRecordId === fr.id}
+                                className={`rounded-full border px-2 py-1 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-zinc-400 ${
+                                  fr.status === "active"
+                                    ? "border-zinc-900 bg-zinc-900 text-white"
+                                    : "border-zinc-200 bg-zinc-200 text-zinc-600"
+                                }`}
+                              >
+                                <option value="active">Có hiệu lực</option>
+                                <option value="cancelled">Vô hiệu lực</option>
+                              </select>
                             </td>
                           </tr>
                         ))}

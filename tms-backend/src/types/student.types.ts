@@ -52,6 +52,7 @@ export type BulkExpelStudentsInput = {
 
 export type ArchivePendingStudentInput = {
   archived_at: Date;
+  settle_finance: boolean;
 };
 
 export type StudentBalanceSnapshot = {

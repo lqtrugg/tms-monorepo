@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Server,
   Settings,
-  Eye,
   Send,
   CircleDollarSign,
   BookOpenCheck,
@@ -117,7 +116,6 @@ export function Messaging() {
   const [selectedTab, setSelectedTab] = useState<"servers" | "messages">("servers");
   const [showAddServerModal, setShowAddServerModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
-  const [showChannelsModal, setShowChannelsModal] = useState(false);
   const [showSendMessageModal, setShowSendMessageModal] = useState(false);
   const [selectedServer, setSelectedServer] = useState<BackendDiscordServer | null>(null);
   const [messageFilter, setMessageFilter] = useState<MessageFilter>("all");
@@ -283,17 +281,7 @@ export function Messaging() {
                             className="px-3 py-1.5 bg-zinc-100 text-zinc-700 rounded-lg hover:bg-zinc-200 transition-colors text-sm flex items-center gap-1"
                           >
                             <Settings className="w-3.5 h-3.5" />
-                            Cấu hình bot
-                          </button>
-                          <button
-                            onClick={() => {
-                              setSelectedServer(server);
-                              setShowChannelsModal(true);
-                            }}
-                            className="px-3 py-1.5 bg-zinc-100 text-zinc-700 rounded-lg hover:bg-zinc-200 transition-colors text-sm flex items-center gap-1"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            Xem channels
+                            Cấu hình server
                           </button>
                           <button
                             onClick={async () => {
@@ -456,7 +444,7 @@ export function Messaging() {
 
       {showConfigModal && selectedServer && (
         <ServerModal
-          title="Cấu hình bot"
+          title="Cấu hình server"
           classes={classes}
           initialValues={{
             class_id: selectedServer.class_id,
@@ -483,16 +471,6 @@ export function Messaging() {
             } finally {
               setSubmitting(false);
             }
-          }}
-        />
-      )}
-
-      {showChannelsModal && selectedServer && (
-        <ChannelsModal
-          server={selectedServer}
-          onClose={() => {
-            setShowChannelsModal(false);
-            setSelectedServer(null);
           }}
         />
       )}
@@ -678,36 +656,6 @@ function ServerModal({
             </button>
           </div>
         </form>
-      </div>
-    </div>
-  );
-}
-
-function ChannelsModal({ server, onClose }: { server: BackendDiscordServer; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white border border-zinc-200 rounded-xl p-6 w-full max-w-md shadow-xl">
-        <h2 className="text-xl font-semibold text-zinc-900 mb-2">Thông tin channels</h2>
-        <p className="text-zinc-600 mb-6">Server ID: {server.discord_server_id}</p>
-
-        <div className="space-y-3 mb-6">
-          <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg flex items-center justify-between">
-            <span className="text-zinc-700">Voice channel (điểm danh)</span>
-            <span className="text-sm text-zinc-900 font-mono">{server.attendance_voice_channel_id || "Chưa cấu hình"}</span>
-          </div>
-          <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg flex items-center justify-between">
-            <span className="text-zinc-700">Text channel (thông báo)</span>
-            <span className="text-sm text-zinc-900 font-mono">{server.notification_channel_id || "Chưa cấu hình"}</span>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-full px-4 py-3 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors font-medium"
-        >
-          Đóng
-        </button>
       </div>
     </div>
   );

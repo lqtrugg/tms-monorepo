@@ -27,9 +27,9 @@ const teacherNavItems: NavItem[] = [
   { path: "/students", icon: Users, label: "Học sinh" },
   { path: "/classes", icon: GraduationCap, label: "Lớp học" },
   { path: "/sessions", icon: ClipboardList, label: "Buổi học" },
-  { path: "/transactions", icon: DollarSign, label: "Giao dịch" },
   { path: "/topics", icon: BookOpen, label: "Chuyên đề" },
   { path: "/messaging", icon: MessageSquare, label: "Tin nhắn" },
+  { path: "/transactions", icon: DollarSign, label: "Giao dịch" },
   { path: "/reports", icon: BarChart3, label: "Báo cáo" },
 ];
 

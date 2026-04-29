@@ -59,7 +59,9 @@ function toSessionCards(sessions: BackendSession[], classes: BackendClass[]): Se
       classId: session.class_id,
       className: classNameById.get(session.class_id) ?? `Lớp #${session.class_id}`,
       dateLabel: Number.isNaN(scheduledAt.getTime()) ? session.scheduled_at : formatSessionDate(scheduledAt),
-      timeLabel: Number.isNaN(scheduledAt.getTime()) ? "--:--" : formatSessionTime(scheduledAt),
+      timeLabel: Number.isNaN(scheduledAt.getTime())
+        ? "--:--"
+        : `${formatSessionTime(scheduledAt)}${session.end_time ? `-${session.end_time.slice(0, 5)}` : ""}`,
       status: session.status,
       isRecurring: !session.is_manual,
     };
@@ -131,7 +133,7 @@ export function Sessions() {
     }
   };
 
-  const handleAddSession = async (payload: { classId: number; date: string; time: string }) => {
+  const handleAddSession = async (payload: { classId: number; date: string; time: string; endTime: string }) => {
     setSubmitting(true);
     setRequestError("");
 
@@ -139,6 +141,7 @@ export function Sessions() {
       await createManualSession(payload.classId, {
         scheduled_date: payload.date,
         start_time: payload.time,
+        end_time: payload.endTime,
       });
 
       setShowAddModal(false);
@@ -302,13 +305,14 @@ function AddSessionModal({
 }: {
   classes: BackendClass[];
   onClose: () => void;
-  onSubmit: (payload: { classId: number; date: string; time: string }) => Promise<void>;
+  onSubmit: (payload: { classId: number; date: string; time: string; endTime: string }) => Promise<void>;
   submitting: boolean;
   error: string;
 }) {
   const [classId, setClassId] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [localError, setLocalError] = useState("");
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -328,7 +332,17 @@ function AddSessionModal({
     }
 
     if (!time) {
-      setLocalError("Vui lòng chọn giờ học");
+      setLocalError("Vui lòng chọn giờ bắt đầu");
+      return;
+    }
+
+    if (!endTime) {
+      setLocalError("Vui lòng chọn giờ kết thúc");
+      return;
+    }
+
+    if (endTime <= time) {
+      setLocalError("Giờ kết thúc phải lớn hơn giờ bắt đầu");
       return;
     }
 
@@ -336,6 +350,7 @@ function AddSessionModal({
       classId: parsedClassId,
       date,
       time,
+      endTime,
     });
   };
 
@@ -367,14 +382,25 @@ function AddSessionModal({
             />
           </div>
 
-          <div>
-            <label className="block text-sm text-zinc-700 mb-2">Giờ</label>
-            <input
-              type="time"
-              value={time}
-              onChange={(event) => setTime(event.target.value)}
-              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm text-zinc-700 mb-2">Giờ bắt đầu</label>
+              <input
+                type="time"
+                value={time}
+                onChange={(event) => setTime(event.target.value)}
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-zinc-700 mb-2">Giờ kết thúc</label>
+              <input
+                type="time"
+                value={endTime}
+                onChange={(event) => setEndTime(event.target.value)}
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              />
+            </div>
           </div>
 
           <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3">

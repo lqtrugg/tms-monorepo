@@ -18,6 +18,7 @@ import {
   listFeeRecords,
   listStudentBalances,
   listTransactions,
+  updateFeeRecordStatus,
   updateTransaction,
 } from '../services/finance.service.js';
 import { requireRoles } from '../middlewares/rbac.middleware.js';
@@ -159,6 +160,25 @@ financeRouter.get('/finance/fee-records', async (req, res, next) => {
     });
 
     res.json({ fee_records: feeRecords });
+  } catch (error) {
+    next(error);
+  }
+});
+
+financeRouter.patch('/finance/fee-records/:id/status', async (req, res, next) => {
+  try {
+    const teacherId = getTeacherId(req);
+    const feeRecordId = parsePositiveInteger(req.params.id, 'id');
+    const body = asRecord(req.body, 'body');
+    const status = parseFeeRecordStatus(body.status);
+
+    if (!status) {
+      throw new ServiceError('status is required', 400);
+    }
+
+    const feeRecord = await updateFeeRecordStatus(teacherId, feeRecordId, status);
+
+    res.json({ fee_record: feeRecord });
   } catch (error) {
     next(error);
   }

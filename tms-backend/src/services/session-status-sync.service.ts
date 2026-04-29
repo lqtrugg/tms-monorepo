@@ -32,32 +32,27 @@ export async function syncSessionStatusesOnce(): Promise<void> {
     const completedResult = await AppDataSource.query(`
       UPDATE sessions AS session
       SET status = 'completed'::session_status
-      FROM class_schedules AS schedule
-      WHERE session.teacher_id = schedule.teacher_id
-        AND session.class_id = schedule.class_id
-        AND session.is_manual = false
+      FROM classes AS class
+      WHERE session.teacher_id = class.teacher_id
+        AND session.class_id = class.id
+        AND class.status = 'active'::class_status
+        AND session.end_time IS NOT NULL
         AND session.status IN ('scheduled'::session_status, 'in_progress'::session_status)
-        AND schedule.day_of_week = EXTRACT(DOW FROM session.scheduled_at)::integer
-        AND schedule.start_time = session.scheduled_at::time
-        AND CURRENT_TIMESTAMP >= (session.scheduled_at::date + schedule.end_time)::timestamptz
+        AND CURRENT_TIMESTAMP >= (session.scheduled_at::date + session.end_time)::timestamptz
       RETURNING session.id
     `) as UpdatedSessionRow[] | [UpdatedSessionRow[], number];
 
     const startedResult = await AppDataSource.query(`
       UPDATE sessions AS session
       SET status = 'in_progress'::session_status
-      FROM classes AS class, class_schedules AS schedule
+      FROM classes AS class
       WHERE session.teacher_id = class.teacher_id
         AND session.class_id = class.id
-        AND session.teacher_id = schedule.teacher_id
-        AND session.class_id = schedule.class_id
         AND class.status = 'active'::class_status
-        AND session.is_manual = false
+        AND session.end_time IS NOT NULL
         AND session.status = 'scheduled'::session_status
-        AND schedule.day_of_week = EXTRACT(DOW FROM session.scheduled_at)::integer
-        AND schedule.start_time = session.scheduled_at::time
         AND CURRENT_TIMESTAMP >= session.scheduled_at
-        AND CURRENT_TIMESTAMP < (session.scheduled_at::date + schedule.end_time)::timestamptz
+        AND CURRENT_TIMESTAMP < (session.scheduled_at::date + session.end_time)::timestamptz
       RETURNING session.id
     `) as UpdatedSessionRow[] | [UpdatedSessionRow[], number];
 

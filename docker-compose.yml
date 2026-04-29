@@ -20,6 +20,7 @@ services:
       - SYSADMIN_USERNAME=${SYSADMIN_USERNAME}
       - SYSADMIN_PASSWORD=${SYSADMIN_PASSWORD}
       - DATABASE_URL=${DATABASE_URL}
+      - TZ=${APP_TIMEZONE:-Asia/Ho_Chi_Minh}
       - VOICE_ATTENDANCE_SYNC_ENABLED=${VOICE_ATTENDANCE_SYNC_ENABLED:-true}
       - VOICE_ATTENDANCE_SYNC_INTERVAL_SECONDS=${VOICE_ATTENDANCE_SYNC_INTERVAL_SECONDS:-15}
       - SESSION_STATUS_SYNC_ENABLED=${SESSION_STATUS_SYNC_ENABLED:-true}
@@ -43,6 +44,9 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
       - PGDATA=/var/lib/postgresql/data/18/docker
+      - TZ=${APP_TIMEZONE:-Asia/Ho_Chi_Minh}
+      - PGTZ=${APP_TIMEZONE:-Asia/Ho_Chi_Minh}
+    command: postgres -c timezone=${APP_TIMEZONE:-Asia/Ho_Chi_Minh}
     ports:
       - "${POSTGRES_PORT}:${DB_PORT}"
     volumes:

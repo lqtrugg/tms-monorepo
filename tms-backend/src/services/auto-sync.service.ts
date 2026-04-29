@@ -13,6 +13,7 @@ import { fetchDiscordGuildMetadata } from './discord-api.service.js';
 
 let autoSyncTimer: NodeJS.Timeout | null = null;
 let isAutoSyncRunning = false;
+const CODEFORCES_STANDING_SYNC_INTERVAL_MS = 15 * 1000;
 
 async function fetchDiscordServerName(discordServerId: string, botToken: string): Promise<string | null> {
   try {
@@ -115,8 +116,7 @@ function shouldPullTopicStanding(topic: Topic, now: Date): boolean {
     return true;
   }
 
-  const intervalMs = Math.max(1, topic.pull_interval_minutes) * 60 * 1000;
-  return now.getTime() - topic.last_pulled_at.getTime() >= intervalMs;
+  return now.getTime() - topic.last_pulled_at.getTime() >= CODEFORCES_STANDING_SYNC_INTERVAL_MS;
 }
 
 async function syncTopicStanding(
@@ -329,7 +329,7 @@ export async function runAutoSyncOnce(options: {
 }
 
 export function startAutoSyncScheduler(options: {
-  intervalMinutes: number;
+  intervalSeconds: number;
   syncDiscord: boolean;
   syncCodeforces: boolean;
 }): void {
@@ -337,7 +337,7 @@ export function startAutoSyncScheduler(options: {
     return;
   }
 
-  const intervalMs = Math.max(1, options.intervalMinutes) * 60 * 1000;
+  const intervalMs = Math.max(1, options.intervalSeconds) * 1000;
   void runAutoSyncOnce({
     syncDiscord: options.syncDiscord,
     syncCodeforces: options.syncCodeforces,
@@ -354,7 +354,7 @@ export function startAutoSyncScheduler(options: {
     autoSyncTimer.unref();
   }
 
-  console.log(`[auto-sync] scheduler started (interval=${options.intervalMinutes}m)`);
+  console.log(`[auto-sync] scheduler started (interval=${options.intervalSeconds}s)`);
 }
 
 export function stopAutoSyncScheduler(): void {

@@ -66,6 +66,22 @@ function parseDateTime(value: unknown, fieldName: string): Date {
   return parsed;
 }
 
+function parseBoolean(value: unknown, fieldName: string): boolean {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (value === 'true') {
+    return true;
+  }
+
+  if (value === 'false') {
+    return false;
+  }
+
+  throw new StudentServiceError(`${fieldName} must be a boolean`, 400);
+}
+
 function parseNullableString(value: unknown, fieldName: string): string | null {
   if (value === undefined || value === null) {
     return null;
@@ -252,6 +268,7 @@ export function parseArchivePendingStudentInput(value: unknown): ArchivePendingS
 
   return {
     archived_at: body.archived_at === undefined ? new Date() : parseDateTime(body.archived_at, 'archived_at'),
+    settle_finance: body.settle_finance === undefined ? false : parseBoolean(body.settle_finance, 'settle_finance'),
   };
 }
 

@@ -52,7 +52,7 @@ async function main(): Promise<void> {
 
   if (config.autoSync.enabled) {
     startAutoSyncScheduler({
-      intervalMinutes: config.autoSync.intervalMinutes,
+      intervalSeconds: config.autoSync.intervalSeconds,
       syncDiscord: config.autoSync.syncDiscord,
       syncCodeforces: config.autoSync.syncCodeforces,
     });

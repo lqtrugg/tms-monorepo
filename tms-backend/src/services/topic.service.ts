@@ -123,6 +123,20 @@ export async function createTopic(teacherId: number, input: {
     const gymMetadata = await syncGymMetadata(parsedGymLink.toString(), codeforcesCredentials);
 
     const topicRepo = manager.getRepository(Topic);
+    const existing = await topicRepo.findOneBy({
+      teacher_id: teacherId,
+      class_id: input.class_id,
+      gym_id: gymMetadata.gym_id,
+    });
+
+    if (existing) {
+      existing.title = gymMetadata.title;
+      existing.gym_link = parsedGymLink.toString();
+      existing.closed_at = null;
+      existing.pull_interval_minutes = input.pull_interval_minutes ?? existing.pull_interval_minutes;
+      return topicRepo.save(existing);
+    }
+
     const topic = topicRepo.create({
       teacher_id: teacherId,
       class_id: input.class_id,

@@ -34,6 +34,9 @@ export class Session {
   @Column({ type: 'timestamptz' })
   scheduled_at!: Date;
 
+  @Column({ type: 'time', nullable: true })
+  end_time!: string | null;
+
   @Column({
     type: 'enum',
     enum: SessionStatus,

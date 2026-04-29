@@ -25,8 +25,9 @@ export function TopicStanding() {
   const [requestError, setRequestError] = useState("");
   const [matrix, setMatrix] = useState<BackendTopicStandingMatrix | null>(null);
   const [className, setClassName] = useState<string>("N/A");
+  const [autoSyncTick, setAutoSyncTick] = useState(15);
 
-  const loadData = async () => {
+  const loadData = async (showLoading = true) => {
     const topicId = Number(id);
     if (!Number.isInteger(topicId) || topicId <= 0) {
       setRequestError("ID chuyên đề không hợp lệ");
@@ -34,7 +35,9 @@ export function TopicStanding() {
       return;
     }
 
-    setLoading(true);
+    if (showLoading) {
+      setLoading(true);
+    }
     setRequestError("");
 
     try {
@@ -49,12 +52,30 @@ export function TopicStanding() {
     } catch (error) {
       setRequestError(toErrorMessage(error));
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     void loadData();
+  }, [id]);
+
+  useEffect(() => {
+    setAutoSyncTick(15);
+    const timer = window.setInterval(() => {
+      setAutoSyncTick((current) => {
+        if (current <= 1) {
+          void loadData(false);
+          return 15;
+        }
+
+        return current - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
   }, [id]);
 
   const lastPulled = useMemo(() => {
@@ -132,6 +153,7 @@ export function TopicStanding() {
       <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 mb-6">
         <p className="text-sm text-zinc-600">
           Cập nhật lần cuối: {lastPulled ? lastPulled.toLocaleString("vi-VN") : "Chưa có dữ liệu"}
+          <span className="ml-3 text-zinc-500">Tự sync sau {autoSyncTick}s</span>
         </p>
       </div>
 

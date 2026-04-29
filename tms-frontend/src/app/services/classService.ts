@@ -27,6 +27,7 @@ export interface BackendSession {
   teacher_id: number;
   class_id: number;
   scheduled_at: string;
+  end_time: string | null;
   status: BackendSessionStatus;
   is_manual: boolean;
   created_at: string;
@@ -199,6 +200,7 @@ export async function createManualSession(
   payload: {
     scheduled_date: string;
     start_time: string;
+    end_time: string;
   },
 ): Promise<BackendSession> {
   const data = await apiRequest<{ session: RawBackendSession }>(`/classes/${classId}/sessions/manual`, {

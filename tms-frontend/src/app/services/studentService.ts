@@ -165,10 +165,14 @@ export async function reinstateStudent(payload: {
   return data.student;
 }
 
-export async function archiveStudent(studentId: number): Promise<BackendStudentSummary> {
+export async function archiveStudent(studentId: number, options?: {
+  settle_finance?: boolean;
+}): Promise<BackendStudentSummary> {
   const data = await apiRequest<StudentResponse>(`/students/${studentId}/archive`, {
     method: "POST",
-    body: JSON.stringify({}),
+    body: JSON.stringify({
+      settle_finance: options?.settle_finance ?? false,
+    }),
   });
 
   return data.student;

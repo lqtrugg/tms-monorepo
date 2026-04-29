@@ -337,7 +337,7 @@ export function Students() {
     setRequestError("");
 
     try {
-      await archiveStudent(student.id);
+      await archiveStudent(student.id, { settle_finance: student.balance !== 0 });
       await loadData();
     } catch (error) {
       setRequestError(toErrorMessage(error));

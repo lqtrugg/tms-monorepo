@@ -263,6 +263,31 @@ export async function listFeeRecords(teacherId: number, filters: {
   return queryBuilder.orderBy('fee_record.created_at', 'DESC').getMany();
 }
 
+export async function updateFeeRecordStatus(
+  teacherId: number,
+  feeRecordId: number,
+  status: FeeRecordStatus,
+) {
+  const repo = AppDataSource.getRepository(FeeRecord);
+  const feeRecord = await repo.findOneBy({
+    id: feeRecordId,
+    teacher_id: teacherId,
+  });
+
+  if (!feeRecord) {
+    throw new ServiceError('fee record not found', 404);
+  }
+
+  if (feeRecord.status === status) {
+    return feeRecord;
+  }
+
+  feeRecord.status = status;
+  feeRecord.cancelled_at = status === FeeRecordStatus.Cancelled ? new Date() : null;
+
+  return repo.save(feeRecord);
+}
+
 export async function listStudentBalances(teacherId: number, filters: {
   status?: StudentStatus;
   include_pending_archive?: boolean;

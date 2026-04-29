@@ -5,7 +5,6 @@ import {
   DollarSign,
   Wallet,
   AlertCircle,
-  Users,
 } from "lucide-react";
 
 import { ApiError } from "../services/apiClient";
@@ -98,12 +97,18 @@ type DebtStudent = {
   pending_archive_reason: "needs_collection" | "needs_refund" | null;
 };
 
+type ReportStudentStatusFilter = "all" | "active" | "pending_archive" | "archived";
+type BalanceFilter = "all" | "debt" | "settled";
+
 export function Reports() {
   const presets = getDatePresets();
 
   const [startDate, setStartDate] = useState(presets[0].from);
   const [endDate, setEndDate] = useState(presets[0].to);
   const [selectedClassId, setSelectedClassId] = useState<string>("all");
+  const [includeUnpaid, setIncludeUnpaid] = useState(false);
+  const [studentStatusFilter, setStudentStatusFilter] = useState<ReportStudentStatusFilter>("all");
+  const [balanceFilter, setBalanceFilter] = useState<BalanceFilter>("all");
   const [classOptions, setClassOptions] = useState<ClassOption[]>([]);
   const [requestError, setRequestError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -140,15 +145,19 @@ export function Reports() {
           from: `${startDate}T00:00:00.000Z`,
           to: `${endDate}T23:59:59.999Z`,
           class_ids: classIds,
+          include_unpaid: includeUnpaid,
         }),
-        listStudentBalances({ include_pending_archive: true }),
+        listStudentBalances({
+          status: studentStatusFilter === "all" ? undefined : studentStatusFilter,
+          include_pending_archive: true,
+        }),
       ]);
 
       setSummary({
         totalPayments: parseAmount(incomeReport.summary.total_payments),
         totalFees: parseAmount(incomeReport.summary.total_active_fees),
         totalRefunds: parseAmount(incomeReport.summary.total_refunds),
-        netRevenue: parseAmount(incomeReport.summary.net_revenue),
+        netRevenue: parseAmount(includeUnpaid ? incomeReport.summary.projected_revenue : incomeReport.summary.net_revenue),
       });
 
       setAllBalances(
@@ -169,35 +178,34 @@ export function Reports() {
 
   useEffect(() => {
     void loadReport();
-  }, [startDate, endDate, selectedClassId]);
+  }, [startDate, endDate, selectedClassId, includeUnpaid, studentStatusFilter]);
 
-  const debtStudents = useMemo(
-    () => allBalances
-      .filter((item) => item.balance < 0)
-      .sort((a, b) => a.balance - b.balance),
-    [allBalances],
+  const filteredBalances = useMemo(
+    () => allBalances.filter((item) => {
+      if (balanceFilter === "debt") {
+        return item.balance < 0;
+      }
+
+      if (balanceFilter === "settled") {
+        return item.balance === 0;
+      }
+
+      return true;
+    }),
+    [allBalances, balanceFilter],
   );
 
-  const refundStudents = useMemo(
-    () => allBalances
-      .filter((item) => item.balance > 0)
-      .sort((a, b) => b.balance - a.balance),
-    [allBalances],
+  const debtStudents = useMemo(
+    () => filteredBalances
+      .filter((item) => item.balance < 0)
+      .sort((a, b) => a.balance - b.balance),
+    [filteredBalances],
   );
 
   const totalDebt = useMemo(
     () => debtStudents.reduce((sum, item) => sum + Math.abs(item.balance), 0),
     [debtStudents],
   );
-
-  const totalRefundable = useMemo(
-    () => refundStudents.reduce((sum, item) => sum + item.balance, 0),
-    [refundStudents],
-  );
-
-  const collectionRate = summary.totalFees > 0
-    ? Math.round((summary.totalPayments / summary.totalFees) * 100)
-    : 0;
 
   const handleExport = () => {
     downloadCsv(`bao-cao-${startDate}-${endDate}.csv`, [
@@ -209,19 +217,14 @@ export function Reports() {
       ["Tổng thu", summary.totalPayments],
       ["Học phí phát sinh", summary.totalFees],
       ["Hoàn trả", summary.totalRefunds],
-      ["Doanh thu ròng", summary.netRevenue],
-      ["Tỷ lệ thu", `${collectionRate}%`],
+      ["Tiền ra", summary.totalRefunds],
+      ["Lợi nhuận", summary.netRevenue],
       [],
       ["Tổng nợ chưa thu", totalDebt],
-      ["Tổng cần hoàn trả", totalRefundable],
       [],
       ["HỌC SINH NỢ"],
       ["Tên", "Trạng thái", "Số nợ (VNĐ)"],
       ...debtStudents.map((s) => [s.full_name, s.status, Math.abs(s.balance)]),
-      [],
-      ["HỌC SINH CẦN HOÀN TRẢ"],
-      ["Tên", "Trạng thái", "Số dư (VNĐ)"],
-      ...refundStudents.map((s) => [s.full_name, s.status, s.balance]),
     ]);
   };
 
@@ -289,7 +292,6 @@ export function Reports() {
             />
           </div>
 
-          {/* Class filter */}
           {classOptions.length > 0 && (
             <select
               value={selectedClassId}
@@ -302,43 +304,67 @@ export function Reports() {
               ))}
             </select>
           )}
+
+          <select
+            value={studentStatusFilter}
+            onChange={(e) => setStudentStatusFilter(e.target.value as ReportStudentStatusFilter)}
+            className="px-4 py-3 bg-zinc-100 border border-zinc-200 rounded-lg text-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+          >
+            <option value="all">Tất cả trạng thái học sinh</option>
+            <option value="active">Đang học</option>
+            <option value="pending_archive">Chờ xử lý</option>
+            <option value="archived">Đã archive</option>
+          </select>
+
+          <select
+            value={balanceFilter}
+            onChange={(e) => setBalanceFilter(e.target.value as BalanceFilter)}
+            className="px-4 py-3 bg-zinc-100 border border-zinc-200 rounded-lg text-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+          >
+            <option value="all">Tất cả số dư</option>
+            <option value="debt">Chỉ còn nợ</option>
+            <option value="settled">Đã cân bằng</option>
+          </select>
+
+          <label className="flex items-center gap-2 rounded-lg bg-zinc-100 px-4 py-3 text-sm text-zinc-700">
+            <input
+              type="checkbox"
+              checked={includeUnpaid}
+              onChange={(event) => setIncludeUnpaid(event.target.checked)}
+              className="h-4 w-4"
+            />
+            Bao gồm khoản chưa thu
+          </label>
         </div>
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <SummaryCard
           icon={TrendingUp}
           iconColor="bg-zinc-100 text-zinc-900"
-          label="Tổng thu"
+          label="Tiền vào"
           value={formatMoneyShort(summary.totalPayments)}
           detail={formatMoneyFull(summary.totalPayments)}
         />
         <SummaryCard
           icon={DollarSign}
           iconColor="bg-zinc-100 text-zinc-600"
-          label="Học phí phát sinh"
-          value={formatMoneyShort(summary.totalFees)}
-          detail={formatMoneyFull(summary.totalFees)}
+          label="Tiền ra"
+          value={formatMoneyShort(summary.totalRefunds)}
+          detail={formatMoneyFull(summary.totalRefunds)}
         />
         <SummaryCard
           icon={Wallet}
           iconColor="bg-zinc-100 text-zinc-900"
-          label="Doanh thu ròng"
+          label="Lợi nhuận"
           value={formatMoneyShort(summary.netRevenue)}
-          detail={formatMoneyFull(summary.netRevenue)}
-        />
-        <SummaryCard
-          icon={Users}
-          iconColor="bg-zinc-100 text-zinc-600"
-          label="Tỷ lệ thu"
-          value={`${collectionRate}%`}
-          detail={`${formatMoneyShort(summary.totalPayments)} / ${formatMoneyShort(summary.totalFees)}`}
+          detail={includeUnpaid ? `${formatMoneyFull(summary.netRevenue)} đã gồm khoản chưa thu` : formatMoneyFull(summary.netRevenue)}
         />
       </div>
 
       {/* Debt overview cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <div className="mb-6">
         <div className="bg-white border border-zinc-200 rounded-xl p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-zinc-100 rounded-lg flex items-center justify-center">
@@ -351,21 +377,6 @@ export function Reports() {
           </div>
           <div className="text-sm text-zinc-600">
             Tổng nợ: <span className="text-zinc-900 font-semibold">{formatMoneyFull(totalDebt)}</span>
-          </div>
-        </div>
-
-        <div className="bg-white border border-zinc-200 rounded-xl p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-zinc-100 rounded-lg flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-zinc-600" />
-            </div>
-            <div>
-              <p className="text-zinc-600 text-sm">Cần hoàn trả</p>
-              <p className="text-2xl font-semibold text-zinc-900">{refundStudents.length}</p>
-            </div>
-          </div>
-          <div className="text-sm text-zinc-600">
-            Tổng dư: <span className="text-zinc-600 font-semibold">{formatMoneyFull(totalRefundable)}</span>
           </div>
         </div>
       </div>
@@ -414,56 +425,12 @@ export function Reports() {
         </div>
       )}
 
-      {/* Refund table */}
-      {refundStudents.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-zinc-900 mb-4">Cần hoàn trả</h2>
-          <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-zinc-100 border-b border-zinc-200">
-                <tr>
-                  <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Học sinh</th>
-                  <th className="px-6 py-4 text-left text-sm font-medium text-zinc-600">Trạng thái</th>
-                  <th className="px-6 py-4 text-right text-sm font-medium text-zinc-600">Số dư</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {refundStudents.map((student) => (
-                  <tr key={student.student_id} className="hover:bg-zinc-100/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <p className="text-zinc-900 font-medium">{student.full_name}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <StudentStatusBadge status={student.status} />
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className="text-zinc-600 font-semibold">
-                        +{formatMoneyShort(student.balance)}
-                      </span>
-                      <p className="text-xs text-zinc-500">{formatMoneyFull(student.balance)}</p>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-zinc-50 border-t border-zinc-200">
-                <tr>
-                  <td colSpan={2} className="px-6 py-4 text-sm font-medium text-zinc-600">Tổng cộng</td>
-                  <td className="px-6 py-4 text-right text-zinc-600 font-semibold">
-                    {formatMoneyFull(totalRefundable)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-      )}
-
       {/* Empty state */}
-      {debtStudents.length === 0 && refundStudents.length === 0 && !loading && (
+      {debtStudents.length === 0 && !loading && (
         <div className="bg-white border border-zinc-200 rounded-xl p-12 text-center">
           <Wallet className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
-          <p className="text-zinc-900 font-medium mb-2">Không có khoản nợ hay hoàn trả</p>
-          <p className="text-zinc-600 text-sm">Tất cả học sinh đều có số dư bằng 0</p>
+          <p className="text-zinc-900 font-medium mb-2">Không có khoản nợ</p>
+          <p className="text-zinc-600 text-sm">Không có học sinh nào đang nợ học phí</p>
         </div>
       )}
     </div>

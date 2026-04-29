@@ -12,6 +12,7 @@ import {
   Student,
   StudentStatus,
   Transaction,
+  TransactionType,
 } from '../entities/index.js';
 import { StudentServiceError } from '../errors/student.error.js';
 import { toStudentSummary } from '../helpers/student.helpers.js';
@@ -647,7 +648,24 @@ export async function archivePendingStudent(
     ensurePendingArchiveStudent(student);
 
     const balanceSnapshot = await loadBalanceSnapshotForStudent(manager, teacherId, student.id);
-    const balanceAmount = parseAmountToBigInt(balanceSnapshot.balance);
+    let balanceAmount = parseAmountToBigInt(balanceSnapshot.balance);
+
+    if (balanceAmount !== 0n && input.settle_finance) {
+      const transactionRepo = manager.getRepository(Transaction);
+      const isCollectingDebt = balanceAmount < 0n;
+      const transaction = transactionRepo.create({
+        teacher_id: teacherId,
+        student_id: student.id,
+        amount: isCollectingDebt ? (balanceAmount * -1n).toString() : (balanceAmount * -1n).toString(),
+        type: isCollectingDebt ? TransactionType.Payment : TransactionType.Refund,
+        notes: isCollectingDebt ? 'Tự động ghi nhận khi đã thu nợ và archive học sinh' : 'Tự động ghi nhận khi đã hoàn trả và archive học sinh',
+        recorded_at: input.archived_at,
+      });
+      await transactionRepo.save(transaction);
+      balanceAmount = 0n;
+      balanceSnapshot.transactions_total = (parseAmountToBigInt(balanceSnapshot.transactions_total) + parseAmountToBigInt(transaction.amount)).toString();
+      balanceSnapshot.balance = '0';
+    }
 
     if (balanceAmount !== 0n) {
       throw new StudentServiceError('student balance must be zero before archive', 409);
@@ -822,4 +840,3 @@ async function handleDiscordTransfer(
     // Invite/DM failure is non-critical
   }
 }
-

@@ -6,6 +6,7 @@ import {
   ClassSchedule,
   ClassStatus,
   CodeforcesGroup,
+  DiscordServer,
   Enrollment,
   FeeRecord,
   FeeRecordStatus,
@@ -150,6 +151,7 @@ async function generateSessionsForSchedule(
         teacher_id: teacherId,
         class_id: schedule.class_id,
         scheduled_at: scheduledAt,
+        end_time: schedule.end_time,
         status: SessionStatus.Scheduled,
         is_manual: false,
       }),
@@ -163,6 +165,112 @@ async function generateSessionsForSchedule(
   }
 
   return sessionsToCreate.length;
+}
+
+function sessionMatchesSchedule(session: Session, schedule: ClassSchedule): boolean {
+  const scheduledTime = [
+    String(session.scheduled_at.getHours()).padStart(2, '0'),
+    String(session.scheduled_at.getMinutes()).padStart(2, '0'),
+    String(session.scheduled_at.getSeconds()).padStart(2, '0'),
+  ].join(':');
+
+  return session.scheduled_at.getDay() === schedule.day_of_week
+    && scheduledTime === schedule.start_time;
+}
+
+async function reconcileGeneratedSessionsForClass(
+  manager: EntityManager,
+  teacherId: number,
+  classId: number,
+): Promise<{ sessions_created: number; sessions_removed: number }> {
+  const schedules = await manager.getRepository(ClassSchedule).find({
+    where: {
+      teacher_id: teacherId,
+      class_id: classId,
+    },
+  });
+
+  const now = new Date();
+  const sessionRepo = manager.getRepository(Session);
+  const upcomingGeneratedSessions = await sessionRepo.find({
+    where: {
+      teacher_id: teacherId,
+      class_id: classId,
+      status: SessionStatus.Scheduled,
+      is_manual: false,
+      scheduled_at: MoreThanOrEqual(now),
+    },
+  });
+
+  const obsoleteSessions = upcomingGeneratedSessions.filter((session) => (
+    !schedules.some((schedule) => sessionMatchesSchedule(session, schedule))
+  ));
+  const scheduleBySessionId = new Map<number, ClassSchedule>();
+  upcomingGeneratedSessions.forEach((session) => {
+    const schedule = schedules.find((item) => sessionMatchesSchedule(session, item));
+    if (schedule) {
+      scheduleBySessionId.set(session.id, schedule);
+    }
+  });
+  const sessionsNeedingEndTimeUpdate = upcomingGeneratedSessions.filter((session) => {
+    const schedule = scheduleBySessionId.get(session.id);
+    return schedule && session.end_time !== schedule.end_time;
+  });
+
+  if (obsoleteSessions.length > 0) {
+    await sessionRepo.remove(obsoleteSessions);
+  }
+
+  if (sessionsNeedingEndTimeUpdate.length > 0) {
+    sessionsNeedingEndTimeUpdate.forEach((session) => {
+      const schedule = scheduleBySessionId.get(session.id);
+      session.end_time = schedule?.end_time ?? session.end_time;
+    });
+    await sessionRepo.save(sessionsNeedingEndTimeUpdate);
+  }
+
+  let sessionsCreated = 0;
+  for (const schedule of schedules) {
+    sessionsCreated += await generateSessionsForSchedule(manager, teacherId, schedule);
+  }
+
+  return {
+    sessions_created: sessionsCreated,
+    sessions_removed: obsoleteSessions.length,
+  };
+}
+
+export async function reconcileAllGeneratedClassSessions(): Promise<{
+  classes_reconciled: number;
+  sessions_created: number;
+  sessions_removed: number;
+}> {
+  return AppDataSource.transaction(async (manager) => {
+    const classes = await manager.getRepository(Class).find({
+      where: {
+        status: ClassStatus.Active,
+      },
+    });
+
+    let sessionsCreated = 0;
+    let sessionsRemoved = 0;
+
+    for (const classEntity of classes) {
+      const result = await reconcileGeneratedSessionsForClass(
+        manager,
+        classEntity.teacher_id,
+        classEntity.id,
+      );
+      sessionsCreated += result.sessions_created;
+      sessionsRemoved += result.sessions_removed;
+    }
+
+    return {
+      classes_reconciled: classes.length,
+      sessions_created: sessionsCreated,
+      sessions_removed: sessionsRemoved,
+    };
+  });
 }
 
 async function cancelFeeRecordsBySessionIds(
@@ -285,6 +393,20 @@ export async function archiveClass(teacherId: number, classId: number): Promise<
       );
     }
 
+    const linkedDiscordServerCount = await manager.getRepository(DiscordServer).count({
+      where: {
+        teacher_id: teacherId,
+        class_id: classId,
+      },
+    });
+
+    if (linkedDiscordServerCount > 0) {
+      throw new ClassServiceError(
+        'Không thể đóng lớp: lớp vẫn đang liên kết với Discord server',
+        409,
+      );
+    }
+
     const archivedAt = new Date();
 
     classEntity.status = ClassStatus.Archived;
@@ -357,7 +479,11 @@ export async function createClassSchedule(
     ensureScheduleTimeRange(schedule);
 
     const savedSchedule = await scheduleRepo.save(schedule);
-    const sessionsCreated = await generateSessionsForSchedule(manager, teacherId, savedSchedule);
+    const { sessions_created: sessionsCreated } = await reconcileGeneratedSessionsForClass(
+      manager,
+      teacherId,
+      classId,
+    );
 
     return {
       schedule: savedSchedule,
@@ -394,7 +520,11 @@ export async function updateClassSchedule(
     ensureScheduleTimeRange(schedule);
 
     const savedSchedule = await scheduleRepo.save(schedule);
-    const sessionsCreated = await generateSessionsForSchedule(manager, teacherId, savedSchedule);
+    const { sessions_created: sessionsCreated } = await reconcileGeneratedSessionsForClass(
+      manager,
+      teacherId,
+      classId,
+    );
 
     return {
       schedule: savedSchedule,
@@ -410,6 +540,7 @@ export async function deleteClassSchedule(teacherId: number, classId: number, sc
 
     const schedule = await requireOwnedSchedule(manager, teacherId, classId, scheduleId);
     await manager.getRepository(ClassSchedule).remove(schedule);
+    await reconcileGeneratedSessionsForClass(manager, teacherId, classId);
   });
 }
 
@@ -482,6 +613,7 @@ export async function createManualSession(
       teacher_id: teacherId,
       class_id: classId,
       scheduled_at: input.scheduled_at,
+      end_time: input.end_time,
       status: SessionStatus.Scheduled,
       is_manual: true,
     });

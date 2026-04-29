@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { DollarSign, Pencil, Plus, Search, TrendingUp } from "lucide-react";
+import { Pencil, Plus, Search } from "lucide-react";
 
 import { ApiError } from "../services/apiClient";
 import {
@@ -136,20 +136,6 @@ export function Transactions() {
     [rows, searchTerm, filterType],
   );
 
-  const totalPayments = useMemo(
-    () => rows
-      .filter((row) => row.type === "payment")
-      .reduce((sum, row) => sum + row.amount, 0),
-    [rows],
-  );
-
-  const totalFees = useMemo(
-    () => rows
-      .filter((row) => row.type === "fee")
-      .reduce((sum, row) => sum + Math.abs(row.amount), 0),
-    [rows],
-  );
-
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
@@ -171,32 +157,6 @@ export function Transactions() {
           {requestError}
         </div>
       )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white border border-zinc-200 rounded-xl p-6">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-zinc-100 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-zinc-900" />
-            </div>
-            <span className="text-zinc-600">Tổng thu</span>
-          </div>
-          <p className="text-3xl font-semibold text-zinc-900">
-            {(totalPayments / 1_000_000).toFixed(1)}M
-          </p>
-        </div>
-
-        <div className="bg-white border border-zinc-200 rounded-xl p-6">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-zinc-100 rounded-lg flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-zinc-300" />
-            </div>
-            <span className="text-zinc-600">Tổng học phí</span>
-          </div>
-          <p className="text-3xl font-semibold text-zinc-900">
-            {(totalFees / 1_000_000).toFixed(1)}M
-          </p>
-        </div>
-      </div>
 
       <div className="bg-white border border-zinc-200 rounded-xl p-6 mb-6">
         <div className="flex flex-col md:flex-row gap-4">

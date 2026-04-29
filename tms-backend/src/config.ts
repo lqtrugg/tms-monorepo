@@ -55,7 +55,12 @@ const config = {
   },
   autoSync: {
     enabled: parseBoolean(process.env.AUTO_SYNC_ENABLED, true),
-    intervalMinutes: parsePositiveInteger(process.env.AUTO_SYNC_INTERVAL_MINUTES, 30),
+    intervalSeconds: parsePositiveInteger(
+      process.env.AUTO_SYNC_INTERVAL_SECONDS,
+      process.env.AUTO_SYNC_INTERVAL_MINUTES === undefined
+        ? 15
+        : parsePositiveInteger(process.env.AUTO_SYNC_INTERVAL_MINUTES, 30) * 60,
+    ),
     syncDiscord: parseBoolean(process.env.AUTO_SYNC_DISCORD_ENABLED, true),
     syncCodeforces: parseBoolean(process.env.AUTO_SYNC_CODEFORCES_ENABLED, true),
   },

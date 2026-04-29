@@ -35,6 +35,7 @@ export type SessionListFilters = {
 
 export type CreateManualSessionInput = {
   scheduled_at: Date;
+  end_time: string;
 };
 
 export type UpsertCodeforcesGroupInput = {
