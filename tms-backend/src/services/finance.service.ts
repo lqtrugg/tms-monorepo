@@ -8,6 +8,7 @@ import {
   Student,
   StudentStatus,
   Transaction,
+  TransactionAuditLog,
   TransactionType,
 } from '../entities/index.js';
 import { ServiceError } from '../errors/service.error.js';
@@ -94,6 +95,8 @@ export async function listTransactions(teacherId: number, filters: {
   type?: TransactionType;
   from?: Date;
   to?: Date;
+  limit?: number;
+  offset?: number;
 }) {
   toDateRange(filters.from, filters.to);
 
@@ -130,7 +133,25 @@ export async function listTransactions(teacherId: number, filters: {
     queryBuilder.andWhere('transaction.recorded_at <= :to', { to: filters.to });
   }
 
-  return queryBuilder.orderBy('transaction.recorded_at', 'DESC').getMany();
+  queryBuilder
+    .orderBy('transaction.recorded_at', 'DESC')
+    .addOrderBy('transaction.id', 'DESC');
+
+  if (filters.limit !== undefined) {
+    queryBuilder.take(filters.limit);
+  }
+
+  if (filters.offset !== undefined) {
+    queryBuilder.skip(filters.offset);
+  }
+
+  const [items, total] = await queryBuilder.getManyAndCount();
+  return {
+    items,
+    total,
+    limit: filters.limit ?? null,
+    offset: filters.offset ?? 0,
+  };
 }
 
 export async function createTransaction(teacherId: number, input: {
@@ -182,6 +203,7 @@ export async function updateTransaction(teacherId: number, transactionId: number
   type: TransactionType;
   notes?: string | null;
   recorded_at?: Date;
+  update_reason?: string | null;
 }) {
   const transactionRepository = AppDataSource.getRepository(Transaction);
   const transaction = await transactionRepository.findOneBy({
@@ -210,14 +232,44 @@ export async function updateTransaction(teacherId: number, transactionId: number
     exclude_transaction_id: transactionId,
   });
 
-  transaction.student_id = input.student_id;
-  transaction.amount = amount.toString();
-  transaction.type = input.type;
-  transaction.notes = input.notes ?? null;
-  transaction.recorded_at = input.recorded_at ?? transaction.recorded_at;
+  const oldSnapshot = {
+    student_id: transaction.student_id,
+    amount: transaction.amount,
+    type: transaction.type,
+    notes: transaction.notes,
+    recorded_at: transaction.recorded_at,
+  };
+
+  const nextRecordedAt = input.recorded_at ?? transaction.recorded_at;
 
   try {
-    return await transactionRepository.save(transaction);
+    return await AppDataSource.transaction(async (manager) => {
+      transaction.student_id = input.student_id;
+      transaction.amount = amount.toString();
+      transaction.type = input.type;
+      transaction.notes = input.notes ?? null;
+      transaction.recorded_at = nextRecordedAt;
+
+      const saved = await manager.getRepository(Transaction).save(transaction);
+      const auditLog = manager.getRepository(TransactionAuditLog).create({
+        teacher_id: teacherId,
+        transaction_id: transactionId,
+        old_student_id: oldSnapshot.student_id,
+        new_student_id: saved.student_id,
+        old_amount: oldSnapshot.amount,
+        new_amount: saved.amount,
+        old_type: oldSnapshot.type,
+        new_type: saved.type,
+        old_recorded_at: oldSnapshot.recorded_at,
+        new_recorded_at: saved.recorded_at,
+        old_notes: oldSnapshot.notes,
+        new_notes: saved.notes,
+        reason: input.update_reason ?? null,
+      });
+      await manager.getRepository(TransactionAuditLog).save(auditLog);
+
+      return saved;
+    });
   } catch (error) {
     if (isRefundBalanceConstraintError(error)) {
       throw new ServiceError('Tổng số tiền hoàn trả không được lớn hơn tổng số tiền đã nhận', 400);
@@ -233,6 +285,8 @@ export async function listFeeRecords(teacherId: number, filters: {
   status?: FeeRecordStatus;
   from?: Date;
   to?: Date;
+  limit?: number;
+  offset?: number;
 }) {
   toDateRange(filters.from, filters.to);
 
@@ -260,7 +314,47 @@ export async function listFeeRecords(teacherId: number, filters: {
     queryBuilder.andWhere('fee_record.created_at <= :to', { to: filters.to });
   }
 
-  return queryBuilder.orderBy('fee_record.created_at', 'DESC').getMany();
+  queryBuilder
+    .orderBy('fee_record.created_at', 'DESC')
+    .addOrderBy('fee_record.id', 'DESC');
+
+  if (filters.limit !== undefined) {
+    queryBuilder.take(filters.limit);
+  }
+
+  if (filters.offset !== undefined) {
+    queryBuilder.skip(filters.offset);
+  }
+
+  const [items, total] = await queryBuilder.getManyAndCount();
+  return {
+    items,
+    total,
+    limit: filters.limit ?? null,
+    offset: filters.offset ?? 0,
+  };
+}
+
+export async function listTransactionAuditLogs(teacherId: number, transactionId: number) {
+  const transaction = await AppDataSource.getRepository(Transaction).findOneBy({
+    id: transactionId,
+    teacher_id: teacherId,
+  });
+
+  if (!transaction) {
+    throw new ServiceError('transaction not found', 404);
+  }
+
+  return AppDataSource.getRepository(TransactionAuditLog).find({
+    where: {
+      teacher_id: teacherId,
+      transaction_id: transactionId,
+    },
+    order: {
+      created_at: 'DESC',
+      id: 'DESC',
+    },
+  });
 }
 
 export async function updateFeeRecordStatus(

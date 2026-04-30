@@ -171,6 +171,8 @@ export function StudentDetail() {
   }
 
   const studentBalance = parseAmount(student.balance);
+  const transactionsTotal = parseAmount(student.transactions_total);
+  const activeFeeTotal = parseAmount(student.active_fee_total);
 
   return (
     <div className="p-8">
@@ -194,13 +196,33 @@ export function StudentDetail() {
           {statusBadge}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           <div className="bg-zinc-50 rounded-lg p-4 border border-zinc-200">
             <div className="flex items-center gap-2 mb-2">
               <GraduationCap className="w-5 h-5 text-zinc-600" />
               <span className="text-sm text-zinc-600">Lớp học</span>
             </div>
             <p className="text-lg font-semibold text-zinc-900">{className}</p>
+          </div>
+
+          <div className="bg-zinc-50 rounded-lg p-4 border border-zinc-200">
+            <div className="flex items-center gap-2 mb-2">
+              <DollarSign className="w-5 h-5 text-zinc-600" />
+              <span className="text-sm text-zinc-600">Đã đóng</span>
+            </div>
+            <p className="text-lg font-semibold text-zinc-900">
+              {(Math.abs(transactionsTotal) / 1000).toFixed(0)}K
+            </p>
+          </div>
+
+          <div className="bg-zinc-50 rounded-lg p-4 border border-zinc-200">
+            <div className="flex items-center gap-2 mb-2">
+              <Receipt className="w-5 h-5 text-zinc-600" />
+              <span className="text-sm text-zinc-600">Học phí</span>
+            </div>
+            <p className="text-lg font-semibold text-zinc-900">
+              {(Math.abs(activeFeeTotal) / 1000).toFixed(0)}K
+            </p>
           </div>
 
           <div className="bg-zinc-50 rounded-lg p-4 border border-zinc-200">

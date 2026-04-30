@@ -1,4 +1,4 @@
-import { Check, Column, Entity, ForeignKey, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { Check, Column, Entity, ForeignKey, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 
 import { TransactionType } from './enums.js';
 import { Student } from './student.entity.js';
@@ -43,4 +43,7 @@ export class Transaction {
 
   @Column({ type: 'text', nullable: true })
   notes!: string | null;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  updated_at!: Date;
 }

@@ -25,28 +25,48 @@ export async function installDatabaseIntegrityRules(dataSource: DataSource): Pro
     CREATE OR REPLACE FUNCTION enforce_transaction_refund_balance()
     RETURNS trigger AS $$
     DECLARE
-      affected_teacher_id integer;
-      affected_student_id integer;
       total_payments numeric;
       total_refunds numeric;
     BEGIN
-      affected_teacher_id := COALESCE(NEW.teacher_id, OLD.teacher_id);
-      affected_student_id := COALESCE(NEW.student_id, OLD.student_id);
+      IF TG_OP IN ('INSERT', 'UPDATE') THEN
+        PERFORM pg_advisory_xact_lock(NEW.teacher_id, NEW.student_id);
 
-      PERFORM pg_advisory_xact_lock(affected_teacher_id, affected_student_id);
+        SELECT
+          COALESCE(SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END), 0),
+          COALESCE(SUM(CASE WHEN type = 'refund' THEN ABS(amount) ELSE 0 END), 0)
+        INTO total_payments, total_refunds
+        FROM transactions
+        WHERE teacher_id = NEW.teacher_id
+          AND student_id = NEW.student_id;
 
-      SELECT
-        COALESCE(SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END), 0),
-        COALESCE(SUM(CASE WHEN type = 'refund' THEN ABS(amount) ELSE 0 END), 0)
-      INTO total_payments, total_refunds
-      FROM transactions
-      WHERE teacher_id = affected_teacher_id
-        AND student_id = affected_student_id;
+        IF total_refunds > total_payments THEN
+          RAISE EXCEPTION 'Tổng số tiền hoàn trả không được lớn hơn tổng số tiền đã nhận'
+            USING ERRCODE = '23514',
+              CONSTRAINT = 'chk_transactions_refund_not_over_payment';
+        END IF;
+      END IF;
 
-      IF total_refunds > total_payments THEN
-        RAISE EXCEPTION 'Tổng số tiền hoàn trả không được lớn hơn tổng số tiền đã nhận'
-          USING ERRCODE = '23514',
-            CONSTRAINT = 'chk_transactions_refund_not_over_payment';
+      IF TG_OP = 'DELETE'
+        OR (
+          TG_OP = 'UPDATE'
+          AND (OLD.teacher_id <> NEW.teacher_id OR OLD.student_id <> NEW.student_id)
+        )
+      THEN
+        PERFORM pg_advisory_xact_lock(OLD.teacher_id, OLD.student_id);
+
+        SELECT
+          COALESCE(SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END), 0),
+          COALESCE(SUM(CASE WHEN type = 'refund' THEN ABS(amount) ELSE 0 END), 0)
+        INTO total_payments, total_refunds
+        FROM transactions
+        WHERE teacher_id = OLD.teacher_id
+          AND student_id = OLD.student_id;
+
+        IF total_refunds > total_payments THEN
+          RAISE EXCEPTION 'Tổng số tiền hoàn trả không được lớn hơn tổng số tiền đã nhận'
+            USING ERRCODE = '23514',
+              CONSTRAINT = 'chk_transactions_refund_not_over_payment';
+        END IF;
       END IF;
 
       IF TG_OP = 'DELETE' THEN

@@ -16,6 +16,7 @@ import {
   createTransaction,
   getFinanceSummary,
   listFeeRecords,
+  listTransactionAuditLogs,
   listStudentBalances,
   listTransactions,
   updateFeeRecordStatus,
@@ -81,18 +82,53 @@ function parseFeeRecordStatus(value: unknown): FeeRecordStatus | undefined {
   return value;
 }
 
+function parseOptionalLimit(value: unknown, fieldName: string): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const limit = parsePositiveInteger(value, fieldName);
+  if (limit > 200) {
+    throw new ServiceError(`${fieldName} must be less than or equal to 200`, 400);
+  }
+
+  return limit;
+}
+
+function parseOptionalOffset(value: unknown, fieldName: string): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const offset = typeof value === 'string' ? Number(value.trim()) : value;
+  if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0) {
+    throw new ServiceError(`${fieldName} must be a non-negative integer`, 400);
+  }
+
+  return offset;
+}
+
 financeRouter.get('/finance/transactions', async (req, res, next) => {
   try {
     const teacherId = getTeacherId(req);
     const query = asRecord(req.query, 'query');
-    const transactions = await listTransactions(teacherId, {
+    const result = await listTransactions(teacherId, {
       student_id: query.student_id === undefined ? undefined : parsePositiveInteger(query.student_id, 'student_id'),
       type: parseTransactionType(query.type),
       from: query.from === undefined ? undefined : parseDateTime(query.from, 'from'),
       to: query.to === undefined ? undefined : parseDateTime(query.to, 'to'),
+      limit: parseOptionalLimit(query.limit, 'limit'),
+      offset: parseOptionalOffset(query.offset, 'offset'),
     });
 
-    res.json({ transactions });
+    res.json({
+      transactions: result.items,
+      pagination: {
+        total: result.total,
+        limit: result.limit,
+        offset: result.offset,
+      },
+    });
   } catch (error) {
     next(error);
   }
@@ -139,6 +175,7 @@ financeRouter.patch('/finance/transactions/:id', async (req, res, next) => {
       type,
       notes: parseOptionalString(body.notes, 'notes') ?? null,
       recorded_at: body.recorded_at === undefined ? undefined : parseDateTime(body.recorded_at, 'recorded_at'),
+      update_reason: parseOptionalString(body.update_reason, 'update_reason') ?? null,
     });
 
     res.json({ transaction });
@@ -151,15 +188,36 @@ financeRouter.get('/finance/fee-records', async (req, res, next) => {
   try {
     const teacherId = getTeacherId(req);
     const query = asRecord(req.query, 'query');
-    const feeRecords = await listFeeRecords(teacherId, {
+    const result = await listFeeRecords(teacherId, {
       student_id: query.student_id === undefined ? undefined : parsePositiveInteger(query.student_id, 'student_id'),
       session_id: query.session_id === undefined ? undefined : parsePositiveInteger(query.session_id, 'session_id'),
       status: parseFeeRecordStatus(query.status),
       from: query.from === undefined ? undefined : parseDateTime(query.from, 'from'),
       to: query.to === undefined ? undefined : parseDateTime(query.to, 'to'),
+      limit: parseOptionalLimit(query.limit, 'limit'),
+      offset: parseOptionalOffset(query.offset, 'offset'),
     });
 
-    res.json({ fee_records: feeRecords });
+    res.json({
+      fee_records: result.items,
+      pagination: {
+        total: result.total,
+        limit: result.limit,
+        offset: result.offset,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+financeRouter.get('/finance/transactions/:id/audit-logs', async (req, res, next) => {
+  try {
+    const teacherId = getTeacherId(req);
+    const transactionId = parsePositiveInteger(req.params.id, 'id');
+    const auditLogs = await listTransactionAuditLogs(teacherId, transactionId);
+
+    res.json({ audit_logs: auditLogs });
   } catch (error) {
     next(error);
   }

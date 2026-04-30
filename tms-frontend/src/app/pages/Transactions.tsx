@@ -67,8 +67,8 @@ export function Transactions() {
     try {
       const [studentList, transactionList, feeRecords] = await Promise.all([
         listStudents(),
-        listTransactions(),
-        listFeeRecords({ status: "active" }),
+        listTransactions({ limit: 200 }),
+        listFeeRecords({ status: "active", limit: 200 }),
       ]);
 
       const studentNameById = new Map<number, string>();
@@ -331,6 +331,7 @@ function TransactionModal({
     type: BackendTransactionType;
     notes: string | null;
     recorded_at: string;
+    update_reason?: string | null;
   }) => Promise<void>;
 }) {
   const initialType = initialTransaction?.type === "refund" ? "refund" : "payment";
@@ -341,6 +342,7 @@ function TransactionModal({
   const [recordedAt, setRecordedAt] = useState(
     initialTransaction ? new Date(initialTransaction.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
   );
+  const [updateReason, setUpdateReason] = useState("");
   const [localError, setLocalError] = useState("");
   const [studentSearch, setStudentSearch] = useState(initialTransaction?.studentName ?? "");
 
@@ -369,12 +371,18 @@ function TransactionModal({
       return;
     }
 
+    if (mode === "edit" && updateReason.trim().length === 0) {
+      setLocalError("Vui lòng nhập lý do sửa giao dịch");
+      return;
+    }
+
     await onSubmit({
       student_id: parsedStudentId,
       amount: type === "refund" ? String(parsedAmount * -1) : String(parsedAmount),
       type,
       notes: notes.trim() || null,
       recorded_at: `${recordedAt}T00:00:00.000Z`,
+      update_reason: mode === "edit" ? updateReason.trim() : undefined,
     });
   };
 
@@ -477,6 +485,18 @@ function TransactionModal({
               className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
             />
           </div>
+
+          {mode === "edit" && (
+            <div>
+              <label className="block text-sm text-zinc-600 mb-2">Lý do sửa</label>
+              <textarea
+                value={updateReason}
+                onChange={(event) => setUpdateReason(event.target.value)}
+                className="min-h-20 w-full px-4 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                placeholder="Ví dụ: sửa nhầm số tiền / chọn nhầm học sinh"
+              />
+            </div>
+          )}
 
           {localError && <p className="text-sm text-red-600">{localError}</p>}
 
