@@ -24,7 +24,7 @@ import { Teacher } from './teacher.entity.js';
 @Index('idx_attendance_student_id', ['student_id'])
 @Check(
   'chk_attendance_override',
-  "(source = 'manual' AND overridden_at IS NOT NULL) OR (source = 'bot' AND overridden_at IS NULL)",
+  "(source = 'manual' AND overridden_at IS NOT NULL) OR (source IN ('bot', 'system') AND overridden_at IS NULL)",
 )
 export class Attendance {
   @PrimaryGeneratedColumn()
@@ -50,7 +50,7 @@ export class Attendance {
     type: 'enum',
     enum: AttendanceSource,
     enumName: 'attendance_source',
-    default: AttendanceSource.Bot,
+    default: AttendanceSource.System,
   })
   source!: AttendanceSource;
 

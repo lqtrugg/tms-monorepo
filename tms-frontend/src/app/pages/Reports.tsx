@@ -98,7 +98,6 @@ type DebtStudent = {
 };
 
 type ReportStudentStatusFilter = "all" | "active" | "pending_archive" | "archived";
-type BalanceFilter = "all" | "debt" | "settled";
 
 export function Reports() {
   const presets = getDatePresets();
@@ -108,7 +107,6 @@ export function Reports() {
   const [selectedClassId, setSelectedClassId] = useState<string>("all");
   const [includeUnpaid, setIncludeUnpaid] = useState(false);
   const [studentStatusFilter, setStudentStatusFilter] = useState<ReportStudentStatusFilter>("all");
-  const [balanceFilter, setBalanceFilter] = useState<BalanceFilter>("all");
   const [classOptions, setClassOptions] = useState<ClassOption[]>([]);
   const [requestError, setRequestError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -180,26 +178,11 @@ export function Reports() {
     void loadReport();
   }, [startDate, endDate, selectedClassId, includeUnpaid, studentStatusFilter]);
 
-  const filteredBalances = useMemo(
-    () => allBalances.filter((item) => {
-      if (balanceFilter === "debt") {
-        return item.balance < 0;
-      }
-
-      if (balanceFilter === "settled") {
-        return item.balance === 0;
-      }
-
-      return true;
-    }),
-    [allBalances, balanceFilter],
-  );
-
   const debtStudents = useMemo(
-    () => filteredBalances
+    () => allBalances
       .filter((item) => item.balance < 0)
       .sort((a, b) => a.balance - b.balance),
-    [filteredBalances],
+    [allBalances],
   );
 
   const totalDebt = useMemo(
@@ -314,16 +297,6 @@ export function Reports() {
             <option value="active">Đang học</option>
             <option value="pending_archive">Chờ xử lý</option>
             <option value="archived">Đã archive</option>
-          </select>
-
-          <select
-            value={balanceFilter}
-            onChange={(e) => setBalanceFilter(e.target.value as BalanceFilter)}
-            className="px-4 py-3 bg-zinc-100 border border-zinc-200 rounded-lg text-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
-          >
-            <option value="all">Tất cả số dư</option>
-            <option value="debt">Chỉ còn nợ</option>
-            <option value="settled">Đã cân bằng</option>
           </select>
 
           <label className="flex items-center gap-2 rounded-lg bg-zinc-100 px-4 py-3 text-sm text-zinc-700">

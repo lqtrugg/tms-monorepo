@@ -1,6 +1,7 @@
 export enum AttendanceSource {
   Bot = 'bot',
   Manual = 'manual',
+  System = 'system',
 }
 
 export enum AttendanceStatus {

@@ -4,7 +4,7 @@ import passport from 'passport';
 import { AttendanceStatus, Teacher, TeacherRole } from '../entities/index.js';
 import { ServiceError } from '../errors/service.error.js';
 import { asRecord, parseOptionalString, parsePositiveInteger } from '../helpers/service.helpers.js';
-import { requireRoles } from '../middlewares/rbac.middleware.js';
+import { requireRoles } from '../services/auth.rbac.js';
 import {
   listAttendanceRecords,
   listSessionAttendance,
@@ -50,6 +50,10 @@ function parseAttendanceStatus(value: unknown): AttendanceStatus | undefined {
 function parseAttendanceNotes(body: Record<string, unknown>): string | null | undefined {
   if (!Object.prototype.hasOwnProperty.call(body, 'notes')) {
     return undefined;
+  }
+
+  if (body.notes === null) {
+    return null;
   }
 
   return parseOptionalString(body.notes, 'notes') ?? null;

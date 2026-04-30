@@ -203,7 +203,7 @@ export function Sessions() {
         </div>
       )}
 
-      <div className="bg-white border border-zinc-200 rounded-xl p-4 mb-6">
+      <div className="mb-6">
         <div className="flex gap-2">
           {(['all', 'scheduled', 'in_progress', 'completed', 'cancelled'] as const).map((status) => (
             <button

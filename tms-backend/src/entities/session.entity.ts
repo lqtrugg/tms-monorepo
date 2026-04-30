@@ -21,6 +21,7 @@ import { Teacher } from './teacher.entity.js';
   'chk_sessions_cancelled',
   "(status = 'cancelled' AND cancelled_at IS NOT NULL) OR (status <> 'cancelled' AND cancelled_at IS NULL)",
 )
+@Check('chk_sessions_time_range', 'end_time IS NULL OR end_time > scheduled_at::time')
 export class Session {
   @PrimaryGeneratedColumn()
   id!: number;

@@ -119,6 +119,10 @@ function sourceText(source: BackendAttendanceSource | null): string {
     return "Bot";
   }
 
+  if (source === "system") {
+    return "Hệ thống";
+  }
+
   return "-";
 }
 

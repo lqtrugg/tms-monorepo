@@ -1,6 +1,25 @@
 import type { DataSource } from 'typeorm';
 
 export async function installDatabaseIntegrityRules(dataSource: DataSource): Promise<void> {
+  await dataSource.query(`
+    ALTER TABLE attendance
+    DROP CONSTRAINT IF EXISTS chk_attendance_override
+  `);
+
+  await dataSource.query(`
+    ALTER TABLE attendance
+    ADD CONSTRAINT chk_attendance_override
+    CHECK (
+      (source = 'manual' AND overridden_at IS NOT NULL)
+      OR (source IN ('bot', 'system') AND overridden_at IS NULL)
+    )
+  `);
+
+  await dataSource.query(`
+    ALTER TABLE attendance
+    ALTER COLUMN source SET DEFAULT 'system'::attendance_source
+  `);
+
   // ── R7: Refund balance — total refunds must not exceed total payments per (teacher, student) ──
   await dataSource.query(`
     CREATE OR REPLACE FUNCTION enforce_transaction_refund_balance()
@@ -192,6 +211,109 @@ export async function installDatabaseIntegrityRules(dataSource: DataSource): Pro
     DEFERRABLE INITIALLY IMMEDIATE
     FOR EACH ROW
     EXECUTE FUNCTION enforce_no_schedule_on_archived_class();
+  `);
+
+  // ── R13: Class schedules for active classes cannot overlap per teacher/day.
+  // Uses [start_time, end_time), so touching boundaries are allowed.
+  await dataSource.query(`
+    CREATE OR REPLACE FUNCTION enforce_class_schedule_no_overlap()
+    RETURNS trigger AS $$
+    DECLARE
+      overlapping_class_name text;
+    BEGIN
+      PERFORM pg_advisory_xact_lock(NEW.teacher_id, NEW.day_of_week);
+
+      SELECT class.name INTO overlapping_class_name
+      FROM class_schedules AS schedule
+      INNER JOIN classes AS class
+        ON class.id = schedule.class_id
+      WHERE schedule.teacher_id = NEW.teacher_id
+        AND schedule.day_of_week = NEW.day_of_week
+        AND schedule.id <> NEW.id
+        AND class.status = 'active'::class_status
+        AND schedule.start_time < NEW.end_time
+        AND NEW.start_time < schedule.end_time
+      LIMIT 1;
+
+      IF overlapping_class_name IS NOT NULL THEN
+        RAISE EXCEPTION 'Lịch học bị trùng với lớp %', overlapping_class_name
+          USING ERRCODE = '23514',
+            CONSTRAINT = 'chk_class_schedules_no_overlap';
+      END IF;
+
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+  `);
+
+  await dataSource.query('DROP TRIGGER IF EXISTS trg_class_schedule_no_overlap ON class_schedules');
+
+  await dataSource.query(`
+    CREATE CONSTRAINT TRIGGER trg_class_schedule_no_overlap
+    AFTER INSERT OR UPDATE ON class_schedules
+    DEFERRABLE INITIALLY IMMEDIATE
+    FOR EACH ROW
+    EXECUTE FUNCTION enforce_class_schedule_no_overlap();
+  `);
+
+  // ── R14: Non-cancelled sessions cannot overlap per teacher/date.
+  // Uses [scheduled_at, end_at), so touching boundaries are allowed.
+  await dataSource.query(`
+    CREATE OR REPLACE FUNCTION enforce_session_no_overlap()
+    RETURNS trigger AS $$
+    DECLARE
+      overlapping_class_name text;
+    BEGIN
+      IF NEW.status = 'cancelled'::session_status THEN
+        RETURN NEW;
+      END IF;
+
+      IF NEW.end_time IS NULL THEN
+        RAISE EXCEPTION 'Buổi học chưa huỷ phải có giờ kết thúc'
+          USING ERRCODE = '23514',
+            CONSTRAINT = 'chk_sessions_end_time_required';
+      END IF;
+
+      IF NEW.end_time <= NEW.scheduled_at::time THEN
+        RAISE EXCEPTION 'Giờ kết thúc buổi học phải lớn hơn giờ bắt đầu'
+          USING ERRCODE = '23514',
+            CONSTRAINT = 'chk_sessions_time_range';
+      END IF;
+
+      PERFORM pg_advisory_xact_lock(NEW.teacher_id, hashtext((NEW.scheduled_at::date)::text));
+
+      SELECT class.name INTO overlapping_class_name
+      FROM sessions AS session
+      INNER JOIN classes AS class
+        ON class.id = session.class_id
+      WHERE session.teacher_id = NEW.teacher_id
+        AND session.id <> NEW.id
+        AND session.status <> 'cancelled'::session_status
+        AND session.end_time IS NOT NULL
+        AND session.scheduled_at::date = NEW.scheduled_at::date
+        AND session.scheduled_at < (NEW.scheduled_at::date + NEW.end_time)::timestamptz
+        AND NEW.scheduled_at < (session.scheduled_at::date + session.end_time)::timestamptz
+      LIMIT 1;
+
+      IF overlapping_class_name IS NOT NULL THEN
+        RAISE EXCEPTION 'Buổi học bị trùng với lớp %', overlapping_class_name
+          USING ERRCODE = '23514',
+            CONSTRAINT = 'chk_sessions_no_overlap';
+      END IF;
+
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+  `);
+
+  await dataSource.query('DROP TRIGGER IF EXISTS trg_session_no_overlap ON sessions');
+
+  await dataSource.query(`
+    CREATE CONSTRAINT TRIGGER trg_session_no_overlap
+    AFTER INSERT OR UPDATE OF teacher_id, class_id, scheduled_at, end_time, status ON sessions
+    DEFERRABLE INITIALLY IMMEDIATE
+    FOR EACH ROW
+    EXECUTE FUNCTION enforce_session_no_overlap();
   `);
 
   // ── R4: Fee records must be cancelled when their session is cancelled ──

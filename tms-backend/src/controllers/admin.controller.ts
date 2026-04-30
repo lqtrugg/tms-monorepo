@@ -4,7 +4,7 @@ import passport from 'passport';
 import { Teacher, TeacherRole } from '../entities/index.js';
 import { ServiceError } from '../errors/service.error.js';
 import { parsePositiveInteger } from '../helpers/service.helpers.js';
-import { requireRoles } from '../middlewares/rbac.middleware.js';
+import { requireRoles } from '../services/auth.rbac.js';
 import { createTeacherByAdmin, listTeachersForAdmin, updateTeacherByAdmin } from '../services/admin.service.js';
 
 export const adminRouter = Router();

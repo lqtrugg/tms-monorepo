@@ -56,6 +56,166 @@ function ensureScheduleTimeRange(schedule: ClassSchedule): void {
   }
 }
 
+function scheduleInputsOverlap(left: CreateClassScheduleInput, right: CreateClassScheduleInput): boolean {
+  return left.day_of_week === right.day_of_week
+    && left.start_time < right.end_time
+    && right.start_time < left.end_time;
+}
+
+function assertNoOverlappingScheduleInputs(schedules: CreateClassScheduleInput[]): void {
+  for (let leftIndex = 0; leftIndex < schedules.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < schedules.length; rightIndex += 1) {
+      if (scheduleInputsOverlap(schedules[leftIndex], schedules[rightIndex])) {
+        throw new ClassServiceError('Lịch học không được giao nhau', 409);
+      }
+    }
+  }
+}
+
+function dateOnlyString(date: Date): string {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+function timeStringFromDate(date: Date): string {
+  return [
+    String(date.getHours()).padStart(2, '0'),
+    String(date.getMinutes()).padStart(2, '0'),
+    String(date.getSeconds()).padStart(2, '0'),
+  ].join(':');
+}
+
+function combineDateWithEndTime(date: Date, endTime: string): Date {
+  return combineDateAndTime(dateOnlyString(date), endTime);
+}
+
+function sessionOverlaps(
+  sessionStart: Date,
+  sessionEndTime: string,
+  candidateStart: Date,
+  candidateEndTime: string,
+): boolean {
+  const sessionEnd = combineDateWithEndTime(sessionStart, sessionEndTime);
+  const candidateEnd = combineDateWithEndTime(candidateStart, candidateEndTime);
+
+  return sessionStart < candidateEnd && candidateStart < sessionEnd;
+}
+
+async function assertNoPersistedScheduleOverlap(
+  manager: EntityManager,
+  teacherId: number,
+  schedules: CreateClassScheduleInput[],
+  options?: {
+    excludeClassId?: number;
+    excludeScheduleId?: number;
+  },
+): Promise<void> {
+  for (const schedule of schedules) {
+    const query = manager.getRepository(ClassSchedule)
+      .createQueryBuilder('schedule')
+      .innerJoin(Class, 'class', 'class.id = schedule.class_id')
+      .where('schedule.teacher_id = :teacherId', { teacherId })
+      .andWhere('schedule.day_of_week = :dayOfWeek', { dayOfWeek: schedule.day_of_week })
+      .andWhere('class.status = :activeStatus', { activeStatus: ClassStatus.Active })
+      .andWhere('schedule.start_time < :endTime', { endTime: schedule.end_time })
+      .andWhere(':startTime < schedule.end_time', { startTime: schedule.start_time });
+
+    if (options?.excludeClassId !== undefined) {
+      query.andWhere('schedule.class_id <> :excludeClassId', { excludeClassId: options.excludeClassId });
+    }
+
+    if (options?.excludeScheduleId !== undefined) {
+      query.andWhere('schedule.id <> :excludeScheduleId', { excludeScheduleId: options.excludeScheduleId });
+    }
+
+    const overlappingSchedule = await query.getOne();
+
+    if (overlappingSchedule) {
+      throw new ClassServiceError('Lịch học không được giao nhau', 409);
+    }
+  }
+}
+
+async function assertNoUpcomingSessionOverlapForSchedules(
+  manager: EntityManager,
+  teacherId: number,
+  classId: number,
+  schedules: CreateClassScheduleInput[],
+): Promise<void> {
+  if (schedules.length === 0) {
+    return;
+  }
+
+  const now = new Date();
+  const startDate = nowStartOfDay();
+  const endDate = addDays(startDate, SESSION_GENERATION_HORIZON_DAYS);
+  const sessions = await manager.getRepository(Session).find({
+    where: {
+      teacher_id: teacherId,
+      scheduled_at: Between(now, endOfDay(endDate)),
+    },
+  });
+
+  const sessionsToCompare = sessions.filter((session) => (
+    session.status !== SessionStatus.Cancelled
+    && session.end_time !== null
+    && (session.class_id !== classId || session.is_manual)
+  ));
+
+  for (const schedule of schedules) {
+    for (let cursor = new Date(startDate); cursor <= endDate; cursor.setDate(cursor.getDate() + 1)) {
+      if (cursor.getDay() !== schedule.day_of_week) {
+        continue;
+      }
+
+      const scheduledAt = combineDateAndTime(dateOnlyString(cursor), schedule.start_time);
+
+      if (scheduledAt < now) {
+        continue;
+      }
+
+      const overlappingSession = sessionsToCompare.find((session) => (
+        session.end_time !== null
+        && sessionOverlaps(session.scheduled_at, session.end_time, scheduledAt, schedule.end_time)
+      ));
+
+      if (overlappingSession) {
+        throw new ClassServiceError('Lịch học bị trùng với buổi học đã có', 409);
+      }
+    }
+  }
+}
+
+async function assertManualSessionDoesNotOverlap(
+  manager: EntityManager,
+  teacherId: number,
+  scheduledAt: Date,
+  endTime: string,
+): Promise<void> {
+  const sessions = await manager.getRepository(Session).find({
+    where: {
+      teacher_id: teacherId,
+      scheduled_at: Between(
+        new Date(scheduledAt.getFullYear(), scheduledAt.getMonth(), scheduledAt.getDate(), 0, 0, 0, 0),
+        endOfDay(scheduledAt),
+      ),
+    },
+  });
+
+  const overlappingSession = sessions.find((session) => (
+    session.status !== SessionStatus.Cancelled
+    && session.end_time !== null
+    && sessionOverlaps(session.scheduled_at, session.end_time, scheduledAt, endTime)
+  ));
+
+  if (overlappingSession) {
+    throw new ClassServiceError('Buổi học không được giao nhau với buổi học đã có', 409);
+  }
+}
+
 async function requireOwnedClass(manager: EntityManager, teacherId: number, classId: number): Promise<Class> {
   const classEntity = await manager.getRepository(Class).findOneBy({
     id: classId,
@@ -99,6 +259,48 @@ async function requireOwnedSession(manager: EntityManager, teacherId: number, se
   }
 
   return session;
+}
+
+async function replaceClassSchedules(
+  manager: EntityManager,
+  teacherId: number,
+  classId: number,
+  schedules: CreateClassScheduleInput[],
+): Promise<void> {
+  assertNoOverlappingScheduleInputs(schedules);
+  await assertNoPersistedScheduleOverlap(manager, teacherId, schedules, { excludeClassId: classId });
+  await assertNoUpcomingSessionOverlapForSchedules(manager, teacherId, classId, schedules);
+
+  const scheduleRepo = manager.getRepository(ClassSchedule);
+  const existingSchedules = await scheduleRepo.find({
+    where: {
+      teacher_id: teacherId,
+      class_id: classId,
+    },
+  });
+
+  if (existingSchedules.length > 0) {
+    await scheduleRepo.remove(existingSchedules);
+  }
+
+  if (schedules.length > 0) {
+    const schedulesToSave = schedules.map((input) => {
+      const schedule = scheduleRepo.create({
+        teacher_id: teacherId,
+        class_id: classId,
+        day_of_week: input.day_of_week,
+        start_time: input.start_time,
+        end_time: input.end_time,
+      });
+
+      ensureScheduleTimeRange(schedule);
+      return schedule;
+    });
+
+    await scheduleRepo.save(schedulesToSave);
+  }
+
+  await reconcileGeneratedSessionsForClass(manager, teacherId, classId);
 }
 
 async function generateSessionsForSchedule(
@@ -323,34 +525,49 @@ export async function getClassById(teacherId: number, classId: number): Promise<
 }
 
 export async function createClass(teacherId: number, input: CreateClassInput): Promise<Class> {
-  const classRepo = AppDataSource.getRepository(Class);
+  return AppDataSource.transaction(async (manager) => {
+    const classRepo = manager.getRepository(Class);
+    const classEntity = classRepo.create({
+      teacher_id: teacherId,
+      name: input.name,
+      fee_per_session: input.fee_per_session,
+      status: ClassStatus.Active,
+      archived_at: null,
+    });
 
-  const classEntity = classRepo.create({
-    teacher_id: teacherId,
-    name: input.name,
-    fee_per_session: input.fee_per_session,
-    status: ClassStatus.Active,
-    archived_at: null,
+    const savedClass = await classRepo.save(classEntity);
+
+    if (input.schedules !== undefined) {
+      await replaceClassSchedules(manager, teacherId, savedClass.id, input.schedules);
+    }
+
+    return savedClass;
   });
-
-  return classRepo.save(classEntity);
 }
 
 export async function updateClass(teacherId: number, classId: number, input: UpdateClassInput): Promise<Class> {
-  const classRepo = AppDataSource.getRepository(Class);
-  const classEntity = await requireOwnedClass(AppDataSource.manager, teacherId, classId);
+  return AppDataSource.transaction(async (manager) => {
+    const classRepo = manager.getRepository(Class);
+    const classEntity = await requireOwnedClass(manager, teacherId, classId);
 
-  ensureClassActive(classEntity);
+    ensureClassActive(classEntity);
 
-  if (input.name !== undefined) {
-    classEntity.name = input.name;
-  }
+    if (input.name !== undefined) {
+      classEntity.name = input.name;
+    }
 
-  if (input.fee_per_session !== undefined) {
-    classEntity.fee_per_session = input.fee_per_session;
-  }
+    if (input.fee_per_session !== undefined) {
+      classEntity.fee_per_session = input.fee_per_session;
+    }
 
-  return classRepo.save(classEntity);
+    const savedClass = await classRepo.save(classEntity);
+
+    if (input.schedules !== undefined) {
+      await replaceClassSchedules(manager, teacherId, classId, input.schedules);
+    }
+
+    return savedClass;
+  });
 }
 
 export async function archiveClass(teacherId: number, classId: number): Promise<Class> {
@@ -466,6 +683,9 @@ export async function createClassSchedule(
   return AppDataSource.transaction(async (manager) => {
     const classEntity = await requireOwnedClass(manager, teacherId, classId);
     ensureClassActive(classEntity);
+    assertNoOverlappingScheduleInputs([input]);
+    await assertNoPersistedScheduleOverlap(manager, teacherId, [input]);
+    await assertNoUpcomingSessionOverlapForSchedules(manager, teacherId, classId, [input]);
 
     const scheduleRepo = manager.getRepository(ClassSchedule);
     const schedule = scheduleRepo.create({
@@ -518,6 +738,16 @@ export async function updateClassSchedule(
     }
 
     ensureScheduleTimeRange(schedule);
+    const nextScheduleInput = {
+      day_of_week: schedule.day_of_week,
+      start_time: schedule.start_time,
+      end_time: schedule.end_time,
+    };
+    assertNoOverlappingScheduleInputs([nextScheduleInput]);
+    await assertNoPersistedScheduleOverlap(manager, teacherId, [nextScheduleInput], {
+      excludeScheduleId: scheduleId,
+    });
+    await assertNoUpcomingSessionOverlapForSchedules(manager, teacherId, classId, [nextScheduleInput]);
 
     const savedSchedule = await scheduleRepo.save(schedule);
     const { sessions_created: sessionsCreated } = await reconcileGeneratedSessionsForClass(
@@ -608,6 +838,8 @@ export async function createManualSession(
     if (duplicated) {
       throw new ClassServiceError('session at this datetime already exists', 409);
     }
+
+    await assertManualSessionDoesNotOverlap(manager, teacherId, input.scheduled_at, input.end_time);
 
     const session = sessionRepo.create({
       teacher_id: teacherId,

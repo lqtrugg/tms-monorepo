@@ -37,6 +37,15 @@ async function installPreSynchronizeSchemaPatches(): Promise<void> {
     if (driverError.code !== '42704') {
       throw error;
     }
+  }
+
+  try {
+    await patchDataSource.query("ALTER TYPE attendance_source ADD VALUE IF NOT EXISTS 'system' AFTER 'bot'");
+  } catch (error) {
+    const driverError = error as { code?: string };
+    if (driverError.code !== '42704') {
+      throw error;
+    }
   } finally {
     await patchDataSource.destroy();
   }
@@ -44,9 +53,7 @@ async function installPreSynchronizeSchemaPatches(): Promise<void> {
 
 export async function initializeDatabase(): Promise<DataSource> {
   if (!AppDataSource.isInitialized) {
-    if (config.database.synchronize) {
-      await installPreSynchronizeSchemaPatches();
-    }
+    await installPreSynchronizeSchemaPatches();
 
     await AppDataSource.initialize();
     await installDatabaseIntegrityRules(AppDataSource);

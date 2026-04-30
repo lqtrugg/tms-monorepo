@@ -20,7 +20,7 @@ type UpsertAttendanceInput = {
   notes?: string | null;
 };
 
-type UpsertAttendanceSource = AttendanceSource.Bot | AttendanceSource.Manual;
+type UpsertAttendanceSource = AttendanceSource.Bot | AttendanceSource.Manual | AttendanceSource.System;
 
 function requireOwnedSession(manager: EntityManager, teacherId: number, sessionId: number): Promise<Session> {
   return manager.getRepository(Session).findOneBy({
@@ -199,6 +199,77 @@ export async function upsertBotSessionAttendance(
   );
 }
 
+export async function materializeSessionAttendance(teacherId: number, sessionId: number): Promise<{
+  attendance_created: number;
+  fee_records_synced: number;
+}> {
+  return AppDataSource.transaction(async (manager) => {
+    const session = await requireOwnedSession(manager, teacherId, sessionId);
+
+    if (session.status === SessionStatus.Cancelled) {
+      return {
+        attendance_created: 0,
+        fee_records_synced: 0,
+      };
+    }
+
+    const classEntity = await requireOwnedClass(manager, teacherId, session.class_id);
+    const enrollments = await manager
+      .getRepository(Enrollment)
+      .createQueryBuilder('enrollment')
+      .where('enrollment.teacher_id = :teacherId', { teacherId })
+      .andWhere('enrollment.class_id = :classId', { classId: session.class_id })
+      .andWhere('enrollment.enrolled_at <= :scheduledAt', { scheduledAt: session.scheduled_at })
+      .andWhere('(enrollment.unenrolled_at IS NULL OR enrollment.unenrolled_at > :scheduledAt)', {
+        scheduledAt: session.scheduled_at,
+      })
+      .orderBy('enrollment.enrolled_at', 'DESC')
+      .getMany();
+
+    const attendanceRepo = manager.getRepository(Attendance);
+    let attendanceCreated = 0;
+    let feeRecordsSynced = 0;
+
+    for (const enrollment of enrollments) {
+      let attendance = await attendanceRepo.findOneBy({
+        teacher_id: teacherId,
+        session_id: sessionId,
+        student_id: enrollment.student_id,
+      });
+
+      if (!attendance) {
+        attendance = attendanceRepo.create({
+          teacher_id: teacherId,
+          session_id: sessionId,
+          student_id: enrollment.student_id,
+          status: AttendanceStatus.AbsentUnexcused,
+          source: AttendanceSource.System,
+          overridden_at: null,
+          notes: null,
+        });
+        attendance = await attendanceRepo.save(attendance);
+        attendanceCreated += 1;
+      }
+
+      await syncFeeRecordByAttendance(
+        manager,
+        teacherId,
+        session,
+        classEntity,
+        enrollment,
+        enrollment.student_id,
+        attendance.status,
+      );
+      feeRecordsSynced += 1;
+    }
+
+    return {
+      attendance_created: attendanceCreated,
+      fee_records_synced: feeRecordsSynced,
+    };
+  });
+}
+
 async function upsertSessionAttendanceWithSource(
   teacherId: number,
   sessionId: number,
@@ -242,6 +313,10 @@ async function upsertSessionAttendanceWithSource(
     });
 
     if (source === AttendanceSource.Bot && attendance?.source === AttendanceSource.Manual) {
+      return null;
+    }
+
+    if (source === AttendanceSource.Bot && attendance?.status === AttendanceStatus.AbsentExcused) {
       return null;
     }
 

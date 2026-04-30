@@ -18,7 +18,7 @@ import {
   sendBulkDm,
   upsertDiscordServerByClass,
 } from '../services/messaging.service.js';
-import { requireRoles } from '../middlewares/rbac.middleware.js';
+import { requireRoles } from '../services/auth.rbac.js';
 
 export const messagingRouter = Router();
 

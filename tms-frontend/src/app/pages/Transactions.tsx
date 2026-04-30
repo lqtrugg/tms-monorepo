@@ -158,7 +158,7 @@ export function Transactions() {
         </div>
       )}
 
-      <div className="bg-white border border-zinc-200 rounded-xl p-6 mb-6">
+      <div className="mb-6">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-600" />

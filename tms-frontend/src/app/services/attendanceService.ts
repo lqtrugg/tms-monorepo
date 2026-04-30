@@ -1,7 +1,7 @@
 import { apiRequest } from "./apiClient";
 
 export type BackendAttendanceStatus = "present" | "absent_excused" | "absent_unexcused";
-export type BackendAttendanceSource = "bot" | "manual";
+export type BackendAttendanceSource = "bot" | "manual" | "system";
 
 export interface SessionAttendanceRow {
   student_id: number;

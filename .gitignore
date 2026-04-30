@@ -1,5 +1,7 @@
 tms-backend/guidelines
 .DS_Store
+objectives.txt
+postgres-data/
 
 tms-frontend/to_be_merge
 

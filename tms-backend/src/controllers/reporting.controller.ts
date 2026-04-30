@@ -15,7 +15,7 @@ import {
   getIncomeReport,
   getStudentLearningProfile,
 } from '../services/reporting.service.js';
-import { requireRoles } from '../middlewares/rbac.middleware.js';
+import { requireRoles } from '../services/auth.rbac.js';
 
 export const reportingRouter = Router();
 

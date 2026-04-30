@@ -1,4 +1,5 @@
 import { AppDataSource } from '../data-source.js';
+import { materializeSessionAttendance } from './attendance.service.js';
 
 const DEFAULT_SYNC_INTERVAL_MS = 15_000;
 
@@ -7,6 +8,11 @@ let isSessionStatusSyncRunning = false;
 
 type UpdatedSessionRow = {
   id: number;
+};
+
+type MaterializeSessionRow = {
+  id: number;
+  teacher_id: number;
 };
 
 function getUpdatedSessionCount(result: unknown): number {
@@ -29,6 +35,26 @@ export async function syncSessionStatusesOnce(): Promise<void> {
   isSessionStatusSyncRunning = true;
 
   try {
+    const materializeRows = await AppDataSource.query(`
+      SELECT session.id, session.teacher_id
+      FROM sessions AS session
+      INNER JOIN classes AS class
+        ON class.teacher_id = session.teacher_id
+        AND class.id = session.class_id
+      WHERE class.status = 'active'::class_status
+        AND session.end_time IS NOT NULL
+        AND session.status IN ('scheduled'::session_status, 'in_progress'::session_status)
+        AND CURRENT_TIMESTAMP >= session.scheduled_at
+    `) as MaterializeSessionRow[];
+
+    let attendanceCreated = 0;
+    let feeRecordsSynced = 0;
+    for (const row of materializeRows) {
+      const result = await materializeSessionAttendance(Number(row.teacher_id), Number(row.id));
+      attendanceCreated += result.attendance_created;
+      feeRecordsSynced += result.fee_records_synced;
+    }
+
     const completedResult = await AppDataSource.query(`
       UPDATE sessions AS session
       SET status = 'completed'::session_status
@@ -59,9 +85,9 @@ export async function syncSessionStatusesOnce(): Promise<void> {
     const completedCount = getUpdatedSessionCount(completedResult);
     const startedCount = getUpdatedSessionCount(startedResult);
 
-    if (startedCount > 0 || completedCount > 0) {
+    if (startedCount > 0 || completedCount > 0 || attendanceCreated > 0 || feeRecordsSynced > 0) {
       console.log(
-        `[session-status] synced: started=${startedCount}, completed=${completedCount}`,
+        `[session-status] synced: started=${startedCount}, completed=${completedCount}, attendance_created=${attendanceCreated}, fee_records_synced=${feeRecordsSynced}`,
       );
     }
   } catch (error) {

@@ -104,6 +104,11 @@ export async function listClasses(status?: BackendClassStatus): Promise<BackendC
 export async function createClass(payload: {
   name: string;
   fee_per_session: number;
+  schedules?: {
+    day_of_week: number;
+    start_time: string;
+    end_time: string;
+  }[];
 }): Promise<BackendClass> {
   const data = await apiRequest<{ class: RawBackendClass }>("/classes", {
     method: "POST",
@@ -118,6 +123,11 @@ export async function updateClass(
   payload: {
     name?: string;
     fee_per_session?: number;
+    schedules?: {
+      day_of_week: number;
+      start_time: string;
+      end_time: string;
+    }[];
   },
 ): Promise<BackendClass> {
   const data = await apiRequest<{ class: RawBackendClass }>(`/classes/${classId}`, {
@@ -139,47 +149,6 @@ export async function archiveClass(classId: number): Promise<BackendClass> {
 export async function listClassSchedules(classId: number): Promise<BackendClassSchedule[]> {
   const data = await apiRequest<{ schedules: BackendClassSchedule[] }>(`/classes/${classId}/schedules`);
   return data.schedules;
-}
-
-export async function createClassSchedule(
-  classId: number,
-  payload: {
-    day_of_week: number;
-    start_time: string;
-    end_time: string;
-  },
-): Promise<{ schedule: BackendClassSchedule; sessions_created: number }> {
-  return apiRequest<{ schedule: BackendClassSchedule; sessions_created: number }>(
-    `/classes/${classId}/schedules`,
-    {
-      method: "POST",
-      body: JSON.stringify(payload),
-    },
-  );
-}
-
-export async function updateClassSchedule(
-  classId: number,
-  scheduleId: number,
-  payload: {
-    day_of_week?: number;
-    start_time?: string;
-    end_time?: string;
-  },
-): Promise<{ schedule: BackendClassSchedule; sessions_created: number }> {
-  return apiRequest<{ schedule: BackendClassSchedule; sessions_created: number }>(
-    `/classes/${classId}/schedules/${scheduleId}`,
-    {
-      method: "PATCH",
-      body: JSON.stringify(payload),
-    },
-  );
-}
-
-export async function deleteClassSchedule(classId: number, scheduleId: number): Promise<void> {
-  await apiRequest<void>(`/classes/${classId}/schedules/${scheduleId}`, {
-    method: "DELETE",
-  });
 }
 
 export async function listSessions(filters?: {

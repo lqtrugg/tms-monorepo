@@ -1,5 +1,6 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import passport from 'passport';
+import { QueryFailedError } from 'typeorm';
 
 import { Teacher, TeacherRole } from '../entities/index.js';
 import { ClassServiceError } from '../errors/class.error.js';
@@ -32,7 +33,7 @@ import {
   updateClassSchedule,
   upsertCodeforcesGroup,
 } from '../services/class.service.js';
-import { requireRoles } from '../middlewares/rbac.middleware.js';
+import { requireRoles } from '../services/auth.rbac.js';
 
 export const classRouter = Router();
 
@@ -53,6 +54,15 @@ function handleClassError(error: unknown, _req: Request, res: Response, next: Ne
   if (error instanceof ClassServiceError) {
     res.status(error.statusCode).json({ error: error.message });
     return;
+  }
+
+  if (error instanceof QueryFailedError) {
+    const driverError = error.driverError as { code?: string; message?: string } | undefined;
+
+    if (driverError?.code === '23514' || driverError?.code === '23505') {
+      res.status(409).json({ error: driverError.message ?? 'database constraint violation' });
+      return;
+    }
   }
 
   next(error);

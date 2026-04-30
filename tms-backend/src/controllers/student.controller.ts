@@ -27,7 +27,7 @@ import {
   transferStudent,
   updateStudent,
 } from '../services/student.service.js';
-import { requireRoles } from '../middlewares/rbac.middleware.js';
+import { requireRoles } from '../services/auth.rbac.js';
 
 export const studentRouter = Router();
 

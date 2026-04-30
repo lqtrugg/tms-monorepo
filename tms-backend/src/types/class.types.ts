@@ -7,11 +7,13 @@ export type ClassListFilters = {
 export type CreateClassInput = {
   name: string;
   fee_per_session: string;
+  schedules?: CreateClassScheduleInput[];
 };
 
 export type UpdateClassInput = {
   name?: string;
   fee_per_session?: string;
+  schedules?: CreateClassScheduleInput[];
 };
 
 export type CreateClassScheduleInput = {

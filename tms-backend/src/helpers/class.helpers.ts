@@ -152,6 +152,14 @@ function assertScheduleTimeRange(startTime: string, endTime: string): void {
   }
 }
 
+function parseClassSchedules(value: unknown, fieldName: string): CreateClassScheduleInput[] {
+  if (!Array.isArray(value)) {
+    throw new ClassServiceError(`${fieldName} must be an array`, 400);
+  }
+
+  return value.map((item, index) => parseCreateClassScheduleInputWithFieldName(item, `${fieldName}[${index}]`));
+}
+
 export function parseIdParam(value: unknown, fieldName: string): number {
   return parsePositiveInteger(value, fieldName);
 }
@@ -174,6 +182,9 @@ export function parseCreateClassInput(value: unknown): CreateClassInput {
   return {
     name,
     fee_per_session: normalizeFeePerSession(body.fee_per_session),
+    schedules: body.schedules === undefined
+      ? undefined
+      : parseClassSchedules(body.schedules, 'schedules'),
   };
 }
 
@@ -194,6 +205,10 @@ export function parseUpdateClassInput(value: unknown): UpdateClassInput {
     patch.fee_per_session = normalizeFeePerSession(body.fee_per_session);
   }
 
+  if (body.schedules !== undefined) {
+    patch.schedules = parseClassSchedules(body.schedules, 'schedules');
+  }
+
   if (Object.keys(patch).length === 0) {
     throw new ClassServiceError('at least one field is required', 400);
   }
@@ -202,15 +217,19 @@ export function parseUpdateClassInput(value: unknown): UpdateClassInput {
 }
 
 export function parseCreateClassScheduleInput(value: unknown): CreateClassScheduleInput {
-  const body = asRecord(value, 'body');
-  const dayOfWeek = parseNonNegativeInteger(body.day_of_week, 'day_of_week');
+  return parseCreateClassScheduleInputWithFieldName(value, 'body');
+}
+
+function parseCreateClassScheduleInputWithFieldName(value: unknown, fieldName: string): CreateClassScheduleInput {
+  const body = asRecord(value, fieldName);
+  const dayOfWeek = parseNonNegativeInteger(body.day_of_week, `${fieldName}.day_of_week`);
 
   if (dayOfWeek > 6) {
-    throw new ClassServiceError('day_of_week must be between 0 and 6', 400);
+    throw new ClassServiceError(`${fieldName}.day_of_week must be between 0 and 6`, 400);
   }
 
-  const startTime = normalizeTime(body.start_time, 'start_time');
-  const endTime = normalizeTime(body.end_time, 'end_time');
+  const startTime = normalizeTime(body.start_time, `${fieldName}.start_time`);
+  const endTime = normalizeTime(body.end_time, `${fieldName}.end_time`);
   assertScheduleTimeRange(startTime, endTime);
 
   return {
