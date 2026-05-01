@@ -1,4 +1,4 @@
-import { EntityManager, IsNull } from 'typeorm';
+import { EntityManager } from 'typeorm';
 
 import { AppDataSource } from '../../../data-source.js';
 import {
@@ -11,9 +11,27 @@ import {
   FeeRecordStatus,
   Session,
   SessionStatus,
-  Student,
 } from '../../../entities/index.js';
 import { ServiceError } from '../../../shared/errors/service.error.js';
+import {
+  createAttendance,
+  createFeeRecord,
+  findActiveFeeRecordsBySession,
+  findAttendanceBySession,
+  findAttendanceForStudent,
+  findEnrollmentAtSessionTime,
+  findEnrollmentsAtSessionTime,
+  findFeeRecordForAttendance,
+  findOwnedClass,
+  findOwnedSession,
+  findOwnedStudent,
+  listAttendanceRecordsForTeacher,
+  listStudentsEnrolledAtSessionTime,
+  removeAttendanceRecords,
+  saveAttendance,
+  saveFeeRecord,
+  saveFeeRecords,
+} from './attendance.repository.js';
 
 type UpsertAttendanceInput = {
   status: AttendanceStatus;
@@ -23,10 +41,7 @@ type UpsertAttendanceInput = {
 type UpsertAttendanceSource = AttendanceSource.Bot | AttendanceSource.Manual | AttendanceSource.System;
 
 function requireOwnedSession(manager: EntityManager, teacherId: number, sessionId: number): Promise<Session> {
-  return manager.getRepository(Session).findOneBy({
-    id: sessionId,
-    teacher_id: teacherId,
-  }).then((session) => {
+  return findOwnedSession(manager, teacherId, sessionId).then((session) => {
     if (!session) {
       throw new ServiceError('session not found', 404);
     }
@@ -36,35 +51,13 @@ function requireOwnedSession(manager: EntityManager, teacherId: number, sessionI
 }
 
 function requireOwnedClass(manager: EntityManager, teacherId: number, classId: number): Promise<Class> {
-  return manager.getRepository(Class).findOneBy({
-    id: classId,
-    teacher_id: teacherId,
-  }).then((classEntity) => {
+  return findOwnedClass(manager, teacherId, classId).then((classEntity) => {
     if (!classEntity) {
       throw new ServiceError('class not found', 404);
     }
 
     return classEntity;
   });
-}
-
-async function findEnrollmentAtSessionTime(
-  manager: EntityManager,
-  teacherId: number,
-  studentId: number,
-  classId: number,
-  scheduledAt: Date,
-): Promise<Enrollment | null> {
-  return manager
-    .getRepository(Enrollment)
-    .createQueryBuilder('enrollment')
-    .where('enrollment.teacher_id = :teacherId', { teacherId })
-    .andWhere('enrollment.student_id = :studentId', { studentId })
-    .andWhere('enrollment.class_id = :classId', { classId })
-    .andWhere('enrollment.enrolled_at <= :scheduledAt', { scheduledAt })
-    .andWhere('(enrollment.unenrolled_at IS NULL OR enrollment.unenrolled_at > :scheduledAt)', { scheduledAt })
-    .orderBy('enrollment.enrolled_at', 'DESC')
-    .getOne();
 }
 
 async function syncFeeRecordByAttendance(
@@ -76,12 +69,7 @@ async function syncFeeRecordByAttendance(
   studentId: number,
   status: AttendanceStatus,
 ): Promise<void> {
-  const feeRecordRepo = manager.getRepository(FeeRecord);
-  const existing = await feeRecordRepo.findOneBy({
-    teacher_id: teacherId,
-    session_id: session.id,
-    student_id: studentId,
-  });
+  const existing = await findFeeRecordForAttendance(manager, teacherId, session.id, studentId);
 
   const shouldCharge = session.status !== SessionStatus.Cancelled
     && (status === AttendanceStatus.Present || status === AttendanceStatus.AbsentUnexcused);
@@ -90,14 +78,14 @@ async function syncFeeRecordByAttendance(
     if (existing && existing.status !== FeeRecordStatus.Cancelled) {
       existing.status = FeeRecordStatus.Cancelled;
       existing.cancelled_at = new Date();
-      await feeRecordRepo.save(existing);
+      await saveFeeRecord(manager, existing);
     }
 
     return;
   }
 
   if (!existing) {
-    const feeRecord = feeRecordRepo.create({
+    const feeRecord = createFeeRecord(manager, {
       teacher_id: teacherId,
       student_id: studentId,
       session_id: session.id,
@@ -107,7 +95,7 @@ async function syncFeeRecordByAttendance(
       cancelled_at: null,
     });
 
-    await feeRecordRepo.save(feeRecord);
+    await saveFeeRecord(manager, feeRecord);
     return;
   }
 
@@ -115,37 +103,20 @@ async function syncFeeRecordByAttendance(
   existing.amount = classEntity.fee_per_session;
   existing.status = FeeRecordStatus.Active;
   existing.cancelled_at = null;
-  await feeRecordRepo.save(existing);
+  await saveFeeRecord(manager, existing);
 }
 
 export async function listSessionAttendance(teacherId: number, sessionId: number) {
   const session = await requireOwnedSession(AppDataSource.manager, teacherId, sessionId);
 
-  const students = await AppDataSource
-    .getRepository(Student)
-    .createQueryBuilder('student')
-    .innerJoin(
-      Enrollment,
-      'enrollment',
-      `
-        enrollment.teacher_id = student.teacher_id
-        AND enrollment.student_id = student.id
-        AND enrollment.class_id = :classId
-        AND enrollment.enrolled_at <= :scheduledAt
-        AND (enrollment.unenrolled_at IS NULL OR enrollment.unenrolled_at > :scheduledAt)
-      `,
-      { classId: session.class_id, scheduledAt: session.scheduled_at },
-    )
-    .where('student.teacher_id = :teacherId', { teacherId })
-    .orderBy('student.full_name', 'ASC')
-    .getMany();
+  const students = await listStudentsEnrolledAtSessionTime(
+    AppDataSource.manager,
+    teacherId,
+    session.class_id,
+    session.scheduled_at,
+  );
 
-  const attendanceRecords = await AppDataSource.getRepository(Attendance).find({
-    where: {
-      teacher_id: teacherId,
-      session_id: sessionId,
-    },
-  });
+  const attendanceRecords = await findAttendanceBySession(AppDataSource.manager, teacherId, sessionId);
 
   const attendanceByStudentId = new Map<number, Attendance>();
   attendanceRecords.forEach((record) => {
@@ -214,31 +185,15 @@ export async function materializeSessionAttendance(teacherId: number, sessionId:
     }
 
     const classEntity = await requireOwnedClass(manager, teacherId, session.class_id);
-    const enrollments = await manager
-      .getRepository(Enrollment)
-      .createQueryBuilder('enrollment')
-      .where('enrollment.teacher_id = :teacherId', { teacherId })
-      .andWhere('enrollment.class_id = :classId', { classId: session.class_id })
-      .andWhere('enrollment.enrolled_at <= :scheduledAt', { scheduledAt: session.scheduled_at })
-      .andWhere('(enrollment.unenrolled_at IS NULL OR enrollment.unenrolled_at > :scheduledAt)', {
-        scheduledAt: session.scheduled_at,
-      })
-      .orderBy('enrollment.enrolled_at', 'DESC')
-      .getMany();
-
-    const attendanceRepo = manager.getRepository(Attendance);
+    const enrollments = await findEnrollmentsAtSessionTime(manager, teacherId, session.class_id, session.scheduled_at);
     let attendanceCreated = 0;
     let feeRecordsSynced = 0;
 
     for (const enrollment of enrollments) {
-      let attendance = await attendanceRepo.findOneBy({
-        teacher_id: teacherId,
-        session_id: sessionId,
-        student_id: enrollment.student_id,
-      });
+      let attendance = await findAttendanceForStudent(manager, teacherId, sessionId, enrollment.student_id);
 
       if (!attendance) {
-        attendance = attendanceRepo.create({
+        attendance = createAttendance(manager, {
           teacher_id: teacherId,
           session_id: sessionId,
           student_id: enrollment.student_id,
@@ -247,7 +202,7 @@ export async function materializeSessionAttendance(teacherId: number, sessionId:
           overridden_at: null,
           notes: null,
         });
-        attendance = await attendanceRepo.save(attendance);
+        attendance = await saveAttendance(manager, attendance);
         attendanceCreated += 1;
       }
 
@@ -280,10 +235,7 @@ async function upsertSessionAttendanceWithSource(
   return AppDataSource.transaction(async (manager) => {
     const session = await requireOwnedSession(manager, teacherId, sessionId);
     const classEntity = await requireOwnedClass(manager, teacherId, session.class_id);
-    const student = await manager.getRepository(Student).findOneBy({
-      id: studentId,
-      teacher_id: teacherId,
-    });
+    const student = await findOwnedStudent(manager, teacherId, studentId);
 
     if (!student) {
       throw new ServiceError('student not found', 404);
@@ -305,12 +257,7 @@ async function upsertSessionAttendanceWithSource(
       throw new ServiceError('cannot update attendance for a cancelled session', 409);
     }
 
-    const attendanceRepo = manager.getRepository(Attendance);
-    let attendance = await attendanceRepo.findOneBy({
-      teacher_id: teacherId,
-      session_id: sessionId,
-      student_id: studentId,
-    });
+    let attendance = await findAttendanceForStudent(manager, teacherId, sessionId, studentId);
 
     if (source === AttendanceSource.Bot && attendance?.source === AttendanceSource.Manual) {
       return null;
@@ -329,7 +276,7 @@ async function upsertSessionAttendanceWithSource(
     }
 
     if (!attendance) {
-      attendance = attendanceRepo.create({
+      attendance = createAttendance(manager, {
         teacher_id: teacherId,
         session_id: sessionId,
         student_id: studentId,
@@ -347,7 +294,7 @@ async function upsertSessionAttendanceWithSource(
       }
     }
 
-    const saved = await attendanceRepo.save(attendance);
+    const saved = await saveAttendance(manager, attendance);
 
     await syncFeeRecordByAttendance(
       manager,
@@ -368,51 +315,27 @@ export async function listAttendanceRecords(teacherId: number, filters: {
   student_id?: number;
   status?: AttendanceStatus;
 }) {
-  const where = {
-    teacher_id: teacherId,
-    ...(filters.session_id !== undefined ? { session_id: filters.session_id } : {}),
-    ...(filters.student_id !== undefined ? { student_id: filters.student_id } : {}),
-    ...(filters.status !== undefined ? { status: filters.status } : {}),
-  };
-
-  return AppDataSource.getRepository(Attendance).find({
-    where,
-    order: {
-      id: 'DESC',
-    },
-  });
+  return listAttendanceRecordsForTeacher(AppDataSource.manager, teacherId, filters);
 }
 
 export async function resetSessionAttendance(teacherId: number, sessionId: number): Promise<void> {
   const session = await requireOwnedSession(AppDataSource.manager, teacherId, sessionId);
 
-  const existing = await AppDataSource.getRepository(Attendance).find({
-    where: {
-      teacher_id: teacherId,
-      session_id: session.id,
-    },
-  });
+  const existing = await findAttendanceBySession(AppDataSource.manager, teacherId, session.id);
 
   if (existing.length === 0) {
     return;
   }
 
-  await AppDataSource.getRepository(Attendance).remove(existing);
+  await removeAttendanceRecords(AppDataSource.manager, existing);
 
-  const feeRecords = await AppDataSource.getRepository(FeeRecord).find({
-    where: {
-      teacher_id: teacherId,
-      session_id: session.id,
-      status: FeeRecordStatus.Active,
-      cancelled_at: IsNull(),
-    },
-  });
+  const feeRecords = await findActiveFeeRecordsBySession(AppDataSource.manager, teacherId, session.id);
 
   if (feeRecords.length > 0) {
     feeRecords.forEach((item) => {
       item.status = FeeRecordStatus.Cancelled;
       item.cancelled_at = new Date();
     });
-    await AppDataSource.getRepository(FeeRecord).save(feeRecords);
+    await saveFeeRecords(AppDataSource.manager, feeRecords);
   }
 }

@@ -2,13 +2,18 @@ import bcrypt from 'bcrypt';
 import jwt, { type Secret, type SignOptions } from 'jsonwebtoken';
 
 import config from '../../config.js';
-import { AppDataSource } from '../../data-source.js';
 import { Teacher, TeacherRole } from '../../entities/index.js';
 import { AuthError } from '../../shared/errors/auth.error.js';
 import {
   isUniqueViolation,
   toAuthTeacher,
 } from './auth.mapper.js';
+import {
+  createTeacher,
+  findTeacherById,
+  findTeacherByUsername,
+  saveTeacher,
+} from './identity.repository.js';
 import type {
   AuthTeacher,
   AuthTokenPayload,
@@ -20,10 +25,6 @@ import type {
 
 const HARD_CODED_SYSADMIN_USERNAME = 'admin';
 const HARD_CODED_SYSADMIN_PASSWORD = 'gaheocho123';
-
-function teacherRepository() {
-  return AppDataSource.getRepository(Teacher);
-}
 
 function signAccessToken(teacher: Teacher): string {
   const payload: AuthTokenPayload = {
@@ -51,7 +52,7 @@ export async function register(input: RegisterInput): Promise<AuthTokenResponse>
   } = input;
   const passwordHash = await bcrypt.hash(password, config.auth.bcryptSaltRounds);
 
-  const teacher = teacherRepository().create({
+  const teacher = createTeacher({
     username,
     password_hash: passwordHash,
     role: TeacherRole.Teacher,
@@ -62,7 +63,7 @@ export async function register(input: RegisterInput): Promise<AuthTokenResponse>
   });
 
   try {
-    const savedTeacher = await teacherRepository().save(teacher);
+    const savedTeacher = await saveTeacher(teacher);
 
     return {
       accessToken: signAccessToken(savedTeacher),
@@ -81,7 +82,7 @@ export async function register(input: RegisterInput): Promise<AuthTokenResponse>
 
 export async function login(input: LoginInput): Promise<AuthTokenResponse> {
   const { username, password } = input;
-  const teacher = await teacherRepository().findOneBy({ username });
+  const teacher = await findTeacherByUsername(username);
 
   if (!teacher) {
     throw new AuthError('invalid username or password', 401);
@@ -109,8 +110,7 @@ export function me(teacher: Teacher): AuthTeacher {
 }
 
 export async function updateMe(teacherId: number, input: UpdateTeacherInput): Promise<AuthTeacher> {
-  const repository = teacherRepository();
-  const teacher = await repository.findOneBy({ id: teacherId });
+  const teacher = await findTeacherById(teacherId);
 
   if (!teacher) {
     throw new AuthError('teacher not found', 404);
@@ -137,7 +137,7 @@ export async function updateMe(teacherId: number, input: UpdateTeacherInput): Pr
   }
 
   try {
-    const saved = await repository.save(teacher);
+    const saved = await saveTeacher(teacher);
     return toAuthTeacher(saved);
   } catch (error) {
     if (isUniqueViolation(error)) {
@@ -152,12 +152,11 @@ export async function ensureSystemAdminAccount(): Promise<void> {
   const username = HARD_CODED_SYSADMIN_USERNAME;
   const password = HARD_CODED_SYSADMIN_PASSWORD;
 
-  const repository = teacherRepository();
-  let sysAdmin = await repository.findOneBy({ username });
+  let sysAdmin = await findTeacherByUsername(username);
   const passwordHash = await bcrypt.hash(password, config.auth.bcryptSaltRounds);
 
   if (!sysAdmin) {
-    sysAdmin = repository.create({
+    sysAdmin = createTeacher({
       username,
       password_hash: passwordHash,
       role: TeacherRole.SysAdmin,
@@ -167,7 +166,7 @@ export async function ensureSystemAdminAccount(): Promise<void> {
       codeforces_api_secret: null,
     });
 
-    await repository.save(sysAdmin);
+    await saveTeacher(sysAdmin);
     return;
   }
 
@@ -190,6 +189,6 @@ export async function ensureSystemAdminAccount(): Promise<void> {
   }
 
   if (hasChanges) {
-    await repository.save(sysAdmin);
+    await saveTeacher(sysAdmin);
   }
 }

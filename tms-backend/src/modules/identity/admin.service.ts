@@ -1,23 +1,20 @@
 import bcrypt from 'bcrypt';
 
 import config from '../../config.js';
-import { AppDataSource } from '../../data-source.js';
 import { Teacher, TeacherRole } from '../../entities/index.js';
 import { ServiceError } from '../../shared/errors/service.error.js';
 import { toAdminTeacher } from './admin.mapper.js';
 import { isUniqueViolation } from './auth.mapper.js';
+import {
+  createTeacher,
+  findTeacherById,
+  listTeachersNewestFirst,
+  saveTeacher,
+} from './identity.repository.js';
 import type { AdminTeacher, CreateTeacherByAdminInput, UpdateTeacherByAdminInput } from './admin.types.js';
 
-function teacherRepository() {
-  return AppDataSource.getRepository(Teacher);
-}
-
 export async function listTeachersForAdmin(): Promise<AdminTeacher[]> {
-  const teachers = await teacherRepository().find({
-    order: {
-      created_at: 'DESC',
-    },
-  });
+  const teachers = await listTeachersNewestFirst();
 
   return teachers.map(toAdminTeacher);
 }
@@ -25,7 +22,7 @@ export async function listTeachersForAdmin(): Promise<AdminTeacher[]> {
 export async function createTeacherByAdmin(input: CreateTeacherByAdminInput): Promise<AdminTeacher> {
   const passwordHash = await bcrypt.hash(input.password, config.auth.bcryptSaltRounds);
 
-  const teacher = teacherRepository().create({
+  const teacher = createTeacher({
     username: input.username,
     password_hash: passwordHash,
     role: input.role ?? TeacherRole.Teacher,
@@ -36,7 +33,7 @@ export async function createTeacherByAdmin(input: CreateTeacherByAdminInput): Pr
   });
 
   try {
-    const saved = await teacherRepository().save(teacher);
+    const saved = await saveTeacher(teacher);
     return toAdminTeacher(saved);
   } catch (error) {
     if (isUniqueViolation(error)) {
@@ -52,8 +49,7 @@ export async function updateTeacherByAdmin(
   teacherId: number,
   input: UpdateTeacherByAdminInput,
 ): Promise<AdminTeacher> {
-  const repository = teacherRepository();
-  const teacher = await repository.findOneBy({ id: teacherId });
+  const teacher = await findTeacherById(teacherId);
 
   if (!teacher) {
     throw new ServiceError('teacher not found', 404);
@@ -96,7 +92,7 @@ export async function updateTeacherByAdmin(
   }
 
   try {
-    const saved = await repository.save(teacher);
+    const saved = await saveTeacher(teacher);
     return toAdminTeacher(saved);
   } catch (error) {
     if (isUniqueViolation(error)) {

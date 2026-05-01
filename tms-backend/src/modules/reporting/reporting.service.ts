@@ -1,19 +1,22 @@
-import { In } from 'typeorm';
-
-import { AppDataSource } from '../../data-source.js';
 import {
-  Class,
-  ClassStatus,
-  Enrollment,
-  Student,
   StudentStatus,
-  Topic,
-  TopicProblem,
   TopicStanding,
-  Transaction,
 } from '../../entities/index.js';
 import { ServiceError } from '../../shared/errors/service.error.js';
 import { getFinanceSummary, listStudentBalances } from '../finance/index.js';
+import {
+  countActiveClasses,
+  countActiveEnrollmentsByClass,
+  countActiveStudents,
+  findReportClasses,
+  findClassesByIds,
+  findOwnedStudent,
+  findStudentTopicStandings,
+  findStudentTransactions,
+  findTopicProblemsByIds,
+  findTopicsByIds,
+  getRevenueTotalsBetween,
+} from './reporting.repository.js';
 
 function parseAmountToBigInt(value: string | null | undefined): bigint {
   if (!value) {
@@ -25,14 +28,8 @@ function parseAmountToBigInt(value: string | null | undefined): bigint {
 
 export async function getDashboardSummary(teacherId: number) {
   const [activeStudents, activeClasses] = await Promise.all([
-    AppDataSource.getRepository(Student).countBy({
-      teacher_id: teacherId,
-      status: StudentStatus.Active,
-    }),
-    AppDataSource.getRepository(Class).countBy({
-      teacher_id: teacherId,
-      status: ClassStatus.Active,
-    }),
+    countActiveStudents(teacherId),
+    countActiveClasses(teacherId),
   ]);
 
   const balances = await listStudentBalances(teacherId, {
@@ -54,14 +51,7 @@ export async function getDashboardSummary(teacherId: number) {
   monthStart.setHours(0, 0, 0, 0);
 
   const now = new Date();
-  const revenueQuery = await AppDataSource.getRepository(Transaction)
-    .createQueryBuilder('transaction')
-    .select("COALESCE(SUM(CASE WHEN transaction.type = 'payment' THEN transaction.amount ELSE 0 END), 0)", 'payments')
-    .addSelect("COALESCE(SUM(CASE WHEN transaction.type = 'refund' THEN ABS(transaction.amount) ELSE 0 END), 0)", 'refunds')
-    .where('transaction.teacher_id = :teacherId', { teacherId })
-    .andWhere('transaction.recorded_at >= :monthStart', { monthStart })
-    .andWhere('transaction.recorded_at <= :now', { now })
-    .getRawOne<{ payments: string; refunds: string }>();
+  const revenueQuery = await getRevenueTotalsBetween(teacherId, monthStart, now);
 
   const monthRevenue = parseAmountToBigInt(revenueQuery?.payments) - parseAmountToBigInt(revenueQuery?.refunds);
 
@@ -81,31 +71,17 @@ export async function getIncomeReport(teacherId: number, filters: {
 }) {
   const summary = await getFinanceSummary(teacherId, filters);
 
-  const activeClasses = await AppDataSource.getRepository(Class).find({
-    where: {
-      teacher_id: teacherId,
-      ...(filters.class_ids && filters.class_ids.length > 0 ? { id: In(filters.class_ids) } : {}),
-    },
-  });
+  const activeClasses = await findReportClasses(teacherId, filters.class_ids);
 
   const classIds = activeClasses.map((classItem) => classItem.id);
 
-  const studentCountsByClass = await AppDataSource.getRepository(Enrollment)
-    .createQueryBuilder('enrollment')
-    .select('enrollment.class_id', 'class_id')
-    .addSelect('COUNT(*)', 'student_count')
-    .where('enrollment.teacher_id = :teacherId', { teacherId })
-    .andWhere('enrollment.unenrolled_at IS NULL')
-    .andWhere(classIds.length > 0 ? 'enrollment.class_id IN (:...classIds)' : '1=1', { classIds })
-    .groupBy('enrollment.class_id')
-    .getRawMany<{ class_id: string; student_count: string }>();
+  const studentCountsByClass = await countActiveEnrollmentsByClass(teacherId, classIds);
 
   const classStats = activeClasses.map((classItem) => {
-    const row = studentCountsByClass.find((item) => Number(item.class_id) === classItem.id);
     return {
       class_id: classItem.id,
       class_name: classItem.name,
-      student_count: row ? Number(row.student_count) : 0,
+      student_count: studentCountsByClass.get(classItem.id) ?? 0,
       fee_per_session: classItem.fee_per_session,
     };
   });
@@ -117,24 +93,13 @@ export async function getIncomeReport(teacherId: number, filters: {
 }
 
 export async function getStudentLearningProfile(teacherId: number, studentId: number) {
-  const student = await AppDataSource.getRepository(Student).findOneBy({
-    id: studentId,
-    teacher_id: teacherId,
-  });
+  const student = await findOwnedStudent(teacherId, studentId);
 
   if (!student) {
     throw new ServiceError('student not found', 404);
   }
 
-  const standings = await AppDataSource.getRepository(TopicStanding).find({
-    where: {
-      teacher_id: teacherId,
-      student_id: studentId,
-    },
-    order: {
-      pulled_at: 'DESC',
-    },
-  });
+  const standings = await findStudentTopicStandings(teacherId, studentId);
 
   if (standings.length === 0) {
     return {
@@ -147,26 +112,15 @@ export async function getStudentLearningProfile(teacherId: number, studentId: nu
   const problemIds = Array.from(new Set(standings.map((item) => item.problem_id)));
 
   const [topics, problems] = await Promise.all([
-    AppDataSource.getRepository(Topic).findBy({
-      teacher_id: teacherId,
-      id: In(topicIds),
-    }),
-    AppDataSource.getRepository(TopicProblem).findBy({
-      teacher_id: teacherId,
-      id: In(problemIds),
-    }),
+    findTopicsByIds(teacherId, topicIds),
+    findTopicProblemsByIds(teacherId, problemIds),
   ]);
 
   const topicById = new Map(topics.map((topic) => [topic.id, topic]));
   const problemById = new Map(problems.map((problem) => [problem.id, problem]));
 
   const classIds = Array.from(new Set(topics.map((topic) => topic.class_id)));
-  const classes = classIds.length > 0
-    ? await AppDataSource.getRepository(Class).findBy({
-      teacher_id: teacherId,
-      id: In(classIds),
-    })
-    : [];
+  const classes = await findClassesByIds(teacherId, classIds);
   const classNameById = new Map(classes.map((item) => [item.id, item.name]));
 
   const groupedByTopic = new Map<number, TopicStanding[]>();
@@ -231,15 +185,7 @@ export async function getStudentLearningProfile(teacherId: number, studentId: nu
     .filter((row): row is NonNullable<typeof row> => row !== null)
     .sort((a, b) => a.topic_title.localeCompare(b.topic_title, 'vi'));
 
-  const transactions = await AppDataSource.getRepository(Transaction).find({
-    where: {
-      teacher_id: teacherId,
-      student_id: studentId,
-    },
-    order: {
-      recorded_at: 'DESC',
-    },
-  });
+  const transactions = await findStudentTransactions(teacherId, studentId);
 
   return {
     student,

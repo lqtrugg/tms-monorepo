@@ -2,8 +2,7 @@ import passport from 'passport';
 import { ExtractJwt, Strategy as JwtStrategy } from 'passport-jwt';
 
 import config from '../../config.js';
-import { AppDataSource } from '../../data-source.js';
-import { Teacher } from '../../entities/index.js';
+import { findTeacherById } from './identity.repository.js';
 import type { AuthTokenPayload } from './auth.types.js';
 
 export function configurePassport(): typeof passport {
@@ -17,9 +16,7 @@ export function configurePassport(): typeof passport {
       },
       async (payload: AuthTokenPayload, done) => {
         try {
-          const teacher = await AppDataSource.getRepository(Teacher).findOneBy({
-            id: payload.sub,
-          });
+          const teacher = await findTeacherById(payload.sub);
 
           if (!teacher || !teacher.is_active) {
             return done(null, false);
