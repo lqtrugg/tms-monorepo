@@ -1,21 +1,26 @@
 import express from 'express';
 
 import config from './config.js';
-import { adminRouter } from './controllers/admin.controller.js';
-import { attendanceRouter } from './controllers/attendance.controller.js';
-import { authRouter } from './controllers/auth.controller.js';
-import { classRouter } from './controllers/class.controller.js';
-import { financeRouter } from './controllers/finance.controller.js';
-import { messagingRouter } from './controllers/messaging.controller.js';
-import { reportingRouter } from './controllers/reporting.controller.js';
-import { studentRouter } from './controllers/student.controller.js';
-import { topicRouter } from './controllers/topic.controller.js';
 import { AppDataSource, initializeDatabase } from './data-source.js';
-import { ensureSystemAdminAccount } from './services/auth.service.js';
-import { configurePassport } from './services/auth.passport.js';
-import { startAutoSyncScheduler, stopAutoSyncScheduler } from './services/auto-sync.service.js';
-import { startSessionStatusSync, stopSessionStatusSync } from './services/session-status-sync.service.js';
-import { startVoiceAttendanceSync, stopVoiceAttendanceSync } from './services/voice-attendance-sync.service.js';
+import {
+  attendanceRouter,
+  classRouter,
+  startSessionStatusSync,
+  startVoiceAttendanceSync,
+  stopSessionStatusSync,
+  stopVoiceAttendanceSync,
+  studentRouter,
+} from './modules/academic/index.js';
+import {
+  adminRouter,
+  authRouter,
+  configurePassport,
+  ensureSystemAdminAccount,
+} from './modules/identity/index.js';
+import { financeRouter } from './modules/finance/index.js';
+import { messagingRouter } from './modules/messaging/index.js';
+import { reportingRouter } from './modules/reporting/index.js';
+import { startAutoSyncScheduler, stopAutoSyncScheduler, topicRouter } from './modules/training/index.js';
 
 const app = express();
 const passport = configurePassport();
