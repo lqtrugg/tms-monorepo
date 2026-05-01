@@ -41,13 +41,13 @@ export type BulkTransferStudentsInput = {
   transferred_at: Date;
 };
 
-export type ExpelStudentInput = {
-  expelled_at: Date;
+export type WithdrawStudentInput = {
+  withdrawn_at: Date;
 };
 
-export type BulkExpelStudentsInput = {
+export type BulkWithdrawStudentsInput = {
   student_ids: number[];
-  expelled_at: Date;
+  withdrawn_at: Date;
 };
 
 export type ArchivePendingStudentInput = {

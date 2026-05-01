@@ -133,8 +133,8 @@ export async function bulkTransferStudents(payload: {
   return data.students;
 }
 
-export async function expelStudent(studentId: number): Promise<BackendStudentSummary> {
-  const data = await apiRequest<StudentResponse>(`/students/${studentId}/expel`, {
+export async function withdrawStudent(studentId: number): Promise<BackendStudentSummary> {
+  const data = await apiRequest<StudentResponse>(`/students/${studentId}/withdraw`, {
     method: "POST",
     body: JSON.stringify({}),
   });
@@ -142,8 +142,8 @@ export async function expelStudent(studentId: number): Promise<BackendStudentSum
   return data.student;
 }
 
-export async function bulkExpelStudents(student_ids: number[]): Promise<BackendStudentSummary[]> {
-  const data = await apiRequest<ListStudentsResponse>("/students/bulk/expel", {
+export async function bulkWithdrawStudents(student_ids: number[]): Promise<BackendStudentSummary[]> {
+  const data = await apiRequest<ListStudentsResponse>("/students/bulk/withdraw", {
     method: "POST",
     body: JSON.stringify({ student_ids }),
   });

@@ -23,6 +23,10 @@ const nullableTrimmedStringSchema = z.preprocess((value) => {
   return trimmed.length > 0 ? trimmed : null;
 }, z.string().nullable());
 
+const optionalNullableTrimmedStringSchema = nullableTrimmedStringSchema
+  .optional()
+  .transform((value) => value ?? null);
+
 const nonEmptyStudentIdsSchema = positiveIntegerArraySchema.refine((value) => value.length > 0, {
   message: 'student_ids must include at least one student',
 });
@@ -43,7 +47,7 @@ export const createStudentBodySchema = z.object({
   class_id: positiveIntegerSchema,
   codeforces_handle: nullableTrimmedStringSchema,
   discord_username: requiredTrimmedStringSchema,
-  phone: nullableTrimmedStringSchema,
+  phone: optionalNullableTrimmedStringSchema,
   note: nullableTrimmedStringSchema,
   enrolled_at: dateTimeSchema.optional().default(() => new Date()),
 });
@@ -80,8 +84,8 @@ export const transferStudentBodySchema = z.object({
   };
 });
 
-export const expelStudentBodySchema = z.object({
-  expelled_at: dateTimeSchema.optional().default(() => new Date()),
+export const withdrawStudentBodySchema = z.object({
+  withdrawn_at: dateTimeSchema.optional().default(() => new Date()),
 });
 
 export const bulkTransferStudentsBodySchema = z.object({
@@ -103,9 +107,9 @@ export const bulkTransferStudentsBodySchema = z.object({
   };
 });
 
-export const bulkExpelStudentsBodySchema = z.object({
+export const bulkWithdrawStudentsBodySchema = z.object({
   student_ids: nonEmptyStudentIdsSchema,
-  expelled_at: dateTimeSchema.optional().default(() => new Date()),
+  withdrawn_at: dateTimeSchema.optional().default(() => new Date()),
 });
 
 export const archivePendingStudentBodySchema = z.object({
@@ -119,7 +123,7 @@ export type CreateStudentBody = z.infer<typeof createStudentBodySchema>;
 export type UpdateStudentBody = z.infer<typeof updateStudentBodySchema>;
 export type ReinstateStudentBody = z.infer<typeof reinstateStudentBodySchema>;
 export type TransferStudentBody = z.infer<typeof transferStudentBodySchema>;
-export type ExpelStudentBody = z.infer<typeof expelStudentBodySchema>;
+export type WithdrawStudentBody = z.infer<typeof withdrawStudentBodySchema>;
 export type BulkTransferStudentsBody = z.infer<typeof bulkTransferStudentsBodySchema>;
-export type BulkExpelStudentsBody = z.infer<typeof bulkExpelStudentsBodySchema>;
+export type BulkWithdrawStudentsBody = z.infer<typeof bulkWithdrawStudentsBodySchema>;
 export type ArchivePendingStudentBody = z.infer<typeof archivePendingStudentBodySchema>;

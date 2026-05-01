@@ -16,11 +16,11 @@ import { ApiError } from "../services/apiClient";
 import { listClasses } from "../services/classService";
 import {
   archiveStudent,
-  bulkExpelStudents,
+  bulkWithdrawStudents,
   bulkTransferStudents,
   buildStudentNote,
   createStudent,
-  expelStudent,
+  withdrawStudent,
   listStudents,
   reinstateStudent,
   transferStudent,
@@ -105,7 +105,7 @@ export function Students() {
   const [showReinstateModal, setShowReinstateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showBulkTransferModal, setShowBulkTransferModal] = useState(false);
-  const [showBulkExpelModal, setShowBulkExpelModal] = useState(false);
+  const [showBulkWithdrawModal, setShowBulkWithdrawModal] = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
   const [students, setStudents] = useState<StudentView[]>([]);
   const [activeClasses, setActiveClasses] = useState<ActiveClassOption[]>([]);
@@ -264,12 +264,12 @@ export function Students() {
     }
   };
 
-  const handleExpelStudent = async (student: StudentView) => {
+  const handleWithdrawStudent = async (student: StudentView) => {
     setSubmitting(true);
     setRequestError("");
 
     try {
-      await expelStudent(student.id);
+      await withdrawStudent(student.id);
       setShowArchiveModal(false);
       setSelectedStudent(null);
       await loadData();
@@ -317,13 +317,13 @@ export function Students() {
     }
   };
 
-  const handleBulkExpel = async (studentIds: number[]) => {
+  const handleBulkWithdraw = async (studentIds: number[]) => {
     setSubmitting(true);
     setRequestError("");
 
     try {
-      await bulkExpelStudents(studentIds);
-      setShowBulkExpelModal(false);
+      await bulkWithdrawStudents(studentIds);
+      setShowBulkWithdrawModal(false);
       await loadData();
     } catch (error) {
       setRequestError(toErrorMessage(error));
@@ -514,7 +514,7 @@ export function Students() {
                   Chuyển lớp hàng loạt
                 </button>
                 <button
-                  onClick={() => setShowBulkExpelModal(true)}
+                  onClick={() => setShowBulkWithdrawModal(true)}
                   disabled={submitting}
                   className="px-4 py-2 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors text-sm font-medium disabled:opacity-60"
                 >
@@ -693,7 +693,7 @@ export function Students() {
             setShowArchiveModal(false);
             setSelectedStudent(null);
           }}
-          onConfirm={handleExpelStudent}
+          onConfirm={handleWithdrawStudent}
           submitting={submitting}
           error={requestError}
         />
@@ -727,11 +727,11 @@ export function Students() {
         />
       )}
 
-      {showBulkExpelModal && (
-        <BulkExpelModal
+      {showBulkWithdrawModal && (
+        <BulkWithdrawModal
           studentCount={selectedActiveStudentIds.length}
-          onClose={() => setShowBulkExpelModal(false)}
-          onConfirm={() => handleBulkExpel(selectedActiveStudentIds)}
+          onClose={() => setShowBulkWithdrawModal(false)}
+          onConfirm={() => handleBulkWithdraw(selectedActiveStudentIds)}
           submitting={submitting}
           error={requestError}
         />
@@ -1445,7 +1445,7 @@ function BulkTransferModal({
   );
 }
 
-function BulkExpelModal({
+function BulkWithdrawModal({
   studentCount,
   onClose,
   onConfirm,

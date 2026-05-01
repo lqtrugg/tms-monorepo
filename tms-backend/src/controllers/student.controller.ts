@@ -6,20 +6,20 @@ import { ServiceError } from '../errors/service.error.js';
 import { StudentServiceError } from '../errors/student.error.js';
 import {
   archivePendingStudentBodySchema,
-  bulkExpelStudentsBodySchema,
+  bulkWithdrawStudentsBodySchema,
   bulkTransferStudentsBodySchema,
   createStudentBodySchema,
-  expelStudentBodySchema,
+  withdrawStudentBodySchema,
   reinstateStudentBodySchema,
   studentIdParamSchema,
   studentListQuerySchema,
   transferStudentBodySchema,
   updateStudentBodySchema,
   type ArchivePendingStudentBody,
-  type BulkExpelStudentsBody,
+  type BulkWithdrawStudentsBody,
   type BulkTransferStudentsBody,
   type CreateStudentBody,
-  type ExpelStudentBody,
+  type WithdrawStudentBody,
   type ReinstateStudentBody,
   type StudentIdParam,
   type StudentListQuery,
@@ -30,10 +30,10 @@ import { asyncHandler } from '../middlewares/async-handler.js';
 import { getValidatedBody, getValidatedParams, getValidatedQuery, validate } from '../middlewares/validate.js';
 import {
   archivePendingStudent,
-  bulkExpelStudents,
+  bulkWithdrawStudents,
   bulkTransferStudents,
   createStudent,
-  expelStudent,
+  withdrawStudent,
   getStudentById,
   listStudents,
   reinstateStudent,
@@ -95,10 +95,10 @@ studentRouter.post('/students/bulk/transfer', validate({ body: bulkTransferStude
   res.json({ students });
 }));
 
-studentRouter.post('/students/bulk/expel', validate({ body: bulkExpelStudentsBodySchema }), asyncHandler(async (req, res) => {
+studentRouter.post('/students/bulk/withdraw', validate({ body: bulkWithdrawStudentsBodySchema }), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
-  const payload = getValidatedBody<BulkExpelStudentsBody>(res);
-  const students = await bulkExpelStudents(teacherId, payload);
+  const payload = getValidatedBody<BulkWithdrawStudentsBody>(res);
+  const students = await bulkWithdrawStudents(teacherId, payload);
 
   res.json({ students });
 }));
@@ -135,14 +135,14 @@ studentRouter.post('/students/:studentId/transfer', validate({
   res.json({ student });
 }));
 
-studentRouter.post('/students/:studentId/expel', validate({
-  body: expelStudentBodySchema,
+studentRouter.post('/students/:studentId/withdraw', validate({
+  body: withdrawStudentBodySchema,
   params: studentIdParamSchema,
 }), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { studentId } = getValidatedParams<StudentIdParam>(res);
-  const payload = getValidatedBody<ExpelStudentBody>(res);
-  const student = await expelStudent(teacherId, studentId, payload);
+  const payload = getValidatedBody<WithdrawStudentBody>(res);
+  const student = await withdrawStudent(teacherId, studentId, payload);
 
   res.json({ student });
 }));

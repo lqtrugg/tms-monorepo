@@ -1,4 +1,4 @@
-import { EntityManager, In, IsNull } from 'typeorm';
+import { EntityManager } from 'typeorm';
 
 import { AppDataSource } from '../data-source.js';
 import {
@@ -6,8 +6,6 @@ import {
   ClassStatus,
   DiscordServer,
   Enrollment,
-  FeeRecord,
-  FeeRecordStatus,
   PendingArchiveReason,
   Student,
   StudentStatus,
@@ -16,14 +14,27 @@ import {
 } from '../entities/index.js';
 import { StudentServiceError } from '../errors/student.error.js';
 import { toStudentSummary } from '../helpers/student.helpers.js';
+import {
+  codeforcesHandleExists,
+  createZeroBalanceSnapshot,
+  findActiveEnrollment,
+  findActiveEnrollmentsByStudentIds,
+  findDiscordServerByClass,
+  findLastEnrollment,
+  findOwnedClass,
+  findOwnedStudent,
+  findRecentEnrollments,
+  listStudentsForTeacher,
+  loadBalanceSnapshotForStudent,
+  loadBalanceSnapshots,
+} from '../repositories/student.repository.js';
 import type {
   ArchivePendingStudentInput,
-  BulkExpelStudentsInput,
+  BulkWithdrawStudentsInput,
   BulkTransferStudentsInput,
   CreateStudentInput,
-  ExpelStudentInput,
+  WithdrawStudentInput,
   ReinstateStudentInput,
-  StudentBalanceSnapshot,
   StudentListFilters,
   StudentSummary,
   TransferStudentInput,
@@ -53,19 +64,8 @@ function normalizeCodeforcesHandle(value: string | null | undefined): string | n
   return normalized.length > 0 ? normalized : null;
 }
 
-function createZeroBalanceSnapshot(): StudentBalanceSnapshot {
-  return {
-    transactions_total: '0',
-    active_fee_total: '0',
-    balance: '0',
-  };
-}
-
 async function requireOwnedClass(manager: EntityManager, teacherId: number, classId: number): Promise<Class> {
-  const classEntity = await manager.getRepository(Class).findOneBy({
-    id: classId,
-    teacher_id: teacherId,
-  });
+  const classEntity = await findOwnedClass(manager, teacherId, classId);
 
   if (!classEntity) {
     throw new StudentServiceError('class not found', 404);
@@ -75,10 +75,7 @@ async function requireOwnedClass(manager: EntityManager, teacherId: number, clas
 }
 
 async function requireOwnedStudent(manager: EntityManager, teacherId: number, studentId: number): Promise<Student> {
-  const student = await manager.getRepository(Student).findOneBy({
-    id: studentId,
-    teacher_id: teacherId,
-  });
+  const student = await findOwnedStudent(manager, teacherId, studentId);
 
   if (!student) {
     throw new StudentServiceError('student not found', 404);
@@ -108,37 +105,11 @@ async function ensureUniqueCodeforcesHandle(
     return;
   }
 
-  const queryBuilder = manager
-    .getRepository(Student)
-    .createQueryBuilder('student')
-    .where('student.codeforces_handle IS NOT NULL')
-    .andWhere('LOWER(student.codeforces_handle) = LOWER(:handle)', {
-      handle: normalizedHandle,
-    });
-
-  if (excludeStudentId !== undefined) {
-    queryBuilder.andWhere('student.id <> :excludeStudentId', { excludeStudentId });
-  }
-
-  const duplicated = await queryBuilder.getExists();
+  const duplicated = await codeforcesHandleExists(manager, normalizedHandle, excludeStudentId);
 
   if (duplicated) {
     throw new StudentServiceError('codeforces_handle already exists', 409);
   }
-}
-
-async function getActiveEnrollment(
-  manager: EntityManager,
-  teacherId: number,
-  studentId: number,
-): Promise<Enrollment | null> {
-  return manager.getRepository(Enrollment).findOne({
-    where: {
-      teacher_id: teacherId,
-      student_id: studentId,
-      unenrolled_at: IsNull(),
-    },
-  });
 }
 
 async function requireActiveEnrollment(
@@ -146,92 +117,13 @@ async function requireActiveEnrollment(
   teacherId: number,
   studentId: number,
 ): Promise<Enrollment> {
-  const enrollment = await getActiveEnrollment(manager, teacherId, studentId);
+  const enrollment = await findActiveEnrollment(manager, teacherId, studentId);
 
   if (!enrollment) {
     throw new StudentServiceError('student has no active enrollment', 409);
   }
 
   return enrollment;
-}
-
-async function loadTransactionTotals(
-  manager: EntityManager,
-  teacherId: number,
-  studentIds: number[],
-): Promise<Map<number, bigint>> {
-  if (studentIds.length === 0) {
-    return new Map();
-  }
-
-  const rows = await manager
-    .getRepository(Transaction)
-    .createQueryBuilder('transaction')
-    .select('transaction.student_id', 'student_id')
-    .addSelect('COALESCE(SUM(transaction.amount), 0)', 'total')
-    .where('transaction.teacher_id = :teacherId', { teacherId })
-    .andWhere('transaction.student_id IN (:...studentIds)', { studentIds })
-    .groupBy('transaction.student_id')
-    .getRawMany<{ student_id: string; total: string }>();
-
-  return new Map(rows.map((row) => [Number(row.student_id), parseAmountToBigInt(row.total)]));
-}
-
-async function loadActiveFeeTotals(
-  manager: EntityManager,
-  teacherId: number,
-  studentIds: number[],
-): Promise<Map<number, bigint>> {
-  if (studentIds.length === 0) {
-    return new Map();
-  }
-
-  const rows = await manager
-    .getRepository(FeeRecord)
-    .createQueryBuilder('fee_record')
-    .select('fee_record.student_id', 'student_id')
-    .addSelect('COALESCE(SUM(fee_record.amount), 0)', 'total')
-    .where('fee_record.teacher_id = :teacherId', { teacherId })
-    .andWhere('fee_record.student_id IN (:...studentIds)', { studentIds })
-    .andWhere('fee_record.status = :status', { status: FeeRecordStatus.Active })
-    .groupBy('fee_record.student_id')
-    .getRawMany<{ student_id: string; total: string }>();
-
-  return new Map(rows.map((row) => [Number(row.student_id), parseAmountToBigInt(row.total)]));
-}
-
-async function loadBalanceSnapshots(
-  manager: EntityManager,
-  teacherId: number,
-  studentIds: number[],
-): Promise<Map<number, StudentBalanceSnapshot>> {
-  const transactionTotals = await loadTransactionTotals(manager, teacherId, studentIds);
-  const activeFeeTotals = await loadActiveFeeTotals(manager, teacherId, studentIds);
-
-  const balanceSnapshots = new Map<number, StudentBalanceSnapshot>();
-
-  studentIds.forEach((studentId) => {
-    const transactionsTotal = transactionTotals.get(studentId) ?? 0n;
-    const activeFeeTotal = activeFeeTotals.get(studentId) ?? 0n;
-    const balance = transactionsTotal - activeFeeTotal;
-
-    balanceSnapshots.set(studentId, {
-      transactions_total: transactionsTotal.toString(),
-      active_fee_total: activeFeeTotal.toString(),
-      balance: balance.toString(),
-    });
-  });
-
-  return balanceSnapshots;
-}
-
-async function loadBalanceSnapshotForStudent(
-  manager: EntityManager,
-  teacherId: number,
-  studentId: number,
-): Promise<StudentBalanceSnapshot> {
-  const snapshots = await loadBalanceSnapshots(manager, teacherId, [studentId]);
-  return snapshots.get(studentId) ?? createZeroBalanceSnapshot();
 }
 
 function ensureActiveStudent(student: Student): void {
@@ -257,62 +149,14 @@ export async function listStudents(teacherId: number, filters: StudentListFilter
     await requireOwnedClass(AppDataSource.manager, teacherId, filters.class_id);
   }
 
-  const queryBuilder = AppDataSource.getRepository(Student)
-    .createQueryBuilder('student')
-    .where('student.teacher_id = :teacherId', { teacherId });
-
-  if (filters.status !== undefined) {
-    queryBuilder.andWhere('student.status = :status', { status: filters.status });
-  }
-
-  if (filters.pending_archive_reason !== undefined) {
-    queryBuilder.andWhere('student.pending_archive_reason = :pendingArchiveReason', {
-      pendingArchiveReason: filters.pending_archive_reason,
-    });
-  }
-
-  if (filters.search !== undefined) {
-    queryBuilder.andWhere(
-      `(
-        student.full_name ILIKE :search
-        OR student.codeforces_handle ILIKE :search
-        OR student.discord_username ILIKE :search
-        OR student.phone ILIKE :search
-      )`,
-      { search: `%${filters.search}%` },
-    );
-  }
-
-  if (filters.class_id !== undefined) {
-    queryBuilder.innerJoin(
-      Enrollment,
-      'active_enrollment',
-      `
-        active_enrollment.teacher_id = student.teacher_id
-        AND active_enrollment.student_id = student.id
-        AND active_enrollment.unenrolled_at IS NULL
-        AND active_enrollment.class_id = :classId
-      `,
-      { classId: filters.class_id },
-    );
-  }
-
-  const students = await queryBuilder
-    .orderBy('student.created_at', 'DESC')
-    .getMany();
+  const students = await listStudentsForTeacher(AppDataSource.manager, teacherId, filters);
 
   if (students.length === 0) {
     return [];
   }
 
   const studentIds = students.map((student) => student.id);
-  const activeEnrollments = await AppDataSource.getRepository(Enrollment).find({
-    where: {
-      teacher_id: teacherId,
-      student_id: In(studentIds),
-      unenrolled_at: IsNull(),
-    },
-  });
+  const activeEnrollments = await findActiveEnrollmentsByStudentIds(AppDataSource.manager, teacherId, studentIds);
 
   const activeEnrollmentByStudentId = new Map<number, Enrollment>();
   activeEnrollments.forEach((enrollment) => {
@@ -335,7 +179,7 @@ export async function listStudents(teacherId: number, filters: StudentListFilter
 
 export async function getStudentById(teacherId: number, studentId: number): Promise<StudentSummary> {
   const student = await requireOwnedStudent(AppDataSource.manager, teacherId, studentId);
-  const activeEnrollment = await getActiveEnrollment(AppDataSource.manager, teacherId, studentId);
+  const activeEnrollment = await findActiveEnrollment(AppDataSource.manager, teacherId, studentId);
   const balanceSnapshot = await loadBalanceSnapshotForStudent(AppDataSource.manager, teacherId, studentId);
 
   return toStudentSummary(student, {
@@ -418,7 +262,7 @@ export async function updateStudent(
     }
 
     const savedStudent = await studentRepo.save(student);
-    const activeEnrollment = await getActiveEnrollment(manager, teacherId, studentId);
+    const activeEnrollment = await findActiveEnrollment(manager, teacherId, studentId);
     const balanceSnapshot = await loadBalanceSnapshotForStudent(manager, teacherId, studentId);
 
     return toStudentSummary(savedStudent, {
@@ -507,11 +351,11 @@ export async function bulkTransferStudents(
   });
 }
 
-async function expelStudentInManager(
+async function withdrawStudentInManager(
   manager: EntityManager,
   teacherId: number,
   studentId: number,
-  input: ExpelStudentInput,
+  input: WithdrawStudentInput,
 ): Promise<StudentSummary> {
   const studentRepo = manager.getRepository(Student);
   const enrollmentRepo = manager.getRepository(Enrollment);
@@ -519,16 +363,16 @@ async function expelStudentInManager(
   const student = await requireOwnedStudent(manager, teacherId, studentId);
   ensureActiveStudent(student);
 
-  const activeEnrollment = await getActiveEnrollment(manager, teacherId, studentId);
-  if (activeEnrollment && input.expelled_at <= activeEnrollment.enrolled_at) {
-    throw new StudentServiceError('expelled_at must be later than current enrollment start time', 400);
+  const activeEnrollment = await findActiveEnrollment(manager, teacherId, studentId);
+  if (activeEnrollment && input.withdrawn_at <= activeEnrollment.enrolled_at) {
+    throw new StudentServiceError('withdrawn_at must be later than current enrollment start time', 400);
   }
 
   const balanceSnapshot = await loadBalanceSnapshotForStudent(manager, teacherId, student.id);
   const balanceAmount = parseAmountToBigInt(balanceSnapshot.balance);
 
   if (activeEnrollment) {
-    activeEnrollment.unenrolled_at = input.expelled_at;
+    activeEnrollment.unenrolled_at = input.withdrawn_at;
     await enrollmentRepo.save(activeEnrollment);
   }
 
@@ -543,7 +387,7 @@ async function expelStudentInManager(
   } else {
     student.status = StudentStatus.Archived;
     student.pending_archive_reason = null;
-    student.archived_at = input.expelled_at;
+    student.archived_at = input.withdrawn_at;
   }
 
   const savedStudent = await studentRepo.save(student);
@@ -555,12 +399,12 @@ async function expelStudentInManager(
   });
 }
 
-export async function expelStudent(
+export async function withdrawStudent(
   teacherId: number,
   studentId: number,
-  input: ExpelStudentInput,
+  input: WithdrawStudentInput,
 ): Promise<StudentSummary> {
-  const result = await AppDataSource.transaction((manager) => expelStudentInManager(manager, teacherId, studentId, input));
+  const result = await AppDataSource.transaction((manager) => withdrawStudentInManager(manager, teacherId, studentId, input));
 
   // Fire-and-forget Discord kick from current class
   void handleDiscordKick(teacherId, studentId).catch(() => {});
@@ -568,17 +412,17 @@ export async function expelStudent(
   return result;
 }
 
-export async function bulkExpelStudents(
+export async function bulkWithdrawStudents(
   teacherId: number,
-  input: BulkExpelStudentsInput,
+  input: BulkWithdrawStudentsInput,
 ): Promise<StudentSummary[]> {
   return AppDataSource.transaction(async (manager) => {
     const studentIds = Array.from(new Set(input.student_ids));
     const result: StudentSummary[] = [];
 
     for (const studentId of studentIds) {
-      const student = await expelStudentInManager(manager, teacherId, studentId, {
-        expelled_at: input.expelled_at,
+      const student = await withdrawStudentInManager(manager, teacherId, studentId, {
+        withdrawn_at: input.withdrawn_at,
       });
       result.push(student);
     }
@@ -600,7 +444,7 @@ export async function reinstateStudent(
     ensureArchivedStudent(student);
     await requireActiveClass(manager, teacherId, input.class_id);
 
-    const activeEnrollment = await getActiveEnrollment(manager, teacherId, student.id);
+    const activeEnrollment = await findActiveEnrollment(manager, teacherId, student.id);
     if (activeEnrollment) {
       throw new StudentServiceError('student already has an active enrollment', 409);
     }
@@ -671,7 +515,7 @@ export async function archivePendingStudent(
       throw new StudentServiceError('student balance must be zero before archive', 409);
     }
 
-    const activeEnrollment = await getActiveEnrollment(manager, teacherId, student.id);
+    const activeEnrollment = await findActiveEnrollment(manager, teacherId, student.id);
     if (activeEnrollment) {
       if (input.archived_at <= activeEnrollment.enrolled_at) {
         throw new StudentServiceError('archived_at must be later than current enrollment start time', 400);
@@ -728,27 +572,18 @@ async function resolveDiscordUserId(
 }
 
 async function handleDiscordKick(teacherId: number, studentId: number): Promise<void> {
-  const student = await AppDataSource.getRepository(Student).findOneBy({
-    id: studentId,
-    teacher_id: teacherId,
-  });
+  const student = await findOwnedStudent(AppDataSource.manager, teacherId, studentId);
   if (!student?.discord_username) {
     return;
   }
 
   // Find the most recently unenrolled enrollment to determine old class
-  const lastEnrollment = await AppDataSource.getRepository(Enrollment).findOne({
-    where: { teacher_id: teacherId, student_id: studentId },
-    order: { id: 'DESC' },
-  });
+  const lastEnrollment = await findLastEnrollment(AppDataSource.manager, teacherId, studentId);
   if (!lastEnrollment) {
     return;
   }
 
-  const server = await AppDataSource.getRepository(DiscordServer).findOneBy({
-    teacher_id: teacherId,
-    class_id: lastEnrollment.class_id,
-  });
+  const server = await findDiscordServerByClass(AppDataSource.manager, teacherId, lastEnrollment.class_id);
   if (!server?.bot_token) {
     return;
   }
@@ -770,27 +605,17 @@ async function handleDiscordTransfer(
   studentId: number,
   newClassId: number,
 ): Promise<void> {
-  const student = await AppDataSource.getRepository(Student).findOneBy({
-    id: studentId,
-    teacher_id: teacherId,
-  });
+  const student = await findOwnedStudent(AppDataSource.manager, teacherId, studentId);
   if (!student?.discord_username) {
     return;
   }
 
   // Kick from old class (second-to-last enrollment)
-  const enrollments = await AppDataSource.getRepository(Enrollment).find({
-    where: { teacher_id: teacherId, student_id: studentId },
-    order: { id: 'DESC' },
-    take: 2,
-  });
+  const enrollments = await findRecentEnrollments(AppDataSource.manager, teacherId, studentId, 2);
 
   const oldEnrollment = enrollments.length >= 2 ? enrollments[1] : null;
   if (oldEnrollment) {
-    const oldServer = await AppDataSource.getRepository(DiscordServer).findOneBy({
-      teacher_id: teacherId,
-      class_id: oldEnrollment.class_id,
-    });
+    const oldServer = await findDiscordServerByClass(AppDataSource.manager, teacherId, oldEnrollment.class_id);
     if (oldServer?.bot_token) {
       const userId = await resolveDiscordUserId(oldServer, student.discord_username);
       if (userId) {
@@ -808,10 +633,7 @@ async function handleDiscordTransfer(
   }
 
   // Invite to new class Discord
-  const newServer = await AppDataSource.getRepository(DiscordServer).findOneBy({
-    teacher_id: teacherId,
-    class_id: newClassId,
-  });
+  const newServer = await findDiscordServerByClass(AppDataSource.manager, teacherId, newClassId);
   if (!newServer?.bot_token) {
     return;
   }
