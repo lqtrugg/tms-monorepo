@@ -39,8 +39,3 @@ export type CreateManualSessionInput = {
   scheduled_at: Date;
   end_time: string;
 };
-
-export type UpsertCodeforcesGroupInput = {
-  group_url: string;
-  group_name: string | null;
-};

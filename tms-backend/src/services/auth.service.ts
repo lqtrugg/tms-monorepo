@@ -7,9 +7,6 @@ import { Teacher, TeacherRole } from '../entities/index.js';
 import { AuthError } from '../errors/auth.error.js';
 import {
   isUniqueViolation,
-  normalizeLoginInput,
-  normalizeRegisterInput,
-  normalizeUpdateTeacherInput,
   toAuthTeacher,
 } from '../helpers/auth.helpers.js';
 import type {
@@ -51,7 +48,7 @@ export async function register(input: RegisterInput): Promise<AuthTokenResponse>
     codeforces_handle,
     codeforces_api_key,
     codeforces_api_secret,
-  } = normalizeRegisterInput(input);
+  } = input;
   const passwordHash = await bcrypt.hash(password, config.auth.bcryptSaltRounds);
 
   const teacher = teacherRepository().create({
@@ -83,7 +80,7 @@ export async function register(input: RegisterInput): Promise<AuthTokenResponse>
 }
 
 export async function login(input: LoginInput): Promise<AuthTokenResponse> {
-  const { username, password } = normalizeLoginInput(input);
+  const { username, password } = input;
   const teacher = await teacherRepository().findOneBy({ username });
 
   if (!teacher) {
@@ -112,7 +109,6 @@ export function me(teacher: Teacher): AuthTeacher {
 }
 
 export async function updateMe(teacherId: number, input: UpdateTeacherInput): Promise<AuthTeacher> {
-  const patch = normalizeUpdateTeacherInput(input);
   const repository = teacherRepository();
   const teacher = await repository.findOneBy({ id: teacherId });
 
@@ -120,24 +116,24 @@ export async function updateMe(teacherId: number, input: UpdateTeacherInput): Pr
     throw new AuthError('teacher not found', 404);
   }
 
-  if (patch.username !== undefined) {
-    teacher.username = patch.username;
+  if (input.username !== undefined) {
+    teacher.username = input.username;
   }
 
-  if (patch.password !== undefined) {
-    teacher.password_hash = await bcrypt.hash(patch.password, config.auth.bcryptSaltRounds);
+  if (input.password !== undefined) {
+    teacher.password_hash = await bcrypt.hash(input.password, config.auth.bcryptSaltRounds);
   }
 
-  if (patch.codeforces_handle !== undefined) {
-    teacher.codeforces_handle = patch.codeforces_handle;
+  if (input.codeforces_handle !== undefined) {
+    teacher.codeforces_handle = input.codeforces_handle;
   }
 
-  if (patch.codeforces_api_key !== undefined) {
-    teacher.codeforces_api_key = patch.codeforces_api_key;
+  if (input.codeforces_api_key !== undefined) {
+    teacher.codeforces_api_key = input.codeforces_api_key;
   }
 
-  if (patch.codeforces_api_secret !== undefined) {
-    teacher.codeforces_api_secret = patch.codeforces_api_secret;
+  if (input.codeforces_api_secret !== undefined) {
+    teacher.codeforces_api_secret = input.codeforces_api_secret;
   }
 
   try {

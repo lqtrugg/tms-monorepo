@@ -5,7 +5,6 @@ import {
   Class,
   ClassSchedule,
   ClassStatus,
-  CodeforcesGroup,
   DiscordServer,
   Enrollment,
   FeeRecord,
@@ -24,7 +23,6 @@ import type {
   SessionListFilters,
   UpdateClassInput,
   UpdateClassScheduleInput,
-  UpsertCodeforcesGroupInput,
 } from '../types/class.types.js';
 
 const SESSION_GENERATION_HORIZON_DAYS = 180;
@@ -872,62 +870,4 @@ export async function cancelSession(teacherId: number, sessionId: number): Promi
 
     return saved;
   });
-}
-
-export async function getCodeforcesGroup(teacherId: number, classId: number): Promise<CodeforcesGroup | null> {
-  await requireOwnedClass(AppDataSource.manager, teacherId, classId);
-
-  return AppDataSource.getRepository(CodeforcesGroup).findOneBy({
-    teacher_id: teacherId,
-    class_id: classId,
-  });
-}
-
-export async function upsertCodeforcesGroup(
-  teacherId: number,
-  classId: number,
-  input: UpsertCodeforcesGroupInput,
-): Promise<CodeforcesGroup> {
-  return AppDataSource.transaction(async (manager) => {
-    const classEntity = await requireOwnedClass(manager, teacherId, classId);
-    ensureClassActive(classEntity);
-
-    const groupRepo = manager.getRepository(CodeforcesGroup);
-    const existing = await groupRepo.findOneBy({
-      teacher_id: teacherId,
-      class_id: classId,
-    });
-
-    if (existing) {
-      existing.group_url = input.group_url;
-      existing.group_name = input.group_name;
-      return groupRepo.save(existing);
-    }
-
-    const group = groupRepo.create({
-      teacher_id: teacherId,
-      class_id: classId,
-      group_url: input.group_url,
-      group_name: input.group_name,
-    });
-
-    return groupRepo.save(group);
-  });
-}
-
-export async function removeCodeforcesGroup(teacherId: number, classId: number): Promise<boolean> {
-  await requireOwnedClass(AppDataSource.manager, teacherId, classId);
-
-  const groupRepo = AppDataSource.getRepository(CodeforcesGroup);
-  const existing = await groupRepo.findOneBy({
-    teacher_id: teacherId,
-    class_id: classId,
-  });
-
-  if (!existing) {
-    return false;
-  }
-
-  await groupRepo.remove(existing);
-  return true;
 }

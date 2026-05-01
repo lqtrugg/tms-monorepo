@@ -4,17 +4,31 @@ import { QueryFailedError } from 'typeorm';
 
 import { Teacher, TeacherRole } from '../entities/index.js';
 import { ClassServiceError } from '../errors/class.error.js';
+import { ServiceError } from '../errors/service.error.js';
 import {
-  parseClassListFilters,
-  parseCreateClassInput,
-  parseCreateClassScheduleInput,
-  parseCreateManualSessionInput,
-  parseIdParam,
-  parseSessionListFilters,
-  parseUpdateClassInput,
-  parseUpdateClassScheduleInput,
-  parseUpsertCodeforcesGroupInput,
-} from '../helpers/class.helpers.js';
+  classIdParamSchema,
+  classListQuerySchema,
+  classScheduleBodySchema,
+  classScheduleParamSchema,
+  createClassBodySchema,
+  createManualSessionBodySchema,
+  sessionIdParamSchema,
+  sessionListQuerySchema,
+  updateClassBodySchema,
+  updateClassScheduleBodySchema,
+  type ClassIdParam,
+  type ClassListQuery,
+  type ClassScheduleParam,
+  type CreateClassBody,
+  type CreateClassScheduleBody,
+  type CreateManualSessionBody,
+  type SessionIdParam,
+  type SessionListQuery,
+  type UpdateClassBody,
+  type UpdateClassScheduleBody,
+} from '../schemas/class.schemas.js';
+import { asyncHandler } from '../middlewares/async-handler.js';
+import { getValidatedBody, getValidatedParams, getValidatedQuery, validate } from '../middlewares/validate.js';
 import {
   archiveClass,
   cancelSession,
@@ -23,15 +37,12 @@ import {
   createManualSession,
   deleteClassSchedule,
   getClassById,
-  getCodeforcesGroup,
   listClasses,
   listClassSchedules,
   listClassSessions,
   listSessions,
-  removeCodeforcesGroup,
   updateClass,
   updateClassSchedule,
-  upsertCodeforcesGroup,
 } from '../services/class.service.js';
 import { requireRoles } from '../services/auth.rbac.js';
 
@@ -56,6 +67,11 @@ function handleClassError(error: unknown, _req: Request, res: Response, next: Ne
     return;
   }
 
+  if (error instanceof ServiceError) {
+    res.status(error.statusCode).json({ error: error.message });
+    return;
+  }
+
   if (error instanceof QueryFailedError) {
     const driverError = error.driverError as { code?: string; message?: string } | undefined;
 
@@ -68,212 +84,136 @@ function handleClassError(error: unknown, _req: Request, res: Response, next: Ne
   next(error);
 }
 
-classRouter.get('/classes', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const filters = parseClassListFilters(req.query);
-    const classes = await listClasses(teacherId, filters);
+classRouter.get('/classes', validate({ query: classListQuerySchema }), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const filters = getValidatedQuery<ClassListQuery>(res);
+  const classes = await listClasses(teacherId, filters);
 
-    res.json({ classes });
-  } catch (error) {
-    next(error);
-  }
+  res.json({ classes });
+}));
+
+classRouter.post('/classes', validate({ body: createClassBodySchema }), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const payload = getValidatedBody<CreateClassBody>(res);
+  const classEntity = await createClass(teacherId, payload);
+
+  res.status(201).json({ class: classEntity });
+}));
+
+classRouter.get('/classes/:classId', validate({ params: classIdParamSchema }), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const { classId } = getValidatedParams<ClassIdParam>(res);
+  const classEntity = await getClassById(teacherId, classId);
+
+  res.json({ class: classEntity });
+}));
+
+classRouter.patch('/classes/:classId', validate({
+  body: updateClassBodySchema,
+  params: classIdParamSchema,
+}), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const { classId } = getValidatedParams<ClassIdParam>(res);
+  const payload = getValidatedBody<UpdateClassBody>(res);
+  const classEntity = await updateClass(teacherId, classId, payload);
+
+  res.json({ class: classEntity });
+}));
+
+const handleArchiveClass = asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const { classId } = getValidatedParams<ClassIdParam>(res);
+  const classEntity = await archiveClass(teacherId, classId);
+
+  res.json({ class: classEntity });
 });
 
-classRouter.post('/classes', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const payload = parseCreateClassInput(req.body);
-    const classEntity = await createClass(teacherId, payload);
+classRouter.post('/classes/:classId/archive', validate({ params: classIdParamSchema }), handleArchiveClass);
+classRouter.post('/classes/:classId/close', validate({ params: classIdParamSchema }), handleArchiveClass);
 
-    res.status(201).json({ class: classEntity });
-  } catch (error) {
-    next(error);
-  }
-});
+classRouter.get('/classes/:classId/schedules', validate({ params: classIdParamSchema }), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const { classId } = getValidatedParams<ClassIdParam>(res);
+  const schedules = await listClassSchedules(teacherId, classId);
 
-classRouter.get('/classes/:classId', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const classId = parseIdParam(req.params.classId, 'class_id');
-    const classEntity = await getClassById(teacherId, classId);
+  res.json({ schedules });
+}));
 
-    res.json({ class: classEntity });
-  } catch (error) {
-    next(error);
-  }
-});
+classRouter.post('/classes/:classId/schedules', validate({
+  body: classScheduleBodySchema,
+  params: classIdParamSchema,
+}), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const { classId } = getValidatedParams<ClassIdParam>(res);
+  const payload = getValidatedBody<CreateClassScheduleBody>(res);
+  const result = await createClassSchedule(teacherId, classId, payload);
 
-classRouter.patch('/classes/:classId', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const classId = parseIdParam(req.params.classId, 'class_id');
-    const payload = parseUpdateClassInput(req.body);
-    const classEntity = await updateClass(teacherId, classId, payload);
+  res.status(201).json(result);
+}));
 
-    res.json({ class: classEntity });
-  } catch (error) {
-    next(error);
-  }
-});
+classRouter.patch('/classes/:classId/schedules/:scheduleId', validate({
+  body: updateClassScheduleBodySchema,
+  params: classScheduleParamSchema,
+}), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const { classId, scheduleId } = getValidatedParams<ClassScheduleParam>(res);
+  const payload = getValidatedBody<UpdateClassScheduleBody>(res);
+  const result = await updateClassSchedule(teacherId, classId, scheduleId, payload);
 
-async function handleArchiveClass(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const teacherId = getTeacherId(req);
-    const classId = parseIdParam(req.params.classId, 'class_id');
-    const classEntity = await archiveClass(teacherId, classId);
+  res.json(result);
+}));
 
-    res.json({ class: classEntity });
-  } catch (error) {
-    next(error);
-  }
-}
+classRouter.delete('/classes/:classId/schedules/:scheduleId', validate({ params: classScheduleParamSchema }), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const { classId, scheduleId } = getValidatedParams<ClassScheduleParam>(res);
 
-classRouter.post('/classes/:classId/archive', handleArchiveClass);
-classRouter.post('/classes/:classId/close', handleArchiveClass);
+  await deleteClassSchedule(teacherId, classId, scheduleId);
 
-classRouter.get('/classes/:classId/schedules', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const classId = parseIdParam(req.params.classId, 'class_id');
-    const schedules = await listClassSchedules(teacherId, classId);
+  res.status(204).send();
+}));
 
-    res.json({ schedules });
-  } catch (error) {
-    next(error);
-  }
-});
+classRouter.get('/sessions', validate({ query: sessionListQuerySchema }), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const filters = getValidatedQuery<SessionListQuery>(res);
+  const sessions = await listSessions(teacherId, filters);
 
-classRouter.post('/classes/:classId/schedules', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const classId = parseIdParam(req.params.classId, 'class_id');
-    const payload = parseCreateClassScheduleInput(req.body);
-    const result = await createClassSchedule(teacherId, classId, payload);
+  res.json({ sessions });
+}));
 
-    res.status(201).json(result);
-  } catch (error) {
-    next(error);
-  }
-});
+classRouter.get('/classes/:classId/sessions', validate({
+  params: classIdParamSchema,
+  query: sessionListQuerySchema,
+}), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const { classId } = getValidatedParams<ClassIdParam>(res);
+  const filters = getValidatedQuery<SessionListQuery>(res);
+  const sessions = await listClassSessions(teacherId, classId, {
+    status: filters.status,
+    from: filters.from,
+    to: filters.to,
+  });
 
-classRouter.patch('/classes/:classId/schedules/:scheduleId', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const classId = parseIdParam(req.params.classId, 'class_id');
-    const scheduleId = parseIdParam(req.params.scheduleId, 'schedule_id');
-    const payload = parseUpdateClassScheduleInput(req.body);
-    const result = await updateClassSchedule(teacherId, classId, scheduleId, payload);
+  res.json({ sessions });
+}));
 
-    res.json(result);
-  } catch (error) {
-    next(error);
-  }
-});
+classRouter.post('/classes/:classId/sessions/manual', validate({
+  body: createManualSessionBodySchema,
+  params: classIdParamSchema,
+}), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const { classId } = getValidatedParams<ClassIdParam>(res);
+  const payload = getValidatedBody<CreateManualSessionBody>(res);
+  const session = await createManualSession(teacherId, classId, payload);
 
-classRouter.delete('/classes/:classId/schedules/:scheduleId', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const classId = parseIdParam(req.params.classId, 'class_id');
-    const scheduleId = parseIdParam(req.params.scheduleId, 'schedule_id');
+  res.status(201).json({ session });
+}));
 
-    await deleteClassSchedule(teacherId, classId, scheduleId);
+classRouter.post('/sessions/:sessionId/cancel', validate({ params: sessionIdParamSchema }), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const { sessionId } = getValidatedParams<SessionIdParam>(res);
+  const session = await cancelSession(teacherId, sessionId);
 
-    res.status(204).send();
-  } catch (error) {
-    next(error);
-  }
-});
-
-classRouter.get('/sessions', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const filters = parseSessionListFilters(req.query);
-    const sessions = await listSessions(teacherId, filters);
-
-    res.json({ sessions });
-  } catch (error) {
-    next(error);
-  }
-});
-
-classRouter.get('/classes/:classId/sessions', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const classId = parseIdParam(req.params.classId, 'class_id');
-    const filters = parseSessionListFilters(req.query);
-    const sessions = await listClassSessions(teacherId, classId, {
-      status: filters.status,
-      from: filters.from,
-      to: filters.to,
-    });
-
-    res.json({ sessions });
-  } catch (error) {
-    next(error);
-  }
-});
-
-classRouter.post('/classes/:classId/sessions/manual', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const classId = parseIdParam(req.params.classId, 'class_id');
-    const payload = parseCreateManualSessionInput(req.body);
-    const session = await createManualSession(teacherId, classId, payload);
-
-    res.status(201).json({ session });
-  } catch (error) {
-    next(error);
-  }
-});
-
-classRouter.post('/sessions/:sessionId/cancel', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const sessionId = parseIdParam(req.params.sessionId, 'session_id');
-    const session = await cancelSession(teacherId, sessionId);
-
-    res.json({ session });
-  } catch (error) {
-    next(error);
-  }
-});
-
-classRouter.get('/classes/:classId/codeforces-group', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const classId = parseIdParam(req.params.classId, 'class_id');
-    const group = await getCodeforcesGroup(teacherId, classId);
-
-    res.json({ codeforces_group: group });
-  } catch (error) {
-    next(error);
-  }
-});
-
-classRouter.put('/classes/:classId/codeforces-group', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const classId = parseIdParam(req.params.classId, 'class_id');
-    const payload = parseUpsertCodeforcesGroupInput(req.body);
-    const group = await upsertCodeforcesGroup(teacherId, classId, payload);
-
-    res.json({ codeforces_group: group });
-  } catch (error) {
-    next(error);
-  }
-});
-
-classRouter.delete('/classes/:classId/codeforces-group', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const classId = parseIdParam(req.params.classId, 'class_id');
-    const removed = await removeCodeforcesGroup(teacherId, classId);
-
-    res.json({ removed });
-  } catch (error) {
-    next(error);
-  }
-});
+  res.json({ session });
+}));
 
 classRouter.use(handleClassError);

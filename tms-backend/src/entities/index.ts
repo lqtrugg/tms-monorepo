@@ -1,7 +1,6 @@
 export { Attendance } from './attendance.entity.js';
 export { Class } from './class.entity.js';
 export { ClassSchedule } from './class-schedule.entity.js';
-export { CodeforcesGroup } from './codeforces-group.entity.js';
 export { DiscordMessageRecipient } from './discord-message-recipient.entity.js';
 export { DiscordMessage } from './discord-message.entity.js';
 export { DiscordServer } from './discord-server.entity.js';
@@ -20,7 +19,6 @@ export * from './enums.js';
 import { Attendance } from './attendance.entity.js';
 import { Class } from './class.entity.js';
 import { ClassSchedule } from './class-schedule.entity.js';
-import { CodeforcesGroup } from './codeforces-group.entity.js';
 import { DiscordMessageRecipient } from './discord-message-recipient.entity.js';
 import { DiscordMessage } from './discord-message.entity.js';
 import { DiscordServer } from './discord-server.entity.js';
@@ -48,7 +46,6 @@ export const appEntities = [
   DiscordServer,
   DiscordMessage,
   DiscordMessageRecipient,
-  CodeforcesGroup,
   Topic,
   TopicProblem,
   TopicStanding,

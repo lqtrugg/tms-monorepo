@@ -16,7 +16,6 @@ export interface Class {
   name: string;
   schedule: string;
   feePerSession: number;
-  codeforcesGroupId?: string;
   status: 'active' | 'archived';
   studentCount: number;
 }
@@ -111,7 +110,6 @@ export const mockClasses: Class[] = [
     name: 'Lớp Cơ Bản',
     schedule: 'Thứ 3, 5, 7 - 19:00',
     feePerSession: 150000,
-    codeforcesGroupId: 'group_123',
     status: 'active',
     studentCount: 8,
   },
@@ -120,7 +118,6 @@ export const mockClasses: Class[] = [
     name: 'Lớp Nâng Cao',
     schedule: 'Thứ 2, 4, 6 - 20:00',
     feePerSession: 200000,
-    codeforcesGroupId: 'group_456',
     status: 'active',
     studentCount: 6,
   },

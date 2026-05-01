@@ -1,9 +1,20 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import passport from 'passport';
 
-import { AttendanceStatus, Teacher, TeacherRole } from '../entities/index.js';
+import { Teacher, TeacherRole } from '../entities/index.js';
 import { ServiceError } from '../errors/service.error.js';
-import { asRecord, parseOptionalString, parsePositiveInteger } from '../helpers/service.helpers.js';
+import {
+  attendanceListQuerySchema,
+  sessionIdParamSchema,
+  sessionStudentIdParamSchema,
+  upsertAttendanceBodySchema,
+  type AttendanceListQuery,
+  type SessionIdParam,
+  type SessionStudentIdParam,
+  type UpsertAttendanceBody,
+} from '../schemas/attendance.schemas.js';
+import { asyncHandler } from '../middlewares/async-handler.js';
+import { getValidatedBody, getValidatedParams, getValidatedQuery, validate } from '../middlewares/validate.js';
 import { requireRoles } from '../services/auth.rbac.js';
 import {
   listAttendanceRecords,
@@ -28,111 +39,53 @@ function getTeacherId(req: Request): number {
   return teacher.id;
 }
 
-function parseAttendanceStatus(value: unknown): AttendanceStatus | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
+attendanceRouter.get('/sessions/:sessionId/attendance', validate({ params: sessionIdParamSchema }), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const { sessionId } = getValidatedParams<SessionIdParam>(res);
+  const data = await listSessionAttendance(teacherId, sessionId);
 
-  if (
-    value !== AttendanceStatus.Present
-    && value !== AttendanceStatus.AbsentExcused
-    && value !== AttendanceStatus.AbsentUnexcused
-  ) {
-    throw new ServiceError(
-      `status must be one of: ${AttendanceStatus.Present}, ${AttendanceStatus.AbsentExcused}, ${AttendanceStatus.AbsentUnexcused}`,
-      400,
-    );
-  }
+  res.json(data);
+}));
 
-  return value;
-}
+attendanceRouter.post('/sessions/:sessionId/attendance/sync', validate({ params: sessionIdParamSchema }), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const { sessionId } = getValidatedParams<SessionIdParam>(res);
+  const result = await syncVoiceAttendanceForSession(teacherId, sessionId);
 
-function parseAttendanceNotes(body: Record<string, unknown>): string | null | undefined {
-  if (!Object.prototype.hasOwnProperty.call(body, 'notes')) {
-    return undefined;
-  }
+  res.json(result);
+}));
 
-  if (body.notes === null) {
-    return null;
-  }
+attendanceRouter.put('/sessions/:sessionId/attendance/:studentId', validate({
+  body: upsertAttendanceBodySchema,
+  params: sessionStudentIdParamSchema,
+}), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const { sessionId, studentId } = getValidatedParams<SessionStudentIdParam>(res);
+  const body = getValidatedBody<UpsertAttendanceBody>(res);
 
-  return parseOptionalString(body.notes, 'notes') ?? null;
-}
+  const attendance = await upsertSessionAttendance(teacherId, sessionId, studentId, {
+    status: body.status,
+    notes: body.notes,
+  });
 
-attendanceRouter.get('/sessions/:sessionId/attendance', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const sessionId = parsePositiveInteger(req.params.sessionId, 'session_id');
-    const data = await listSessionAttendance(teacherId, sessionId);
+  res.json({ attendance });
+}));
 
-    res.json(data);
-  } catch (error) {
-    next(error);
-  }
-});
+attendanceRouter.get('/attendance', validate({ query: attendanceListQuerySchema }), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const query = getValidatedQuery<AttendanceListQuery>(res);
+  const records = await listAttendanceRecords(teacherId, query);
 
-attendanceRouter.post('/sessions/:sessionId/attendance/sync', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const sessionId = parsePositiveInteger(req.params.sessionId, 'session_id');
-    const result = await syncVoiceAttendanceForSession(teacherId, sessionId);
+  res.json({ attendance: records });
+}));
 
-    res.json(result);
-  } catch (error) {
-    next(error);
-  }
-});
+attendanceRouter.delete('/sessions/:sessionId/attendance', validate({ params: sessionIdParamSchema }), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const { sessionId } = getValidatedParams<SessionIdParam>(res);
+  await resetSessionAttendance(teacherId, sessionId);
 
-attendanceRouter.put('/sessions/:sessionId/attendance/:studentId', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const sessionId = parsePositiveInteger(req.params.sessionId, 'session_id');
-    const studentId = parsePositiveInteger(req.params.studentId, 'student_id');
-    const body = asRecord(req.body, 'body');
-    const status = parseAttendanceStatus(body.status);
-
-    if (!status) {
-      throw new ServiceError('status is required', 400);
-    }
-
-    const attendance = await upsertSessionAttendance(teacherId, sessionId, studentId, {
-      status,
-      notes: parseAttendanceNotes(body),
-    });
-
-    res.json({ attendance });
-  } catch (error) {
-    next(error);
-  }
-});
-
-attendanceRouter.get('/attendance', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const query = asRecord(req.query, 'query');
-    const records = await listAttendanceRecords(teacherId, {
-      session_id: query.session_id === undefined ? undefined : parsePositiveInteger(query.session_id, 'session_id'),
-      student_id: query.student_id === undefined ? undefined : parsePositiveInteger(query.student_id, 'student_id'),
-      status: parseAttendanceStatus(query.status),
-    });
-
-    res.json({ attendance: records });
-  } catch (error) {
-    next(error);
-  }
-});
-
-attendanceRouter.delete('/sessions/:sessionId/attendance', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const sessionId = parsePositiveInteger(req.params.sessionId, 'session_id');
-    await resetSessionAttendance(teacherId, sessionId);
-
-    res.status(204).send();
-  } catch (error) {
-    next(error);
-  }
-});
+  res.status(204).send();
+}));
 
 function handleServiceError(error: unknown, _req: Request, res: Response, next: NextFunction): void {
   if (error instanceof ServiceError) {

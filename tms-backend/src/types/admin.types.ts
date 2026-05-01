@@ -1,23 +1,23 @@
 import { TeacherRole } from '../entities/index.js';
 
 export type CreateTeacherByAdminInput = {
-  username: unknown;
-  password: unknown;
-  role?: unknown;
-  is_active?: unknown;
-  codeforces_handle?: unknown;
-  codeforces_api_key?: unknown;
-  codeforces_api_secret?: unknown;
+  username: string;
+  password: string;
+  role: TeacherRole;
+  is_active: boolean;
+  codeforces_handle: string | null;
+  codeforces_api_key: string | null;
+  codeforces_api_secret: string | null;
 };
 
 export type UpdateTeacherByAdminInput = {
-  username?: unknown;
-  password?: unknown;
-  role?: unknown;
-  is_active?: unknown;
-  codeforces_handle?: unknown;
-  codeforces_api_key?: unknown;
-  codeforces_api_secret?: unknown;
+  username?: string;
+  password?: string;
+  role?: TeacherRole;
+  is_active?: boolean;
+  codeforces_handle?: string | null;
+  codeforces_api_key?: string | null;
+  codeforces_api_secret?: string | null;
 };
 
 export type AdminTeacher = {

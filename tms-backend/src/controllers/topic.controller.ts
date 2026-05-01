@@ -4,12 +4,19 @@ import passport from 'passport';
 import { Teacher, TeacherRole } from '../entities/index.js';
 import { ServiceError } from '../errors/service.error.js';
 import {
-  asRecord,
-  parseDateTime,
-  parseOptionalString,
-  parsePositiveInteger,
-  parseRequiredString,
-} from '../helpers/service.helpers.js';
+  addTopicProblemBodySchema,
+  createTopicBodySchema,
+  topicIdParamSchema,
+  topicListQuerySchema,
+  upsertTopicStandingBodySchema,
+  type AddTopicProblemBody,
+  type CreateTopicBody,
+  type TopicIdParam,
+  type TopicListQuery,
+  type UpsertTopicStandingBody,
+} from '../schemas/topic.schemas.js';
+import { asyncHandler } from '../middlewares/async-handler.js';
+import { getValidatedBody, getValidatedParams, getValidatedQuery, validate } from '../middlewares/validate.js';
 import {
   addTopicProblem,
   closeTopic,
@@ -35,137 +42,61 @@ function getTeacherId(req: Request): number {
   return teacher.id;
 }
 
-function parseTopicStatus(value: unknown): 'active' | 'closed' | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
+topicRouter.get('/topics', validate({ query: topicListQuerySchema }), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const query = getValidatedQuery<TopicListQuery>(res);
+  const topics = await listTopics(teacherId, query);
 
-  if (value !== 'active' && value !== 'closed') {
-    throw new ServiceError('status must be one of: active, closed', 400);
-  }
+  res.json({ topics });
+}));
 
-  return value;
-}
+topicRouter.post('/topics', validate({ body: createTopicBodySchema }), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const body = getValidatedBody<CreateTopicBody>(res);
+  const topic = await createTopic(teacherId, body);
 
-function parseOptionalInteger(value: unknown, fieldName: string): number | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
+  res.status(201).json({ topic });
+}));
 
-  return parsePositiveInteger(value, fieldName);
-}
+topicRouter.post('/topics/:topicId/close', validate({ params: topicIdParamSchema }), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const { topicId } = getValidatedParams<TopicIdParam>(res);
+  const topic = await closeTopic(teacherId, topicId);
 
-function parseOptionalBoolean(value: unknown, fieldName: string): boolean | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
+  res.json({ topic });
+}));
 
-  if (typeof value === 'boolean') {
-    return value;
-  }
+topicRouter.post('/topics/:topicId/problems', validate({
+  body: addTopicProblemBodySchema,
+  params: topicIdParamSchema,
+}), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const { topicId } = getValidatedParams<TopicIdParam>(res);
+  const body = getValidatedBody<AddTopicProblemBody>(res);
+  const problem = await addTopicProblem(teacherId, topicId, body);
 
-  if (value === 'true') {
-    return true;
-  }
+  res.status(201).json({ problem });
+}));
 
-  if (value === 'false') {
-    return false;
-  }
+topicRouter.put('/topics/:topicId/standings', validate({
+  body: upsertTopicStandingBodySchema,
+  params: topicIdParamSchema,
+}), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const { topicId } = getValidatedParams<TopicIdParam>(res);
+  const body = getValidatedBody<UpsertTopicStandingBody>(res);
+  const standing = await upsertTopicStanding(teacherId, topicId, body);
 
-  throw new ServiceError(`${fieldName} must be a boolean`, 400);
-}
+  res.json({ standing });
+}));
 
-topicRouter.get('/topics', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const query = asRecord(req.query, 'query');
-    const topics = await listTopics(teacherId, {
-      class_id: parseOptionalInteger(query.class_id, 'class_id'),
-      status: parseTopicStatus(query.status),
-    });
+topicRouter.get('/topics/:topicId/standing', validate({ params: topicIdParamSchema }), asyncHandler(async (req, res) => {
+  const teacherId = getTeacherId(req);
+  const { topicId } = getValidatedParams<TopicIdParam>(res);
+  const matrix = await getTopicStandingMatrix(teacherId, topicId);
 
-    res.json({ topics });
-  } catch (error) {
-    next(error);
-  }
-});
-
-topicRouter.post('/topics', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const body = asRecord(req.body, 'body');
-    const topic = await createTopic(teacherId, {
-      class_id: parsePositiveInteger(body.class_id, 'class_id'),
-      gym_link: parseRequiredString(body.gym_link, 'gym_link'),
-      pull_interval_minutes: parseOptionalInteger(body.pull_interval_minutes, 'pull_interval_minutes'),
-    });
-
-    res.status(201).json({ topic });
-  } catch (error) {
-    next(error);
-  }
-});
-
-topicRouter.post('/topics/:topicId/close', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const topicId = parsePositiveInteger(req.params.topicId, 'topic_id');
-    const topic = await closeTopic(teacherId, topicId);
-
-    res.json({ topic });
-  } catch (error) {
-    next(error);
-  }
-});
-
-topicRouter.post('/topics/:topicId/problems', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const topicId = parsePositiveInteger(req.params.topicId, 'topic_id');
-    const body = asRecord(req.body, 'body');
-    const problem = await addTopicProblem(teacherId, topicId, {
-      problem_index: parseRequiredString(body.problem_index, 'problem_index'),
-      problem_name: parseOptionalString(body.problem_name, 'problem_name') ?? null,
-    });
-
-    res.status(201).json({ problem });
-  } catch (error) {
-    next(error);
-  }
-});
-
-topicRouter.put('/topics/:topicId/standings', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const topicId = parsePositiveInteger(req.params.topicId, 'topic_id');
-    const body = asRecord(req.body, 'body');
-    const standing = await upsertTopicStanding(teacherId, topicId, {
-      student_id: parsePositiveInteger(body.student_id, 'student_id'),
-      problem_id: parsePositiveInteger(body.problem_id, 'problem_id'),
-      solved: parseOptionalBoolean(body.solved, 'solved') ?? false,
-      penalty_minutes: body.penalty_minutes === undefined
-        ? null
-        : parseOptionalInteger(body.penalty_minutes, 'penalty_minutes') ?? null,
-      pulled_at: body.pulled_at === undefined ? undefined : parseDateTime(body.pulled_at, 'pulled_at'),
-    });
-
-    res.json({ standing });
-  } catch (error) {
-    next(error);
-  }
-});
-
-topicRouter.get('/topics/:topicId/standing', async (req, res, next) => {
-  try {
-    const teacherId = getTeacherId(req);
-    const topicId = parsePositiveInteger(req.params.topicId, 'topic_id');
-    const matrix = await getTopicStandingMatrix(teacherId, topicId);
-
-    res.json(matrix);
-  } catch (error) {
-    next(error);
-  }
-});
+  res.json(matrix);
+}));
 
 function handleServiceError(error: unknown, _req: Request, res: Response, next: NextFunction): void {
   if (error instanceof ServiceError) {
