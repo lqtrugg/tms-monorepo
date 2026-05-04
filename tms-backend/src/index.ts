@@ -2,14 +2,16 @@ import express from 'express';
 
 import config from './config.js';
 import { AppDataSource, initializeDatabase } from './data-source.js';
+import { createJobRunner } from './jobs/index.js';
 import {
   attendanceRouter,
+  academicReportRouter,
   classRouter,
-  startSessionStatusSync,
-  startVoiceAttendanceSync,
-  stopSessionStatusSync,
-  stopVoiceAttendanceSync,
+  createAutoSyncJob,
+  createSessionStatusSyncJob,
+  createVoiceAttendanceSyncJob,
   studentRouter,
+  topicRouter,
 } from './modules/academic/index.js';
 import {
   adminRouter,
@@ -17,10 +19,8 @@ import {
   configurePassport,
   ensureSystemAdminAccount,
 } from './modules/identity/index.js';
-import { financeRouter } from './modules/finance/index.js';
+import { financeReportRouter, financeRouter } from './modules/finance/index.js';
 import { messagingRouter } from './modules/messaging/index.js';
-import { reportingRouter } from './modules/reporting/index.js';
-import { startAutoSyncScheduler, stopAutoSyncScheduler, topicRouter } from './modules/training/index.js';
 
 const app = express();
 const passport = configurePassport();
@@ -40,7 +40,8 @@ app.use(config.apiPrefix, attendanceRouter);
 app.use(config.apiPrefix, financeRouter);
 app.use(config.apiPrefix, topicRouter);
 app.use(config.apiPrefix, messagingRouter);
-app.use(config.apiPrefix, reportingRouter);
+app.use(config.apiPrefix, academicReportRouter);
+app.use(config.apiPrefix, financeReportRouter);
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(error);
@@ -55,21 +56,24 @@ async function main(): Promise<void> {
   await initializeDatabase();
   await ensureSystemAdminAccount();
 
-  if (config.autoSync.enabled) {
-    startAutoSyncScheduler({
+  const jobRunner = createJobRunner([
+    createAutoSyncJob({
+      enabled: config.autoSync.enabled,
       intervalSeconds: config.autoSync.intervalSeconds,
       syncDiscord: config.autoSync.syncDiscord,
       syncCodeforces: config.autoSync.syncCodeforces,
-    });
-  }
+    }),
+    createSessionStatusSyncJob({
+      enabled: config.sessionStatusSync.enabled,
+      intervalMs: config.sessionStatusSync.intervalSeconds * 1000,
+    }),
+    createVoiceAttendanceSyncJob({
+      enabled: config.voiceAttendanceSync.enabled,
+      intervalMs: config.voiceAttendanceSync.intervalSeconds * 1000,
+    }),
+  ]);
 
-  if (config.sessionStatusSync.enabled) {
-    startSessionStatusSync(config.sessionStatusSync.intervalSeconds * 1000);
-  }
-
-  if (config.voiceAttendanceSync.enabled) {
-    startVoiceAttendanceSync(config.voiceAttendanceSync.intervalSeconds * 1000);
-  }
+  jobRunner.startAll();
 
   const server = config.host ? app.listen(config.port, config.host) : app.listen(config.port);
 
@@ -87,9 +91,7 @@ async function main(): Promise<void> {
 
   const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
     console.log(`Received ${signal}, shutting down backend server`);
-    stopAutoSyncScheduler();
-    stopSessionStatusSync();
-    stopVoiceAttendanceSync();
+    await jobRunner.stopAll();
 
     server.close(async () => {
       if (AppDataSource.isInitialized) {

@@ -11,6 +11,7 @@ import {
   SessionStatus,
   Student,
 } from '../../../entities/index.js';
+import type { IntervalJob } from '../../../jobs/index.js';
 import { ServiceError } from '../../../shared/errors/service.error.js';
 import { upsertBotSessionAttendance } from '../attendance/attendance.service.js';
 
@@ -39,8 +40,6 @@ type VoiceAttendanceClientState = {
 
 const DEFAULT_SYNC_INTERVAL_MS = 15_000;
 
-let voiceAttendanceTimer: NodeJS.Timeout | null = null;
-let isSyncRunning = false;
 const clientByToken = new Map<string, VoiceAttendanceClientState>();
 
 function currentTimeString(now: Date): string {
@@ -473,60 +472,42 @@ async function syncVoiceState(voiceState: VoiceState): Promise<void> {
 }
 
 export async function syncVoiceAttendanceOnce(): Promise<void> {
-  if (!AppDataSource.isInitialized || isSyncRunning) {
+  if (!AppDataSource.isInitialized) {
     return;
   }
 
-  isSyncRunning = true;
+  const sessions = await getOpenVoiceAttendanceSessions(new Date());
+  const activeTokens = new Set(sessions.map((session) => session.bot_token));
+  activeTokens.forEach((botToken) => {
+    ensureClient(botToken);
+  });
 
-  try {
-    const sessions = await getOpenVoiceAttendanceSessions(new Date());
-    const activeTokens = new Set(sessions.map((session) => session.bot_token));
-    activeTokens.forEach((botToken) => {
-      ensureClient(botToken);
-    });
+  let markedCount = 0;
+  for (const session of sessions) {
+    markedCount += await syncOpenSession(session);
+  }
 
-    let markedCount = 0;
-    for (const session of sessions) {
-      markedCount += await syncOpenSession(session);
-    }
-
-    if (markedCount > 0) {
-      console.log(`[voice-attendance] marked present: ${markedCount}`);
-    }
-  } catch (error) {
-    console.error('[voice-attendance] sync failed', error);
-  } finally {
-    isSyncRunning = false;
+  if (markedCount > 0) {
+    console.log(`[voice-attendance] marked present: ${markedCount}`);
   }
 }
 
-export function startVoiceAttendanceSync(intervalMs = DEFAULT_SYNC_INTERVAL_MS): void {
-  if (voiceAttendanceTimer) {
-    return;
-  }
-
-  void syncVoiceAttendanceOnce();
-  voiceAttendanceTimer = setInterval(() => {
-    void syncVoiceAttendanceOnce();
-  }, Math.max(5_000, intervalMs));
-
-  if (typeof voiceAttendanceTimer.unref === 'function') {
-    voiceAttendanceTimer.unref();
-  }
-
-  console.log(`[voice-attendance] scheduler started (interval=${Math.max(5_000, intervalMs)}ms)`);
-}
-
-export function stopVoiceAttendanceSync(): void {
-  if (voiceAttendanceTimer) {
-    clearInterval(voiceAttendanceTimer);
-    voiceAttendanceTimer = null;
-  }
-
+function destroyVoiceAttendanceClients(): void {
   clientByToken.forEach((state) => {
     state.client.destroy();
   });
   clientByToken.clear();
-  console.log('[voice-attendance] scheduler stopped');
+}
+
+export function createVoiceAttendanceSyncJob(options: {
+  enabled: boolean;
+  intervalMs?: number;
+}): IntervalJob {
+  return {
+    name: 'voice-attendance-sync',
+    enabled: options.enabled,
+    intervalMs: options.intervalMs ?? DEFAULT_SYNC_INTERVAL_MS,
+    run: syncVoiceAttendanceOnce,
+    onStop: destroyVoiceAttendanceClients,
+  };
 }

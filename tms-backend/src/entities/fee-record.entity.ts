@@ -65,4 +65,41 @@ export class FeeRecord {
 
   @Column({ type: 'timestamptz', nullable: true })
   cancelled_at!: Date | null;
+
+  isActive(): boolean {
+    return this.status === FeeRecordStatus.Active;
+  }
+
+  isCancelled(): boolean {
+    return this.status === FeeRecordStatus.Cancelled;
+  }
+
+  activate(input: {
+    enrollment_id: number;
+    amount: string;
+  }): void {
+    this.enrollment_id = input.enrollment_id;
+    this.amount = input.amount;
+    this.status = FeeRecordStatus.Active;
+    this.cancelled_at = null;
+  }
+
+  cancel(cancelledAt: Date = new Date()): void {
+    if (this.isCancelled()) {
+      return;
+    }
+
+    this.status = FeeRecordStatus.Cancelled;
+    this.cancelled_at = cancelledAt;
+  }
+
+  setStatus(status: FeeRecordStatus, changedAt: Date = new Date()): void {
+    if (status === FeeRecordStatus.Active) {
+      this.status = FeeRecordStatus.Active;
+      this.cancelled_at = null;
+      return;
+    }
+
+    this.cancel(changedAt);
+  }
 }

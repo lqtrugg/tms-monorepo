@@ -1,0 +1,16 @@
+import { z } from 'zod';
+
+import {
+  booleanSchema,
+  commaSeparatedPositiveIntegerArraySchema,
+  dateTimeSchema,
+} from '../../../shared/schemas/common.schemas.js';
+
+export const incomeReportQuerySchema = z.object({
+  from: dateTimeSchema.optional(),
+  to: dateTimeSchema.optional(),
+  class_ids: commaSeparatedPositiveIntegerArraySchema,
+  include_unpaid: booleanSchema.optional(),
+});
+
+export type IncomeReportQuery = z.infer<typeof incomeReportQuerySchema>;

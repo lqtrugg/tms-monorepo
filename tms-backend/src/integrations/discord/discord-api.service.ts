@@ -642,3 +642,91 @@ export async function createGuildInvite(input: {
     url: `https://discord.gg/${payload.code}`,
   };
 }
+
+export class DiscordClient {
+  constructor(private readonly botToken: string) {}
+
+  fetchGuildMetadata(discordServerId: string): Promise<{
+    id: string;
+    name: string;
+  }> {
+    return fetchDiscordGuildMetadata(discordServerId, this.botToken);
+  }
+
+  fetchChannelMetadata(channelId: string): Promise<{
+    id: string;
+    guild_id: string | null;
+    name: string | null;
+  }> {
+    return fetchDiscordChannelMetadata(channelId, this.botToken);
+  }
+
+  ensureChannelBelongsToGuild(input: {
+    channelId: string;
+    guildId: string;
+    fieldName: string;
+  }): Promise<void> {
+    return ensureDiscordChannelBelongsToGuild({
+      ...input,
+      botToken: this.botToken,
+    });
+  }
+
+  searchGuildMembers(input: {
+    guildId: string;
+    query: string;
+    limit?: number;
+  }): Promise<DiscordGuildMemberIdentity[]> {
+    return searchDiscordGuildMembers({
+      ...input,
+      botToken: this.botToken,
+    });
+  }
+
+  postChannelMessage(input: {
+    channelId: string;
+    content: string;
+  }): Promise<{
+    messageId: string;
+    channelId: string;
+  }> {
+    return postDiscordChannelMessage({
+      ...input,
+      botToken: this.botToken,
+    });
+  }
+
+  sendDirectMessage(input: {
+    recipientUserId: string;
+    content: string;
+  }): Promise<{
+    dmChannelId: string;
+    messageId: string;
+  }> {
+    return sendDiscordDirectMessage({
+      ...input,
+      botToken: this.botToken,
+    });
+  }
+
+  kickGuildMember(input: {
+    guildId: string;
+    userId: string;
+  }): Promise<void> {
+    return kickGuildMember({
+      ...input,
+      botToken: this.botToken,
+    });
+  }
+
+  createGuildInvite(input: {
+    channelId: string;
+    maxAge?: number;
+    maxUses?: number;
+  }): Promise<{ code: string; url: string }> {
+    return createGuildInvite({
+      ...input,
+      botToken: this.botToken,
+    });
+  }
+}

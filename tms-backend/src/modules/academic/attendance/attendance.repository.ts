@@ -1,4 +1,4 @@
-import { EntityManager, IsNull } from 'typeorm';
+import { EntityManager } from 'typeorm';
 
 import {
   Attendance,
@@ -6,8 +6,6 @@ import {
   AttendanceStatus,
   Class,
   Enrollment,
-  FeeRecord,
-  FeeRecordStatus,
   Session,
   Student,
 } from '../../../entities/index.js';
@@ -179,55 +177,4 @@ export function removeAttendanceRecords(
   records: Attendance[],
 ): Promise<Attendance[]> {
   return manager.getRepository(Attendance).remove(records);
-}
-
-export function findFeeRecordForAttendance(
-  manager: EntityManager,
-  teacherId: number,
-  sessionId: number,
-  studentId: number,
-): Promise<FeeRecord | null> {
-  return manager.getRepository(FeeRecord).findOneBy({
-    teacher_id: teacherId,
-    session_id: sessionId,
-    student_id: studentId,
-  });
-}
-
-export function createFeeRecord(
-  manager: EntityManager,
-  input: {
-    teacher_id: number;
-    student_id: number;
-    session_id: number;
-    enrollment_id: number;
-    amount: string;
-    status: FeeRecordStatus;
-    cancelled_at: Date | null;
-  },
-): FeeRecord {
-  return manager.getRepository(FeeRecord).create(input);
-}
-
-export function saveFeeRecord(manager: EntityManager, feeRecord: FeeRecord): Promise<FeeRecord> {
-  return manager.getRepository(FeeRecord).save(feeRecord);
-}
-
-export function findActiveFeeRecordsBySession(
-  manager: EntityManager,
-  teacherId: number,
-  sessionId: number,
-): Promise<FeeRecord[]> {
-  return manager.getRepository(FeeRecord).find({
-    where: {
-      teacher_id: teacherId,
-      session_id: sessionId,
-      status: FeeRecordStatus.Active,
-      cancelled_at: IsNull(),
-    },
-  });
-}
-
-export function saveFeeRecords(manager: EntityManager, feeRecords: FeeRecord[]): Promise<FeeRecord[]> {
-  return manager.getRepository(FeeRecord).save(feeRecords);
 }

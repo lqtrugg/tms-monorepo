@@ -4,10 +4,13 @@ import { DiscordMessageType } from '../../entities/index.js';
 import {
   nullableOptionalTrimmedStringSchema,
   optionalPositiveIntegerArraySchema,
-  positiveIntegerArraySchema,
   positiveIntegerSchema,
   requiredTrimmedStringSchema,
 } from '../../shared/schemas/common.schemas.js';
+
+const nonEmptyPositiveIntegerArraySchema = z.array(positiveIntegerSchema)
+  .min(1, 'at least one server is required')
+  .transform((values) => Array.from(new Set(values)));
 
 export const classIdParamSchema = z.object({
   classId: positiveIntegerSchema,
@@ -28,11 +31,14 @@ export const bulkDmBodySchema = z.object({
   content: requiredTrimmedStringSchema,
   class_id: positiveIntegerSchema.optional(),
   student_ids: optionalPositiveIntegerArraySchema,
+}).refine((value) => value.class_id !== undefined || (value.student_ids !== undefined && value.student_ids.length > 0), {
+  message: 'at least one recipient is required',
+  path: ['student_ids'],
 });
 
 export const channelPostBodySchema = z.object({
   content: requiredTrimmedStringSchema,
-  server_ids: positiveIntegerArraySchema.optional().default([]),
+  server_ids: nonEmptyPositiveIntegerArraySchema,
 });
 
 export type ClassIdParam = z.infer<typeof classIdParamSchema>;

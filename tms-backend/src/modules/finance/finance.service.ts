@@ -1,4 +1,4 @@
-import { In, IsNull, QueryFailedError } from 'typeorm';
+import { EntityManager, In, IsNull, QueryFailedError } from 'typeorm';
 
 import { AppDataSource } from '../../data-source.js';
 import {
@@ -12,6 +12,13 @@ import {
   TransactionType,
 } from '../../entities/index.js';
 import { ServiceError } from '../../shared/errors/service.error.js';
+import {
+  createFeeRecord,
+  findActiveFeeRecordsBySessionIds,
+  findFeeRecordForAttendance,
+  saveFeeRecord,
+  saveFeeRecords,
+} from './finance.repository.js';
 
 function parseAmountToBigInt(value: string | null | undefined): bigint {
   if (!value) {
@@ -88,6 +95,74 @@ function toDateRange(from?: Date, to?: Date): { from?: Date; to?: Date } {
   }
 
   return { from, to };
+}
+
+export async function syncAttendanceFeeRecord(
+  manager: EntityManager,
+  input: {
+    teacherId: number;
+    sessionId: number;
+    studentId: number;
+    enrollmentId: number;
+    amount: string;
+    shouldCharge: boolean;
+    cancelledAt?: Date;
+  },
+): Promise<void> {
+  const existing = await findFeeRecordForAttendance(
+    manager,
+    input.teacherId,
+    input.sessionId,
+    input.studentId,
+  );
+
+  if (!input.shouldCharge) {
+    if (existing && !existing.isCancelled()) {
+      existing.cancel(input.cancelledAt ?? new Date());
+      await saveFeeRecord(manager, existing);
+    }
+
+    return;
+  }
+
+  if (!existing) {
+    const feeRecord = createFeeRecord(manager, {
+      teacher_id: input.teacherId,
+      student_id: input.studentId,
+      session_id: input.sessionId,
+      enrollment_id: input.enrollmentId,
+      amount: input.amount,
+    });
+
+    await saveFeeRecord(manager, feeRecord);
+    return;
+  }
+
+  existing.activate({
+    enrollment_id: input.enrollmentId,
+    amount: input.amount,
+  });
+  await saveFeeRecord(manager, existing);
+}
+
+export async function cancelFeeRecordsForSessions(
+  manager: EntityManager,
+  teacherId: number,
+  sessionIds: number[],
+  cancelledAt: Date = new Date(),
+): Promise<number> {
+  const feeRecords = await findActiveFeeRecordsBySessionIds(manager, teacherId, sessionIds);
+
+  if (feeRecords.length === 0) {
+    return 0;
+  }
+
+  feeRecords.forEach((feeRecord) => {
+    feeRecord.cancel(cancelledAt);
+  });
+
+  await saveFeeRecords(manager, feeRecords);
+  return feeRecords.length;
 }
 
 export async function listTransactions(teacherId: number, filters: {
@@ -376,8 +451,7 @@ export async function updateFeeRecordStatus(
     return feeRecord;
   }
 
-  feeRecord.status = status;
-  feeRecord.cancelled_at = status === FeeRecordStatus.Cancelled ? new Date() : null;
+  feeRecord.setStatus(status);
 
   return repo.save(feeRecord);
 }

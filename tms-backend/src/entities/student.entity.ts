@@ -65,4 +65,34 @@ export class Student {
 
   @Column({ type: 'timestamptz', nullable: true })
   archived_at!: Date | null;
+
+  isActive(): boolean {
+    return this.status === StudentStatus.Active;
+  }
+
+  isPendingArchive(): boolean {
+    return this.status === StudentStatus.PendingArchive;
+  }
+
+  isArchived(): boolean {
+    return this.status === StudentStatus.Archived;
+  }
+
+  markPendingArchive(reason: PendingArchiveReason): void {
+    this.status = StudentStatus.PendingArchive;
+    this.pending_archive_reason = reason;
+    this.archived_at = null;
+  }
+
+  archive(archivedAt: Date): void {
+    this.status = StudentStatus.Archived;
+    this.pending_archive_reason = null;
+    this.archived_at = archivedAt;
+  }
+
+  reinstate(): void {
+    this.status = StudentStatus.Active;
+    this.pending_archive_reason = null;
+    this.archived_at = null;
+  }
 }

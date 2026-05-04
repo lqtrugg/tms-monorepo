@@ -54,4 +54,17 @@ export class Session {
 
   @Column({ type: 'timestamptz', nullable: true })
   cancelled_at!: Date | null;
+
+  isCancelled(): boolean {
+    return this.status === SessionStatus.Cancelled;
+  }
+
+  cancel(cancelledAt: Date = new Date()): void {
+    if (this.isCancelled()) {
+      return;
+    }
+
+    this.status = SessionStatus.Cancelled;
+    this.cancelled_at = cancelledAt;
+  }
 }

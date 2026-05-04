@@ -7,21 +7,19 @@ import {
   AttendanceStatus,
   Class,
   Enrollment,
-  FeeRecord,
-  FeeRecordStatus,
   Session,
-  SessionStatus,
 } from '../../../entities/index.js';
 import { ServiceError } from '../../../shared/errors/service.error.js';
 import {
+  cancelFeeRecordsForSessions,
+  syncAttendanceFeeRecord,
+} from '../../finance/index.js';
+import {
   createAttendance,
-  createFeeRecord,
-  findActiveFeeRecordsBySession,
   findAttendanceBySession,
   findAttendanceForStudent,
   findEnrollmentAtSessionTime,
   findEnrollmentsAtSessionTime,
-  findFeeRecordForAttendance,
   findOwnedClass,
   findOwnedSession,
   findOwnedStudent,
@@ -29,8 +27,6 @@ import {
   listStudentsEnrolledAtSessionTime,
   removeAttendanceRecords,
   saveAttendance,
-  saveFeeRecord,
-  saveFeeRecords,
 } from './attendance.repository.js';
 
 type UpsertAttendanceInput = {
@@ -69,41 +65,17 @@ async function syncFeeRecordByAttendance(
   studentId: number,
   status: AttendanceStatus,
 ): Promise<void> {
-  const existing = await findFeeRecordForAttendance(manager, teacherId, session.id, studentId);
-
-  const shouldCharge = session.status !== SessionStatus.Cancelled
+  const shouldCharge = !session.isCancelled()
     && (status === AttendanceStatus.Present || status === AttendanceStatus.AbsentUnexcused);
 
-  if (!shouldCharge) {
-    if (existing && existing.status !== FeeRecordStatus.Cancelled) {
-      existing.status = FeeRecordStatus.Cancelled;
-      existing.cancelled_at = new Date();
-      await saveFeeRecord(manager, existing);
-    }
-
-    return;
-  }
-
-  if (!existing) {
-    const feeRecord = createFeeRecord(manager, {
-      teacher_id: teacherId,
-      student_id: studentId,
-      session_id: session.id,
-      enrollment_id: enrollment.id,
-      amount: classEntity.fee_per_session,
-      status: FeeRecordStatus.Active,
-      cancelled_at: null,
-    });
-
-    await saveFeeRecord(manager, feeRecord);
-    return;
-  }
-
-  existing.enrollment_id = enrollment.id;
-  existing.amount = classEntity.fee_per_session;
-  existing.status = FeeRecordStatus.Active;
-  existing.cancelled_at = null;
-  await saveFeeRecord(manager, existing);
+  await syncAttendanceFeeRecord(manager, {
+    teacherId,
+    sessionId: session.id,
+    studentId,
+    enrollmentId: enrollment.id,
+    amount: classEntity.fee_per_session,
+    shouldCharge,
+  });
 }
 
 export async function listSessionAttendance(teacherId: number, sessionId: number) {
@@ -177,7 +149,7 @@ export async function materializeSessionAttendance(teacherId: number, sessionId:
   return AppDataSource.transaction(async (manager) => {
     const session = await requireOwnedSession(manager, teacherId, sessionId);
 
-    if (session.status === SessionStatus.Cancelled) {
+    if (session.isCancelled()) {
       return {
         attendance_created: 0,
         fee_records_synced: 0,
@@ -253,7 +225,7 @@ async function upsertSessionAttendanceWithSource(
       throw new ServiceError('student is not enrolled in class at this session', 409);
     }
 
-    if (session.status === SessionStatus.Cancelled) {
+    if (session.isCancelled()) {
       throw new ServiceError('cannot update attendance for a cancelled session', 409);
     }
 
@@ -329,13 +301,5 @@ export async function resetSessionAttendance(teacherId: number, sessionId: numbe
 
   await removeAttendanceRecords(AppDataSource.manager, existing);
 
-  const feeRecords = await findActiveFeeRecordsBySession(AppDataSource.manager, teacherId, session.id);
-
-  if (feeRecords.length > 0) {
-    feeRecords.forEach((item) => {
-      item.status = FeeRecordStatus.Cancelled;
-      item.cancelled_at = new Date();
-    });
-    await saveFeeRecords(AppDataSource.manager, feeRecords);
-  }
+  await cancelFeeRecordsForSessions(AppDataSource.manager, teacherId, [session.id]);
 }

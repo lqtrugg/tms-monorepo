@@ -5,7 +5,6 @@ import {
   ClassSchedule,
   DiscordServer,
   Enrollment,
-  FeeRecord,
   Session,
   Topic,
 } from '../../../entities/index.js';
@@ -24,10 +23,6 @@ export function sessionRepository(manager: EntityManager) {
 
 export function enrollmentRepository(manager: EntityManager) {
   return manager.getRepository(Enrollment);
-}
-
-export function feeRecordRepository(manager: EntityManager) {
-  return manager.getRepository(FeeRecord);
 }
 
 export function topicRepository(manager: EntityManager) {

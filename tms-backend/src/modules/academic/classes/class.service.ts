@@ -7,13 +7,12 @@ import {
   ClassStatus,
   DiscordServer,
   Enrollment,
-  FeeRecord,
-  FeeRecordStatus,
   Session,
   SessionStatus,
   Topic,
 } from '../../../entities/index.js';
 import { ClassServiceError } from '../../../shared/errors/class.error.js';
+import { cancelFeeRecordsForSessions } from '../../finance/index.js';
 import { combineDateAndTime } from './class.helpers.js';
 import type {
   ClassListFilters,
@@ -158,7 +157,7 @@ async function assertNoUpcomingSessionOverlapForSchedules(
   });
 
   const sessionsToCompare = sessions.filter((session) => (
-    session.status !== SessionStatus.Cancelled
+    !session.isCancelled()
     && session.end_time !== null
     && (session.class_id !== classId || session.is_manual)
   ));
@@ -204,7 +203,7 @@ async function assertManualSessionDoesNotOverlap(
   });
 
   const overlappingSession = sessions.find((session) => (
-    session.status !== SessionStatus.Cancelled
+    !session.isCancelled()
     && session.end_time !== null
     && sessionOverlaps(session.scheduled_at, session.end_time, scheduledAt, endTime)
   ));
@@ -479,29 +478,7 @@ async function cancelFeeRecordsBySessionIds(
   sessionIds: number[],
   cancelledAt: Date,
 ): Promise<void> {
-  if (sessionIds.length === 0) {
-    return;
-  }
-
-  const feeRecordRepo = manager.getRepository(FeeRecord);
-  const feeRecords = await feeRecordRepo.find({
-    where: {
-      teacher_id: teacherId,
-      session_id: In(sessionIds),
-      status: FeeRecordStatus.Active,
-    },
-  });
-
-  if (feeRecords.length === 0) {
-    return;
-  }
-
-  feeRecords.forEach((item) => {
-    item.status = FeeRecordStatus.Cancelled;
-    item.cancelled_at = cancelledAt;
-  });
-
-  await feeRecordRepo.save(feeRecords);
+  await cancelFeeRecordsForSessions(manager, teacherId, sessionIds, cancelledAt);
 }
 
 export async function listClasses(teacherId: number, filters: ClassListFilters): Promise<Class[]> {
@@ -640,8 +617,7 @@ export async function archiveClass(teacherId: number, classId: number): Promise<
 
     if (upcomingScheduledSessions.length > 0) {
       upcomingScheduledSessions.forEach((session) => {
-        session.status = SessionStatus.Cancelled;
-        session.cancelled_at = archivedAt;
+        session.cancel(archivedAt);
       });
 
       await sessionRepo.save(upcomingScheduledSessions);
@@ -857,13 +833,12 @@ export async function cancelSession(teacherId: number, sessionId: number): Promi
     const sessionRepo = manager.getRepository(Session);
     const session = await requireOwnedSession(manager, teacherId, sessionId);
 
-    if (session.status === SessionStatus.Cancelled) {
+    if (session.isCancelled()) {
       return session;
     }
 
     const cancelledAt = new Date();
-    session.status = SessionStatus.Cancelled;
-    session.cancelled_at = cancelledAt;
+    session.cancel(cancelledAt);
     const saved = await sessionRepo.save(session);
 
     await cancelFeeRecordsBySessionIds(manager, teacherId, [session.id], cancelledAt);

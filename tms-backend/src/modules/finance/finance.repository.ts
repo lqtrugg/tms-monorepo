@@ -1,9 +1,10 @@
-import { EntityManager } from 'typeorm';
+import { EntityManager, In } from 'typeorm';
 
 import { AppDataSource } from '../../data-source.js';
 import {
   Enrollment,
   FeeRecord,
+  FeeRecordStatus,
   Student,
   Transaction,
   TransactionAuditLog,
@@ -48,4 +49,66 @@ export function findOwnedFeeRecord(teacherId: number, feeRecordId: number): Prom
     id: feeRecordId,
     teacher_id: teacherId,
   });
+}
+
+export function findFeeRecordForAttendance(
+  manager: EntityManager,
+  teacherId: number,
+  sessionId: number,
+  studentId: number,
+): Promise<FeeRecord | null> {
+  return feeRecordRepository(manager).findOneBy({
+    teacher_id: teacherId,
+    session_id: sessionId,
+    student_id: studentId,
+  });
+}
+
+export function createFeeRecord(
+  manager: EntityManager,
+  input: {
+    teacher_id: number;
+    student_id: number;
+    session_id: number;
+    enrollment_id: number;
+    amount: string;
+  },
+): FeeRecord {
+  const feeRecord = feeRecordRepository(manager).create({
+    teacher_id: input.teacher_id,
+    student_id: input.student_id,
+    session_id: input.session_id,
+  });
+  feeRecord.activate({
+    enrollment_id: input.enrollment_id,
+    amount: input.amount,
+  });
+
+  return feeRecord;
+}
+
+export function saveFeeRecord(manager: EntityManager, feeRecord: FeeRecord): Promise<FeeRecord> {
+  return feeRecordRepository(manager).save(feeRecord);
+}
+
+export function findActiveFeeRecordsBySessionIds(
+  manager: EntityManager,
+  teacherId: number,
+  sessionIds: number[],
+): Promise<FeeRecord[]> {
+  if (sessionIds.length === 0) {
+    return Promise.resolve([]);
+  }
+
+  return feeRecordRepository(manager).find({
+    where: {
+      teacher_id: teacherId,
+      session_id: In(sessionIds),
+      status: FeeRecordStatus.Active,
+    },
+  });
+}
+
+export function saveFeeRecords(manager: EntityManager, feeRecords: FeeRecord[]): Promise<FeeRecord[]> {
+  return feeRecordRepository(manager).save(feeRecords);
 }
