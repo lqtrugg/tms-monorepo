@@ -1,11 +1,11 @@
 import { EntityManager } from 'typeorm';
 
 import { AppDataSource } from '../../../data-source.js';
-import { Class, ClassStatus, Topic, TopicStanding } from '../../../entities/index.js';
+import { Class, ClassStatus, Student, Topic, TopicProblem, TopicStanding } from '../../../entities/index.js';
 import { ServiceError } from '../../../shared/errors/service.error.js';
 import {
+  CodeforcesClient,
   extractGymIdFromLink,
-  fetchCodeforcesGymMetadata,
   resolveCodeforcesCredentials,
   type CodeforcesCredentials,
 } from '../../../integrations/codeforces/codeforces-api.service.js';
@@ -13,10 +13,6 @@ import {
   createTopicEntity,
   createTopicProblemEntity,
   createTopicStandingEntity,
-  findOwnedClass,
-  findOwnedStudent,
-  findOwnedTopic,
-  findOwnedTopicProblem,
   findStudentsByIds,
   findTeacherById,
   findTopicByGym,
@@ -39,7 +35,7 @@ function normalizeTopicStatus(topic: Topic): TopicStatusFilter {
 
 async function syncGymMetadata(
   gymLink: string,
-  credentials: CodeforcesCredentials | null,
+  codeforces: CodeforcesClient,
 ): Promise<{ gym_id: string; title: string }> {
   const gymId = extractGymIdFromLink(gymLink);
 
@@ -47,21 +43,11 @@ async function syncGymMetadata(
     throw new ServiceError('gym_link must contain a valid gym id', 400);
   }
 
-  return fetchCodeforcesGymMetadata(gymId, credentials);
+  return codeforces.fetchGymMetadata(gymId);
 }
 
-async function requireOwnedClass(manager: EntityManager, teacherId: number, classId: number): Promise<Class> {
-  const classEntity = await findOwnedClass(manager, teacherId, classId);
-
-  if (!classEntity) {
-    throw new ServiceError('class not found', 404);
-  }
-
-  return classEntity;
-}
-
-async function requireOwnedTopic(manager: EntityManager, teacherId: number, topicId: number): Promise<Topic> {
-  const topic = await findOwnedTopic(manager, teacherId, topicId);
+async function requireTopicById(manager: EntityManager, topicId: number): Promise<Topic> {
+  const topic = await manager.getRepository(Topic).findOneBy({ id: topicId });
 
   if (!topic) {
     throw new ServiceError('topic not found', 404);
@@ -87,10 +73,6 @@ export async function listTopics(teacherId: number, filters: {
   class_id?: number;
   status?: TopicStatusFilter;
 }) {
-  if (filters.class_id !== undefined) {
-    await requireOwnedClass(AppDataSource.manager, teacherId, filters.class_id);
-  }
-
   const topics = await listTopicsForTeacher(teacherId, filters);
 
   return topics
@@ -107,13 +89,18 @@ export async function createTopic(teacherId: number, input: {
   pull_interval_minutes?: number;
 }) {
   return AppDataSource.transaction(async (manager) => {
-    const classEntity = await requireOwnedClass(manager, teacherId, input.class_id);
+    const classEntity = await manager.getRepository(Class).findOneBy({ id: input.class_id });
+    if (!classEntity) {
+      throw new ServiceError('class not found', 404);
+    }
+
     if (classEntity.status !== ClassStatus.Active) {
       throw new ServiceError('class is archived', 409);
     }
 
     const codeforcesCredentials = await getTeacherCodeforcesCredentials(manager, teacherId);
-    const gymMetadata = await syncGymMetadata(input.gym_link, codeforcesCredentials);
+    const codeforces = new CodeforcesClient(codeforcesCredentials);
+    const gymMetadata = await syncGymMetadata(input.gym_link, codeforces);
 
     const existing = await findTopicByGym(manager, teacherId, input.class_id, gymMetadata.gym_id);
 
@@ -142,7 +129,7 @@ export async function createTopic(teacherId: number, input: {
 
 export async function closeTopic(teacherId: number, topicId: number) {
   return AppDataSource.transaction(async (manager) => {
-    const topic = await requireOwnedTopic(manager, teacherId, topicId);
+    const topic = await requireTopicById(manager, topicId);
     topic.closed_at = new Date();
 
     return saveTopic(manager, topic);
@@ -154,7 +141,7 @@ export async function addTopicProblem(teacherId: number, topicId: number, input:
   problem_name?: string | null;
 }) {
   return AppDataSource.transaction(async (manager) => {
-    await requireOwnedTopic(manager, teacherId, topicId);
+    await requireTopicById(manager, topicId);
 
     const existing = await findTopicProblemByIndex(manager, topicId, input.problem_index);
 
@@ -182,14 +169,17 @@ export async function upsertTopicStanding(teacherId: number, topicId: number, in
   pulled_at?: Date;
 }) {
   return AppDataSource.transaction(async (manager) => {
-    const topic = await requireOwnedTopic(manager, teacherId, topicId);
+    const topic = await requireTopicById(manager, topicId);
 
-    const student = await findOwnedStudent(manager, teacherId, input.student_id);
+    const student = await manager.getRepository(Student).findOneBy({ id: input.student_id });
     if (!student) {
       throw new ServiceError('student not found', 404);
     }
 
-    const problem = await findOwnedTopicProblem(manager, teacherId, topicId, input.problem_id);
+    const problem = await manager.getRepository(TopicProblem).findOneBy({
+      id: input.problem_id,
+      topic_id: topicId,
+    });
     if (!problem) {
       throw new ServiceError('topic problem not found', 404);
     }
@@ -218,7 +208,7 @@ export async function upsertTopicStanding(teacherId: number, topicId: number, in
 }
 
 export async function getTopicStandingMatrix(teacherId: number, topicId: number) {
-  const topic = await requireOwnedTopic(AppDataSource.manager, teacherId, topicId);
+  const topic = await requireTopicById(AppDataSource.manager, topicId);
 
   const problems = await listTopicProblems(teacherId, topicId);
 

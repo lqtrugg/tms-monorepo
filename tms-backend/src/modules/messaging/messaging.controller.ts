@@ -25,7 +25,7 @@ import {
   sendBulkDm,
   upsertDiscordServerByClass,
 } from './messaging.service.js';
-import { requireRoles } from '../identity/index.js';
+import { authorizeOwnedClassBody, authorizeOwnedClassParam, requireRoles } from '../identity/index.js';
 
 export const messagingRouter = Router();
 
@@ -52,7 +52,7 @@ messagingRouter.get('/discord/servers', asyncHandler(async (req, res) => {
 messagingRouter.put('/classes/:classId/discord-server', validate({
   body: upsertDiscordServerBodySchema,
   params: classIdParamSchema,
-}), asyncHandler(async (req, res) => {
+}), authorizeOwnedClassParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { classId } = getValidatedParams<ClassIdParam>(res);
   const body = getValidatedBody<UpsertDiscordServerBody>(res);
@@ -61,7 +61,7 @@ messagingRouter.put('/classes/:classId/discord-server', validate({
   res.json({ server });
 }));
 
-messagingRouter.delete('/classes/:classId/discord-server', validate({ params: classIdParamSchema }), asyncHandler(async (req, res) => {
+messagingRouter.delete('/classes/:classId/discord-server', validate({ params: classIdParamSchema }), authorizeOwnedClassParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { classId } = getValidatedParams<ClassIdParam>(res);
   const result = await deleteDiscordServer(teacherId, classId);
@@ -79,7 +79,7 @@ messagingRouter.get('/discord/messages', validate({ query: messageListQuerySchem
   res.json({ messages });
 }));
 
-messagingRouter.post('/discord/messages/bulk-dm', validate({ body: bulkDmBodySchema }), asyncHandler(async (req, res) => {
+messagingRouter.post('/discord/messages/bulk-dm', validate({ body: bulkDmBodySchema }), authorizeOwnedClassBody('class_id'), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const body = getValidatedBody<BulkDmBody>(res);
   const result = await sendBulkDm(teacherId, body);

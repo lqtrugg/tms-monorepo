@@ -44,7 +44,12 @@ import {
   updateClass,
   updateClassSchedule,
 } from './class.service.js';
-import { requireRoles } from '../../identity/index.js';
+import {
+  authorizeOwnedClassParam,
+  authorizeOwnedClassQuery,
+  authorizeOwnedSessionParam,
+  requireRoles,
+} from '../../identity/index.js';
 
 export const classRouter = Router();
 
@@ -100,7 +105,7 @@ classRouter.post('/classes', validate({ body: createClassBodySchema }), asyncHan
   res.status(201).json({ class: classEntity });
 }));
 
-classRouter.get('/classes/:classId', validate({ params: classIdParamSchema }), asyncHandler(async (req, res) => {
+classRouter.get('/classes/:classId', validate({ params: classIdParamSchema }), authorizeOwnedClassParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { classId } = getValidatedParams<ClassIdParam>(res);
   const classEntity = await getClassById(teacherId, classId);
@@ -111,7 +116,7 @@ classRouter.get('/classes/:classId', validate({ params: classIdParamSchema }), a
 classRouter.patch('/classes/:classId', validate({
   body: updateClassBodySchema,
   params: classIdParamSchema,
-}), asyncHandler(async (req, res) => {
+}), authorizeOwnedClassParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { classId } = getValidatedParams<ClassIdParam>(res);
   const payload = getValidatedBody<UpdateClassBody>(res);
@@ -128,10 +133,10 @@ const handleArchiveClass = asyncHandler(async (req, res) => {
   res.json({ class: classEntity });
 });
 
-classRouter.post('/classes/:classId/archive', validate({ params: classIdParamSchema }), handleArchiveClass);
-classRouter.post('/classes/:classId/close', validate({ params: classIdParamSchema }), handleArchiveClass);
+classRouter.post('/classes/:classId/archive', validate({ params: classIdParamSchema }), authorizeOwnedClassParam(), handleArchiveClass);
+classRouter.post('/classes/:classId/close', validate({ params: classIdParamSchema }), authorizeOwnedClassParam(), handleArchiveClass);
 
-classRouter.get('/classes/:classId/schedules', validate({ params: classIdParamSchema }), asyncHandler(async (req, res) => {
+classRouter.get('/classes/:classId/schedules', validate({ params: classIdParamSchema }), authorizeOwnedClassParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { classId } = getValidatedParams<ClassIdParam>(res);
   const schedules = await listClassSchedules(teacherId, classId);
@@ -142,7 +147,7 @@ classRouter.get('/classes/:classId/schedules', validate({ params: classIdParamSc
 classRouter.post('/classes/:classId/schedules', validate({
   body: classScheduleBodySchema,
   params: classIdParamSchema,
-}), asyncHandler(async (req, res) => {
+}), authorizeOwnedClassParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { classId } = getValidatedParams<ClassIdParam>(res);
   const payload = getValidatedBody<CreateClassScheduleBody>(res);
@@ -154,7 +159,7 @@ classRouter.post('/classes/:classId/schedules', validate({
 classRouter.patch('/classes/:classId/schedules/:scheduleId', validate({
   body: updateClassScheduleBodySchema,
   params: classScheduleParamSchema,
-}), asyncHandler(async (req, res) => {
+}), authorizeOwnedClassParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { classId, scheduleId } = getValidatedParams<ClassScheduleParam>(res);
   const payload = getValidatedBody<UpdateClassScheduleBody>(res);
@@ -163,7 +168,7 @@ classRouter.patch('/classes/:classId/schedules/:scheduleId', validate({
   res.json(result);
 }));
 
-classRouter.delete('/classes/:classId/schedules/:scheduleId', validate({ params: classScheduleParamSchema }), asyncHandler(async (req, res) => {
+classRouter.delete('/classes/:classId/schedules/:scheduleId', validate({ params: classScheduleParamSchema }), authorizeOwnedClassParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { classId, scheduleId } = getValidatedParams<ClassScheduleParam>(res);
 
@@ -172,7 +177,7 @@ classRouter.delete('/classes/:classId/schedules/:scheduleId', validate({ params:
   res.status(204).send();
 }));
 
-classRouter.get('/sessions', validate({ query: sessionListQuerySchema }), asyncHandler(async (req, res) => {
+classRouter.get('/sessions', validate({ query: sessionListQuerySchema }), authorizeOwnedClassQuery(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const filters = getValidatedQuery<SessionListQuery>(res);
   const sessions = await listSessions(teacherId, filters);
@@ -183,7 +188,7 @@ classRouter.get('/sessions', validate({ query: sessionListQuerySchema }), asyncH
 classRouter.get('/classes/:classId/sessions', validate({
   params: classIdParamSchema,
   query: sessionListQuerySchema,
-}), asyncHandler(async (req, res) => {
+}), authorizeOwnedClassParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { classId } = getValidatedParams<ClassIdParam>(res);
   const filters = getValidatedQuery<SessionListQuery>(res);
@@ -199,7 +204,7 @@ classRouter.get('/classes/:classId/sessions', validate({
 classRouter.post('/classes/:classId/sessions/manual', validate({
   body: createManualSessionBodySchema,
   params: classIdParamSchema,
-}), asyncHandler(async (req, res) => {
+}), authorizeOwnedClassParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { classId } = getValidatedParams<ClassIdParam>(res);
   const payload = getValidatedBody<CreateManualSessionBody>(res);
@@ -208,7 +213,7 @@ classRouter.post('/classes/:classId/sessions/manual', validate({
   res.status(201).json({ session });
 }));
 
-classRouter.post('/sessions/:sessionId/cancel', validate({ params: sessionIdParamSchema }), asyncHandler(async (req, res) => {
+classRouter.post('/sessions/:sessionId/cancel', validate({ params: sessionIdParamSchema }), authorizeOwnedSessionParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { sessionId } = getValidatedParams<SessionIdParam>(res);
   const session = await cancelSession(teacherId, sessionId);

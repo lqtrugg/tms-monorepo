@@ -25,7 +25,13 @@ import {
   listTopics,
   upsertTopicStanding,
 } from './topic.service.js';
-import { requireRoles } from '../../identity/index.js';
+import {
+  authorizeOwnedClassBody,
+  authorizeOwnedClassQuery,
+  authorizeOwnedStudentBody,
+  authorizeOwnedTopicParam,
+  requireRoles,
+} from '../../identity/index.js';
 
 export const topicRouter = Router();
 
@@ -42,7 +48,7 @@ function getTeacherId(req: Request): number {
   return teacher.id;
 }
 
-topicRouter.get('/topics', validate({ query: topicListQuerySchema }), asyncHandler(async (req, res) => {
+topicRouter.get('/topics', validate({ query: topicListQuerySchema }), authorizeOwnedClassQuery(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const query = getValidatedQuery<TopicListQuery>(res);
   const topics = await listTopics(teacherId, query);
@@ -50,7 +56,7 @@ topicRouter.get('/topics', validate({ query: topicListQuerySchema }), asyncHandl
   res.json({ topics });
 }));
 
-topicRouter.post('/topics', validate({ body: createTopicBodySchema }), asyncHandler(async (req, res) => {
+topicRouter.post('/topics', validate({ body: createTopicBodySchema }), authorizeOwnedClassBody('class_id'), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const body = getValidatedBody<CreateTopicBody>(res);
   const topic = await createTopic(teacherId, body);
@@ -58,7 +64,7 @@ topicRouter.post('/topics', validate({ body: createTopicBodySchema }), asyncHand
   res.status(201).json({ topic });
 }));
 
-topicRouter.post('/topics/:topicId/close', validate({ params: topicIdParamSchema }), asyncHandler(async (req, res) => {
+topicRouter.post('/topics/:topicId/close', validate({ params: topicIdParamSchema }), authorizeOwnedTopicParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { topicId } = getValidatedParams<TopicIdParam>(res);
   const topic = await closeTopic(teacherId, topicId);
@@ -69,7 +75,7 @@ topicRouter.post('/topics/:topicId/close', validate({ params: topicIdParamSchema
 topicRouter.post('/topics/:topicId/problems', validate({
   body: addTopicProblemBodySchema,
   params: topicIdParamSchema,
-}), asyncHandler(async (req, res) => {
+}), authorizeOwnedTopicParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { topicId } = getValidatedParams<TopicIdParam>(res);
   const body = getValidatedBody<AddTopicProblemBody>(res);
@@ -81,7 +87,7 @@ topicRouter.post('/topics/:topicId/problems', validate({
 topicRouter.put('/topics/:topicId/standings', validate({
   body: upsertTopicStandingBodySchema,
   params: topicIdParamSchema,
-}), asyncHandler(async (req, res) => {
+}), authorizeOwnedTopicParam(), authorizeOwnedStudentBody('student_id'), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { topicId } = getValidatedParams<TopicIdParam>(res);
   const body = getValidatedBody<UpsertTopicStandingBody>(res);
@@ -90,7 +96,7 @@ topicRouter.put('/topics/:topicId/standings', validate({
   res.json({ standing });
 }));
 
-topicRouter.get('/topics/:topicId/standing', validate({ params: topicIdParamSchema }), asyncHandler(async (req, res) => {
+topicRouter.get('/topics/:topicId/standing', validate({ params: topicIdParamSchema }), authorizeOwnedTopicParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { topicId } = getValidatedParams<TopicIdParam>(res);
   const matrix = await getTopicStandingMatrix(teacherId, topicId);

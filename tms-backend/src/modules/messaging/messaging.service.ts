@@ -1,6 +1,5 @@
 import { AppDataSource } from '../../data-source.js';
 import {
-  Class,
   DiscordMessageType,
   DiscordSendStatus,
   DiscordServer,
@@ -17,7 +16,6 @@ import {
   createMessageWithRecipients,
   findDiscordServerByClass,
   findDiscordServersByIds,
-  findOwnedClass,
   listBulkDmRecipientContextsByClass,
   listBulkDmRecipientContextsByStudentIds,
   listDiscordServersForTeacher,
@@ -27,16 +25,6 @@ import {
   saveDiscordServer,
   type BulkDmRecipientContext,
 } from './messaging.repository.js';
-
-async function requireOwnedClass(teacherId: number, classId: number): Promise<Class> {
-  const classEntity = await findOwnedClass(teacherId, classId);
-
-  if (!classEntity) {
-    throw new ServiceError('class not found', 404);
-  }
-
-  return classEntity;
-}
 
 function normalizeIdArray(values: number[] | undefined): number[] {
   if (!values) {
@@ -77,8 +65,6 @@ export async function listDiscordServers(teacherId: number) {
 }
 
 export async function deleteDiscordServer(teacherId: number, classId: number) {
-  await requireOwnedClass(teacherId, classId);
-
   const existing = await findDiscordServerByClass(teacherId, classId);
 
   if (!existing) {
@@ -96,8 +82,6 @@ export async function upsertDiscordServerByClass(teacherId: number, classId: num
   attendance_voice_channel_id?: string | null;
   notification_channel_id?: string | null;
 }) {
-  await requireOwnedClass(teacherId, classId);
-
   const existing = await findDiscordServerByClass(teacherId, classId);
   const discordServerId = input.discord_server_id.trim();
   const providedBotToken = normalizeBotToken(input.bot_token);
@@ -208,7 +192,6 @@ export async function sendBulkDm(teacherId: number, input: {
   const { content } = input;
 
   if (input.class_id !== undefined) {
-    await requireOwnedClass(teacherId, input.class_id);
     const recipients = await listBulkDmRecipientContextsByClass(teacherId, input.class_id);
 
     if (recipients.length === 0) {

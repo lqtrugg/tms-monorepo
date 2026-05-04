@@ -2,7 +2,6 @@ import { EntityManager, In, IsNull } from 'typeorm';
 
 import { AppDataSource } from '../../../data-source.js';
 import {
-  Class,
   Enrollment,
   Student,
   Teacher,
@@ -10,10 +9,6 @@ import {
   TopicProblem,
   TopicStanding,
 } from '../../../entities/index.js';
-
-export function classRepository(manager: EntityManager = AppDataSource.manager) {
-  return manager.getRepository(Class);
-}
 
 export function teacherRepository(manager: EntityManager = AppDataSource.manager) {
   return manager.getRepository(Teacher);
@@ -37,17 +32,6 @@ export function enrollmentRepository(manager: EntityManager = AppDataSource.mana
 
 export function studentRepository(manager: EntityManager = AppDataSource.manager) {
   return manager.getRepository(Student);
-}
-
-export function findOwnedClass(
-  manager: EntityManager,
-  teacherId: number,
-  classId: number,
-): Promise<Class | null> {
-  return classRepository(manager).findOneBy({
-    id: classId,
-    teacher_id: teacherId,
-  });
 }
 
 export function findOwnedTopic(

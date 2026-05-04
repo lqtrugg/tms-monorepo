@@ -5,7 +5,7 @@ import { Teacher, TeacherRole } from '../../../entities/index.js';
 import { ServiceError } from '../../../shared/errors/service.error.js';
 import { asyncHandler } from '../../../shared/middlewares/async-handler.js';
 import { getValidatedParams, validate } from '../../../shared/middlewares/validate.js';
-import { requireRoles } from '../../identity/index.js';
+import { authorizeOwnedStudentParam, requireRoles } from '../../identity/index.js';
 import {
   studentIdParamSchema,
   type StudentIdParam,
@@ -37,7 +37,7 @@ academicReportRouter.get('/reporting/dashboard', asyncHandler(async (req, res) =
   res.json({ summary });
 }));
 
-academicReportRouter.get('/reporting/students/:studentId/learning-profile', validate({ params: studentIdParamSchema }), asyncHandler(async (req, res) => {
+academicReportRouter.get('/reporting/students/:studentId/learning-profile', validate({ params: studentIdParamSchema }), authorizeOwnedStudentParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { studentId } = getValidatedParams<StudentIdParam>(res);
   const profile = await getStudentLearningProfile(teacherId, studentId);

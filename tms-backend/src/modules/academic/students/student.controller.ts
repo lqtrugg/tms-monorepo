@@ -40,7 +40,13 @@ import {
   transferStudent,
   updateStudent,
 } from './student.service.js';
-import { requireRoles } from '../../identity/index.js';
+import {
+  authorizeOwnedClassBody,
+  authorizeOwnedClassQuery,
+  authorizeOwnedStudentBody,
+  authorizeOwnedStudentParam,
+  requireRoles,
+} from '../../identity/index.js';
 
 export const studentRouter = Router();
 
@@ -71,7 +77,7 @@ function handleStudentError(error: unknown, _req: Request, res: Response, next: 
   next(error);
 }
 
-studentRouter.get('/students', validate({ query: studentListQuerySchema }), asyncHandler(async (req, res) => {
+studentRouter.get('/students', validate({ query: studentListQuerySchema }), authorizeOwnedClassQuery(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const filters = getValidatedQuery<StudentListQuery>(res);
   const students = await listStudents(teacherId, filters);
@@ -79,7 +85,7 @@ studentRouter.get('/students', validate({ query: studentListQuerySchema }), asyn
   res.json({ students });
 }));
 
-studentRouter.post('/students', validate({ body: createStudentBodySchema }), asyncHandler(async (req, res) => {
+studentRouter.post('/students', validate({ body: createStudentBodySchema }), authorizeOwnedClassBody('class_id'), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const payload = getValidatedBody<CreateStudentBody>(res);
   const student = await createStudent(teacherId, payload);
@@ -87,7 +93,7 @@ studentRouter.post('/students', validate({ body: createStudentBodySchema }), asy
   res.status(201).json({ student });
 }));
 
-studentRouter.post('/students/bulk/transfer', validate({ body: bulkTransferStudentsBodySchema }), asyncHandler(async (req, res) => {
+studentRouter.post('/students/bulk/transfer', validate({ body: bulkTransferStudentsBodySchema }), authorizeOwnedClassBody('to_class_id'), authorizeOwnedStudentBody('student_ids'), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const payload = getValidatedBody<BulkTransferStudentsBody>(res);
   const students = await bulkTransferStudents(teacherId, payload);
@@ -95,7 +101,7 @@ studentRouter.post('/students/bulk/transfer', validate({ body: bulkTransferStude
   res.json({ students });
 }));
 
-studentRouter.post('/students/bulk/withdraw', validate({ body: bulkWithdrawStudentsBodySchema }), asyncHandler(async (req, res) => {
+studentRouter.post('/students/bulk/withdraw', validate({ body: bulkWithdrawStudentsBodySchema }), authorizeOwnedStudentBody('student_ids'), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const payload = getValidatedBody<BulkWithdrawStudentsBody>(res);
   const students = await bulkWithdrawStudents(teacherId, payload);
@@ -103,7 +109,7 @@ studentRouter.post('/students/bulk/withdraw', validate({ body: bulkWithdrawStude
   res.json({ students });
 }));
 
-studentRouter.get('/students/:studentId', validate({ params: studentIdParamSchema }), asyncHandler(async (req, res) => {
+studentRouter.get('/students/:studentId', validate({ params: studentIdParamSchema }), authorizeOwnedStudentParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { studentId } = getValidatedParams<StudentIdParam>(res);
   const student = await getStudentById(teacherId, studentId);
@@ -114,7 +120,7 @@ studentRouter.get('/students/:studentId', validate({ params: studentIdParamSchem
 studentRouter.patch('/students/:studentId', validate({
   body: updateStudentBodySchema,
   params: studentIdParamSchema,
-}), asyncHandler(async (req, res) => {
+}), authorizeOwnedStudentParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { studentId } = getValidatedParams<StudentIdParam>(res);
   const payload = getValidatedBody<UpdateStudentBody>(res);
@@ -126,7 +132,7 @@ studentRouter.patch('/students/:studentId', validate({
 studentRouter.post('/students/:studentId/transfer', validate({
   body: transferStudentBodySchema,
   params: studentIdParamSchema,
-}), asyncHandler(async (req, res) => {
+}), authorizeOwnedStudentParam(), authorizeOwnedClassBody('to_class_id'), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { studentId } = getValidatedParams<StudentIdParam>(res);
   const payload = getValidatedBody<TransferStudentBody>(res);
@@ -138,7 +144,7 @@ studentRouter.post('/students/:studentId/transfer', validate({
 studentRouter.post('/students/:studentId/withdraw', validate({
   body: withdrawStudentBodySchema,
   params: studentIdParamSchema,
-}), asyncHandler(async (req, res) => {
+}), authorizeOwnedStudentParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { studentId } = getValidatedParams<StudentIdParam>(res);
   const payload = getValidatedBody<WithdrawStudentBody>(res);
@@ -150,7 +156,7 @@ studentRouter.post('/students/:studentId/withdraw', validate({
 studentRouter.post('/students/:studentId/reinstate', validate({
   body: reinstateStudentBodySchema,
   params: studentIdParamSchema,
-}), asyncHandler(async (req, res) => {
+}), authorizeOwnedStudentParam(), authorizeOwnedClassBody('class_id'), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { studentId } = getValidatedParams<StudentIdParam>(res);
   const payload = getValidatedBody<ReinstateStudentBody>(res);
@@ -162,7 +168,7 @@ studentRouter.post('/students/:studentId/reinstate', validate({
 studentRouter.post('/students/:studentId/archive', validate({
   body: archivePendingStudentBodySchema,
   params: studentIdParamSchema,
-}), asyncHandler(async (req, res) => {
+}), authorizeOwnedStudentParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { studentId } = getValidatedParams<StudentIdParam>(res);
   const payload = getValidatedBody<ArchivePendingStudentBody>(res);

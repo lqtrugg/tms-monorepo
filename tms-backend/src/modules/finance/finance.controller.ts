@@ -33,7 +33,14 @@ import {
   updateFeeRecordStatus,
   updateTransaction,
 } from './finance.service.js';
-import { requireRoles } from '../identity/index.js';
+import {
+  authorizeOwnedClasses,
+  authorizeOwnedFeeRecordParam,
+  authorizeOwnedStudentBody,
+  authorizeOwnedStudentQuery,
+  authorizeOwnedTransactionParam,
+  requireRoles,
+} from '../identity/index.js';
 
 export const financeRouter = Router();
 
@@ -50,7 +57,7 @@ function getTeacherId(req: Request): number {
   return teacher.id;
 }
 
-financeRouter.get('/finance/transactions', validate({ query: financeTransactionListQuerySchema }), asyncHandler(async (req, res) => {
+financeRouter.get('/finance/transactions', validate({ query: financeTransactionListQuerySchema }), authorizeOwnedStudentQuery(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const query = getValidatedQuery<FinanceTransactionListQuery>(res);
   const result = await listTransactions(teacherId, {
@@ -72,7 +79,7 @@ financeRouter.get('/finance/transactions', validate({ query: financeTransactionL
   });
 }));
 
-financeRouter.post('/finance/transactions', validate({ body: financeTransactionBodySchema }), asyncHandler(async (req, res) => {
+financeRouter.post('/finance/transactions', validate({ body: financeTransactionBodySchema }), authorizeOwnedStudentBody('student_id'), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const body = getValidatedBody<FinanceTransactionBody>(res);
   const transaction = await createTransaction(teacherId, body);
@@ -83,7 +90,7 @@ financeRouter.post('/finance/transactions', validate({ body: financeTransactionB
 financeRouter.patch('/finance/transactions/:id', validate({
   body: updateFinanceTransactionBodySchema,
   params: idParamSchema,
-}), asyncHandler(async (req, res) => {
+}), authorizeOwnedTransactionParam('id'), authorizeOwnedStudentBody('student_id'), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { id: transactionId } = getValidatedParams<IdParam>(res);
   const body = getValidatedBody<UpdateFinanceTransactionBody>(res);
@@ -92,7 +99,7 @@ financeRouter.patch('/finance/transactions/:id', validate({
   res.json({ transaction });
 }));
 
-financeRouter.get('/finance/fee-records', validate({ query: financeFeeRecordListQuerySchema }), asyncHandler(async (req, res) => {
+financeRouter.get('/finance/fee-records', validate({ query: financeFeeRecordListQuerySchema }), authorizeOwnedStudentQuery(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const query = getValidatedQuery<FinanceFeeRecordListQuery>(res);
   const result = await listFeeRecords(teacherId, {
@@ -115,7 +122,7 @@ financeRouter.get('/finance/fee-records', validate({ query: financeFeeRecordList
   });
 }));
 
-financeRouter.get('/finance/transactions/:id/audit-logs', validate({ params: idParamSchema }), asyncHandler(async (req, res) => {
+financeRouter.get('/finance/transactions/:id/audit-logs', validate({ params: idParamSchema }), authorizeOwnedTransactionParam('id'), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { id: transactionId } = getValidatedParams<IdParam>(res);
   const auditLogs = await listTransactionAuditLogs(teacherId, transactionId);
@@ -126,7 +133,7 @@ financeRouter.get('/finance/transactions/:id/audit-logs', validate({ params: idP
 financeRouter.patch('/finance/fee-records/:id/status', validate({
   body: updateFeeRecordStatusBodySchema,
   params: idParamSchema,
-}), asyncHandler(async (req, res) => {
+}), authorizeOwnedFeeRecordParam('id'), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { id: feeRecordId } = getValidatedParams<IdParam>(res);
   const { status } = getValidatedBody<UpdateFeeRecordStatusBody>(res);
@@ -146,7 +153,7 @@ financeRouter.get('/finance/balances', validate({ query: studentBalancesQuerySch
   res.json({ balances });
 }));
 
-financeRouter.get('/finance/summary', validate({ query: financeSummaryQuerySchema }), asyncHandler(async (req, res) => {
+financeRouter.get('/finance/summary', validate({ query: financeSummaryQuerySchema }), authorizeOwnedClasses('query', (query) => (query as { class_ids?: number[] } | undefined)?.class_ids), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const query = getValidatedQuery<FinanceSummaryQuery>(res);
   const summary = await getFinanceSummary(teacherId, {

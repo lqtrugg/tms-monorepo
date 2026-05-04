@@ -238,7 +238,6 @@ export async function createTransaction(teacherId: number, input: {
 }) {
   const student = await AppDataSource.getRepository(Student).findOneBy({
     id: input.student_id,
-    teacher_id: teacherId,
   });
 
   if (!student) {
@@ -283,7 +282,6 @@ export async function updateTransaction(teacherId: number, transactionId: number
   const transactionRepository = AppDataSource.getRepository(Transaction);
   const transaction = await transactionRepository.findOneBy({
     id: transactionId,
-    teacher_id: teacherId,
   });
 
   if (!transaction) {
@@ -292,7 +290,6 @@ export async function updateTransaction(teacherId: number, transactionId: number
 
   const student = await AppDataSource.getRepository(Student).findOneBy({
     id: input.student_id,
-    teacher_id: teacherId,
   });
 
   if (!student) {
@@ -413,7 +410,6 @@ export async function listFeeRecords(teacherId: number, filters: {
 export async function listTransactionAuditLogs(teacherId: number, transactionId: number) {
   const transaction = await AppDataSource.getRepository(Transaction).findOneBy({
     id: transactionId,
-    teacher_id: teacherId,
   });
 
   if (!transaction) {
@@ -440,7 +436,6 @@ export async function updateFeeRecordStatus(
   const repo = AppDataSource.getRepository(FeeRecord);
   const feeRecord = await repo.findOneBy({
     id: feeRecordId,
-    teacher_id: teacherId,
   });
 
   if (!feeRecord) {

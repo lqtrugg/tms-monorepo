@@ -20,8 +20,6 @@ import {
   findActiveEnrollmentsByStudentIds,
   findDiscordServerByClass,
   findLastEnrollment,
-  findOwnedClass,
-  findOwnedStudent,
   findRecentEnrollments,
   listStudentsForTeacher,
   loadBalanceSnapshotForStudent,
@@ -61,18 +59,8 @@ function normalizeCodeforcesHandle(value: string | null | undefined): string | n
   return normalized.length > 0 ? normalized : null;
 }
 
-async function requireOwnedClass(manager: EntityManager, teacherId: number, classId: number): Promise<Class> {
-  const classEntity = await findOwnedClass(manager, teacherId, classId);
-
-  if (!classEntity) {
-    throw new StudentServiceError('class not found', 404);
-  }
-
-  return classEntity;
-}
-
-async function requireOwnedStudent(manager: EntityManager, teacherId: number, studentId: number): Promise<Student> {
-  const student = await findOwnedStudent(manager, teacherId, studentId);
+async function requireStudentById(manager: EntityManager, studentId: number): Promise<Student> {
+  const student = await manager.getRepository(Student).findOneBy({ id: studentId });
 
   if (!student) {
     throw new StudentServiceError('student not found', 404);
@@ -81,8 +69,11 @@ async function requireOwnedStudent(manager: EntityManager, teacherId: number, st
   return student;
 }
 
-async function requireActiveClass(manager: EntityManager, teacherId: number, classId: number): Promise<Class> {
-  const classEntity = await requireOwnedClass(manager, teacherId, classId);
+async function requireActiveClass(manager: EntityManager, classId: number): Promise<Class> {
+  const classEntity = await manager.getRepository(Class).findOneBy({ id: classId });
+  if (!classEntity) {
+    throw new StudentServiceError('class not found', 404);
+  }
 
   if (classEntity.status !== ClassStatus.Active) {
     throw new StudentServiceError('class is archived', 409);
@@ -142,10 +133,6 @@ function ensureArchivedStudent(student: Student): void {
 }
 
 export async function listStudents(teacherId: number, filters: StudentListFilters): Promise<StudentSummary[]> {
-  if (filters.class_id !== undefined) {
-    await requireOwnedClass(AppDataSource.manager, teacherId, filters.class_id);
-  }
-
   const students = await listStudentsForTeacher(AppDataSource.manager, teacherId, filters);
 
   if (students.length === 0) {
@@ -175,7 +162,7 @@ export async function listStudents(teacherId: number, filters: StudentListFilter
 }
 
 export async function getStudentById(teacherId: number, studentId: number): Promise<StudentSummary> {
-  const student = await requireOwnedStudent(AppDataSource.manager, teacherId, studentId);
+  const student = await requireStudentById(AppDataSource.manager, studentId);
   const activeEnrollment = await findActiveEnrollment(AppDataSource.manager, teacherId, studentId);
   const balanceSnapshot = await loadBalanceSnapshotForStudent(AppDataSource.manager, teacherId, studentId);
 
@@ -188,7 +175,7 @@ export async function getStudentById(teacherId: number, studentId: number): Prom
 
 export async function createStudent(teacherId: number, input: CreateStudentInput): Promise<StudentSummary> {
   return AppDataSource.transaction(async (manager) => {
-    await requireActiveClass(manager, teacherId, input.class_id);
+    await requireActiveClass(manager, input.class_id);
     const normalizedCodeforcesHandle = normalizeCodeforcesHandle(input.codeforces_handle);
     await ensureUniqueCodeforcesHandle(manager, normalizedCodeforcesHandle);
 
@@ -232,7 +219,7 @@ export async function updateStudent(
 ): Promise<StudentSummary> {
   return AppDataSource.transaction(async (manager) => {
     const studentRepo = manager.getRepository(Student);
-    const student = await requireOwnedStudent(manager, teacherId, studentId);
+    const student = await requireStudentById(manager, studentId);
 
     if (input.full_name !== undefined) {
       student.full_name = input.full_name;
@@ -277,10 +264,10 @@ async function transferStudentInManager(
   const studentRepo = manager.getRepository(Student);
   const enrollmentRepo = manager.getRepository(Enrollment);
 
-  const student = await requireOwnedStudent(manager, teacherId, studentId);
+  const student = await requireStudentById(manager, studentId);
   ensureActiveStudent(student);
 
-  await requireActiveClass(manager, teacherId, input.to_class_id);
+  await requireActiveClass(manager, input.to_class_id);
   const activeEnrollment = await requireActiveEnrollment(manager, teacherId, studentId);
 
   if (activeEnrollment.class_id === input.to_class_id) {
@@ -355,7 +342,7 @@ async function withdrawStudentInManager(
   const studentRepo = manager.getRepository(Student);
   const enrollmentRepo = manager.getRepository(Enrollment);
 
-  const student = await requireOwnedStudent(manager, teacherId, studentId);
+  const student = await requireStudentById(manager, studentId);
   ensureActiveStudent(student);
 
   const activeEnrollment = await findActiveEnrollment(manager, teacherId, studentId);
@@ -429,9 +416,9 @@ export async function reinstateStudent(
     const studentRepo = manager.getRepository(Student);
     const enrollmentRepo = manager.getRepository(Enrollment);
 
-    const student = await requireOwnedStudent(manager, teacherId, studentId);
+    const student = await requireStudentById(manager, studentId);
     ensureArchivedStudent(student);
-    await requireActiveClass(manager, teacherId, input.class_id);
+    await requireActiveClass(manager, input.class_id);
 
     const activeEnrollment = await findActiveEnrollment(manager, teacherId, student.id);
     if (activeEnrollment) {
@@ -475,7 +462,7 @@ export async function archivePendingStudent(
     const studentRepo = manager.getRepository(Student);
     const enrollmentRepo = manager.getRepository(Enrollment);
 
-    const student = await requireOwnedStudent(manager, teacherId, studentId);
+    const student = await requireStudentById(manager, studentId);
     ensurePendingArchiveStudent(student);
 
     const balanceSnapshot = await loadBalanceSnapshotForStudent(manager, teacherId, student.id);
@@ -527,7 +514,7 @@ export async function archivePendingStudent(
 // ── Discord automation helpers ──
 
 async function handleDiscordKick(teacherId: number, studentId: number): Promise<void> {
-  const student = await findOwnedStudent(AppDataSource.manager, teacherId, studentId);
+  const student = await AppDataSource.manager.getRepository(Student).findOneBy({ id: studentId });
   if (!student?.discord_username) {
     return;
   }
@@ -560,7 +547,7 @@ async function handleDiscordTransfer(
   studentId: number,
   newClassId: number,
 ): Promise<void> {
-  const student = await findOwnedStudent(AppDataSource.manager, teacherId, studentId);
+  const student = await AppDataSource.manager.getRepository(Student).findOneBy({ id: studentId });
   if (!student?.discord_username) {
     return;
   }

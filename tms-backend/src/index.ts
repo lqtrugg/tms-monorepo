@@ -4,12 +4,12 @@ import config from './config.js';
 import { AppDataSource, initializeDatabase } from './data-source.js';
 import { createJobRunner } from './jobs/index.js';
 import {
-  attendanceRouter,
   academicReportRouter,
   classRouter,
-  createAutoSyncJob,
+  createCodeforcesTopicSyncJob,
   createSessionStatusSyncJob,
   createVoiceAttendanceSyncJob,
+  sessionsRouter,
   studentRouter,
   topicRouter,
 } from './modules/academic/index.js';
@@ -20,7 +20,7 @@ import {
   ensureSystemAdminAccount,
 } from './modules/identity/index.js';
 import { financeReportRouter, financeRouter } from './modules/finance/index.js';
-import { messagingRouter } from './modules/messaging/index.js';
+import { createDiscordServerSyncJob, messagingRouter } from './modules/messaging/index.js';
 
 const app = express();
 const passport = configurePassport();
@@ -36,7 +36,7 @@ app.use(config.apiPrefix, authRouter);
 app.use(`${config.apiPrefix}/admin`, adminRouter);
 app.use(config.apiPrefix, classRouter);
 app.use(config.apiPrefix, studentRouter);
-app.use(config.apiPrefix, attendanceRouter);
+app.use(config.apiPrefix, sessionsRouter);
 app.use(config.apiPrefix, financeRouter);
 app.use(config.apiPrefix, topicRouter);
 app.use(config.apiPrefix, messagingRouter);
@@ -57,11 +57,13 @@ async function main(): Promise<void> {
   await ensureSystemAdminAccount();
 
   const jobRunner = createJobRunner([
-    createAutoSyncJob({
-      enabled: config.autoSync.enabled,
+    createDiscordServerSyncJob({
+      enabled: config.autoSync.enabled && config.autoSync.syncDiscord,
       intervalSeconds: config.autoSync.intervalSeconds,
-      syncDiscord: config.autoSync.syncDiscord,
-      syncCodeforces: config.autoSync.syncCodeforces,
+    }),
+    createCodeforcesTopicSyncJob({
+      enabled: config.autoSync.enabled && config.autoSync.syncCodeforces,
+      intervalSeconds: config.autoSync.intervalSeconds,
     }),
     createSessionStatusSyncJob({
       enabled: config.sessionStatusSync.enabled,

@@ -1,17 +1,12 @@
 import { EntityManager } from 'typeorm';
 
 import {
-  Class,
   ClassSchedule,
   DiscordServer,
   Enrollment,
   Session,
   Topic,
 } from '../../../entities/index.js';
-
-export function classRepository(manager: EntityManager) {
-  return manager.getRepository(Class);
-}
 
 export function classScheduleRepository(manager: EntityManager) {
   return manager.getRepository(ClassSchedule);
@@ -31,17 +26,6 @@ export function topicRepository(manager: EntityManager) {
 
 export function discordServerRepository(manager: EntityManager) {
   return manager.getRepository(DiscordServer);
-}
-
-export function findOwnedClass(
-  manager: EntityManager,
-  teacherId: number,
-  classId: number,
-): Promise<Class | null> {
-  return classRepository(manager).findOneBy({
-    id: classId,
-    teacher_id: teacherId,
-  });
 }
 
 export function findOwnedSchedule(

@@ -2,7 +2,6 @@ import { EntityManager, In } from 'typeorm';
 
 import { AppDataSource } from '../../data-source.js';
 import {
-  Class,
   DiscordMessage,
   DiscordMessageRecipient,
   DiscordMessageType,
@@ -11,10 +10,6 @@ import {
   Enrollment,
   Student,
 } from '../../entities/index.js';
-
-export function classRepository(manager: EntityManager = AppDataSource.manager) {
-  return manager.getRepository(Class);
-}
 
 export function discordServerRepository(manager: EntityManager = AppDataSource.manager) {
   return manager.getRepository(DiscordServer);
@@ -30,13 +25,6 @@ export function discordMessageRecipientRepository(manager: EntityManager = AppDa
 
 export function studentRepository(manager: EntityManager = AppDataSource.manager) {
   return manager.getRepository(Student);
-}
-
-export function findOwnedClass(teacherId: number, classId: number): Promise<Class | null> {
-  return classRepository().findOneBy({
-    id: classId,
-    teacher_id: teacherId,
-  });
 }
 
 export function findDiscordServerByClass(

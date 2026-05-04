@@ -47,6 +47,15 @@ function ensureClassActive(classEntity: Class): void {
   }
 }
 
+async function requireClassById(manager: EntityManager, classId: number): Promise<Class> {
+  const classEntity = await manager.getRepository(Class).findOneBy({ id: classId });
+  if (!classEntity) {
+    throw new ClassServiceError('class not found', 404);
+  }
+
+  return classEntity;
+}
+
 function ensureScheduleTimeRange(schedule: ClassSchedule): void {
   if (schedule.end_time <= schedule.start_time) {
     throw new ClassServiceError('end_time must be later than start_time', 400);
@@ -213,28 +222,13 @@ async function assertManualSessionDoesNotOverlap(
   }
 }
 
-async function requireOwnedClass(manager: EntityManager, teacherId: number, classId: number): Promise<Class> {
-  const classEntity = await manager.getRepository(Class).findOneBy({
-    id: classId,
-    teacher_id: teacherId,
-  });
-
-  if (!classEntity) {
-    throw new ClassServiceError('class not found', 404);
-  }
-
-  return classEntity;
-}
-
-async function requireOwnedSchedule(
+async function requireScheduleForClass(
   manager: EntityManager,
-  teacherId: number,
   classId: number,
   scheduleId: number,
 ): Promise<ClassSchedule> {
   const schedule = await manager.getRepository(ClassSchedule).findOneBy({
     id: scheduleId,
-    teacher_id: teacherId,
     class_id: classId,
   });
 
@@ -245,11 +239,8 @@ async function requireOwnedSchedule(
   return schedule;
 }
 
-async function requireOwnedSession(manager: EntityManager, teacherId: number, sessionId: number): Promise<Session> {
-  const session = await manager.getRepository(Session).findOneBy({
-    id: sessionId,
-    teacher_id: teacherId,
-  });
+async function requireSessionById(manager: EntityManager, sessionId: number): Promise<Session> {
+  const session = await manager.getRepository(Session).findOneBy({ id: sessionId });
 
   if (!session) {
     throw new ClassServiceError('session not found', 404);
@@ -496,7 +487,7 @@ export async function listClasses(teacherId: number, filters: ClassListFilters):
 }
 
 export async function getClassById(teacherId: number, classId: number): Promise<Class> {
-  return requireOwnedClass(AppDataSource.manager, teacherId, classId);
+  return requireClassById(AppDataSource.manager, classId);
 }
 
 export async function createClass(teacherId: number, input: CreateClassInput): Promise<Class> {
@@ -523,7 +514,7 @@ export async function createClass(teacherId: number, input: CreateClassInput): P
 export async function updateClass(teacherId: number, classId: number, input: UpdateClassInput): Promise<Class> {
   return AppDataSource.transaction(async (manager) => {
     const classRepo = manager.getRepository(Class);
-    const classEntity = await requireOwnedClass(manager, teacherId, classId);
+    const classEntity = await requireClassById(manager, classId);
 
     ensureClassActive(classEntity);
 
@@ -549,7 +540,7 @@ export async function archiveClass(teacherId: number, classId: number): Promise<
   return AppDataSource.transaction(async (manager) => {
     const classRepo = manager.getRepository(Class);
     const sessionRepo = manager.getRepository(Session);
-    const classEntity = await requireOwnedClass(manager, teacherId, classId);
+    const classEntity = await requireClassById(manager, classId);
 
     if (classEntity.status === ClassStatus.Archived) {
       return classEntity;
@@ -634,8 +625,6 @@ export async function archiveClass(teacherId: number, classId: number): Promise<
 }
 
 export async function listClassSchedules(teacherId: number, classId: number): Promise<ClassSchedule[]> {
-  await requireOwnedClass(AppDataSource.manager, teacherId, classId);
-
   return AppDataSource.getRepository(ClassSchedule).find({
     where: {
       teacher_id: teacherId,
@@ -655,7 +644,7 @@ export async function createClassSchedule(
   input: CreateClassScheduleInput,
 ): Promise<{ schedule: ClassSchedule; sessions_created: number }> {
   return AppDataSource.transaction(async (manager) => {
-    const classEntity = await requireOwnedClass(manager, teacherId, classId);
+    const classEntity = await requireClassById(manager, classId);
     ensureClassActive(classEntity);
     assertNoOverlappingScheduleInputs([input]);
     await assertNoPersistedScheduleOverlap(manager, teacherId, [input]);
@@ -693,11 +682,11 @@ export async function updateClassSchedule(
   input: UpdateClassScheduleInput,
 ): Promise<{ schedule: ClassSchedule; sessions_created: number }> {
   return AppDataSource.transaction(async (manager) => {
-    const classEntity = await requireOwnedClass(manager, teacherId, classId);
+    const classEntity = await requireClassById(manager, classId);
     ensureClassActive(classEntity);
 
     const scheduleRepo = manager.getRepository(ClassSchedule);
-    const schedule = await requireOwnedSchedule(manager, teacherId, classId, scheduleId);
+    const schedule = await requireScheduleForClass(manager, classId, scheduleId);
 
     if (input.day_of_week !== undefined) {
       schedule.day_of_week = input.day_of_week;
@@ -739,20 +728,16 @@ export async function updateClassSchedule(
 
 export async function deleteClassSchedule(teacherId: number, classId: number, scheduleId: number): Promise<void> {
   await AppDataSource.transaction(async (manager) => {
-    const classEntity = await requireOwnedClass(manager, teacherId, classId);
+    const classEntity = await requireClassById(manager, classId);
     ensureClassActive(classEntity);
 
-    const schedule = await requireOwnedSchedule(manager, teacherId, classId, scheduleId);
+    const schedule = await requireScheduleForClass(manager, classId, scheduleId);
     await manager.getRepository(ClassSchedule).remove(schedule);
     await reconcileGeneratedSessionsForClass(manager, teacherId, classId);
   });
 }
 
 export async function listSessions(teacherId: number, filters: SessionListFilters): Promise<Session[]> {
-  if (filters.class_id !== undefined) {
-    await requireOwnedClass(AppDataSource.manager, teacherId, filters.class_id);
-  }
-
   const queryBuilder = AppDataSource.getRepository(Session)
     .createQueryBuilder('session')
     .where('session.teacher_id = :teacherId', { teacherId });
@@ -781,8 +766,6 @@ export async function listClassSessions(
   classId: number,
   filters: Omit<SessionListFilters, 'class_id'>,
 ): Promise<Session[]> {
-  await requireOwnedClass(AppDataSource.manager, teacherId, classId);
-
   return listSessions(teacherId, {
     ...filters,
     class_id: classId,
@@ -795,7 +778,7 @@ export async function createManualSession(
   input: CreateManualSessionInput,
 ): Promise<Session> {
   return AppDataSource.transaction(async (manager) => {
-    const classEntity = await requireOwnedClass(manager, teacherId, classId);
+    const classEntity = await requireClassById(manager, classId);
     ensureClassActive(classEntity);
 
     if (input.scheduled_at.getTime() < Date.now()) {
@@ -831,7 +814,7 @@ export async function createManualSession(
 export async function cancelSession(teacherId: number, sessionId: number): Promise<Session> {
   return AppDataSource.transaction(async (manager) => {
     const sessionRepo = manager.getRepository(Session);
-    const session = await requireOwnedSession(manager, teacherId, sessionId);
+    const session = await requireSessionById(manager, sessionId);
 
     if (session.isCancelled()) {
       return session;

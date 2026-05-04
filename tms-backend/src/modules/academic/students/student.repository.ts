@@ -1,7 +1,6 @@
 import { EntityManager, In, IsNull } from 'typeorm';
 
 import {
-  Class,
   DiscordServer,
   Enrollment,
   FeeRecord,
@@ -25,17 +24,6 @@ export function createZeroBalanceSnapshot(): StudentBalanceSnapshot {
     active_fee_total: '0',
     balance: '0',
   };
-}
-
-export async function findOwnedClass(
-  manager: EntityManager,
-  teacherId: number,
-  classId: number,
-): Promise<Class | null> {
-  return manager.getRepository(Class).findOneBy({
-    id: classId,
-    teacher_id: teacherId,
-  });
 }
 
 export async function findOwnedStudent(

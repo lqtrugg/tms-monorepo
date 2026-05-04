@@ -1,4 +1,6 @@
+import { AppDataSource } from '../../../data-source.js';
 import {
+  Student,
   StudentStatus,
   TopicStanding,
 } from '../../../entities/index.js';
@@ -8,7 +10,6 @@ import {
   countActiveClasses,
   countActiveStudents,
   findClassesByIds,
-  findOwnedStudent,
   findStudentTopicStandings,
   findTopicProblemsByIds,
   findTopicsByIds,
@@ -61,7 +62,7 @@ export async function getDashboardSummary(teacherId: number) {
 }
 
 export async function getStudentLearningProfile(teacherId: number, studentId: number) {
-  const student = await findOwnedStudent(teacherId, studentId);
+  const student = await AppDataSource.getRepository(Student).findOneBy({ id: studentId });
 
   if (!student) {
     throw new ServiceError('student not found', 404);

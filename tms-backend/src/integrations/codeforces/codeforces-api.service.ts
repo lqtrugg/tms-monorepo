@@ -288,3 +288,33 @@ export async function fetchCodeforcesGymStandings(
     })),
   };
 }
+
+export class CodeforcesClient {
+  constructor(private readonly credentials: CodeforcesCredentials | null = null) {}
+
+  call<T>(
+    methodName: string,
+    params: Record<string, CodeforcesPrimitive>,
+  ): Promise<T> {
+    return callCodeforcesApi<T>(methodName, params, this.credentials);
+  }
+
+  fetchGymMetadata(gymId: string): Promise<{ gym_id: string; title: string }> {
+    return fetchCodeforcesGymMetadata(gymId, this.credentials);
+  }
+
+  fetchGymStandings(gymId: string): Promise<{
+    gym_id: string;
+    title: string;
+    problems: Array<{ index: string; name: string | null }>;
+    rows: Array<{
+      handles: string[];
+      problemResults: Array<{
+        solved: boolean;
+        penalty_minutes: number | null;
+      }>;
+    }>;
+  }> {
+    return fetchCodeforcesGymStandings(gymId, this.credentials);
+  }
+}
