@@ -277,3 +277,84 @@ export function createChannelPostMessages(
   const messageRepo = discordMessageRepository(manager);
   return messageRepo.save(values.map((value) => messageRepo.create(value)));
 }
+
+export class MessagingRepository {
+  constructor(private readonly manager: EntityManager = AppDataSource.manager) {}
+
+  discordServers() {
+    return discordServerRepository(this.manager);
+  }
+
+  discordMessages() {
+    return discordMessageRepository(this.manager);
+  }
+
+  discordMessageRecipients() {
+    return discordMessageRecipientRepository(this.manager);
+  }
+
+  students() {
+    return studentRepository(this.manager);
+  }
+
+  findDiscordServerByClass(teacherId: number, classId: number): Promise<DiscordServer | null> {
+    return findDiscordServerByClass(teacherId, classId);
+  }
+
+  listDiscordServersForTeacher(teacherId: number): Promise<DiscordServer[]> {
+    return this.discordServers().find({
+      where: { teacher_id: teacherId },
+      order: { id: 'ASC' },
+    });
+  }
+
+  removeDiscordServer(server: DiscordServer): Promise<DiscordServer> {
+    return this.discordServers().remove(server);
+  }
+
+  createDiscordServer(values: Partial<DiscordServer>): DiscordServer {
+    return this.discordServers().create(values);
+  }
+
+  saveDiscordServer(server: DiscordServer): Promise<DiscordServer> {
+    return this.discordServers().save(server);
+  }
+
+  listMessagesForTeacher(teacherId: number, filters: Parameters<typeof listMessagesForTeacher>[1]) {
+    return listMessagesForTeacher(teacherId, filters);
+  }
+
+  countRecipientsByMessageIds(teacherId: number, messageIds: number[]) {
+    return countRecipientsByMessageIds(teacherId, messageIds);
+  }
+
+  listFailedRecipientsByMessageIds(teacherId: number, messageIds: number[]) {
+    return listFailedRecipientsByMessageIds(teacherId, messageIds);
+  }
+
+  listBulkDmRecipientContextsByStudentIds(
+    teacherId: number,
+    studentIds: number[],
+  ): Promise<BulkDmRecipientContext[]> {
+    return listBulkDmRecipientContextsByStudentIds(teacherId, studentIds);
+  }
+
+  listBulkDmRecipientContextsByClass(teacherId: number, classId: number): Promise<BulkDmRecipientContext[]> {
+    return listBulkDmRecipientContextsByClass(teacherId, classId);
+  }
+
+  findDiscordServersByIds(teacherId: number, serverIds: number[]): Promise<DiscordServer[]> {
+    return findDiscordServersByIds(teacherId, serverIds);
+  }
+
+  createMessageWithRecipients(
+    messageValues: Partial<DiscordMessage>,
+    recipientValues: Array<Partial<DiscordMessageRecipient>>,
+  ): Promise<{ message: DiscordMessage; recipients: DiscordMessageRecipient[] }> {
+    return createMessageWithRecipients(this.manager, messageValues, recipientValues);
+  }
+
+  createChannelPostMessages(values: Array<Partial<DiscordMessage>>): Promise<DiscordMessage[]> {
+    return createChannelPostMessages(this.manager, values);
+  }
+}

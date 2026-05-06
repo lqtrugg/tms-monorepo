@@ -16,3 +16,4 @@ export {
 } from './auth.ownership.js';
 export { requireRoles } from './auth.rbac.js';
 export { ensureSystemAdminAccount } from './auth.service.js';
+export { IdentityService, identityService } from './identity.service.js';

@@ -1,8 +1,7 @@
-export class ServiceError extends Error {
-  statusCode: number;
+import { DomainError } from './domain.error.js';
 
+export class ServiceError extends DomainError {
   constructor(message: string, statusCode = 400) {
-    super(message);
-    this.statusCode = statusCode;
+    super(message, statusCode);
   }
 }

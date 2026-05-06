@@ -15,39 +15,3 @@ export { TopicStanding } from './topic-standing.entity.js';
 export { TransactionAuditLog } from './transaction-audit-log.entity.js';
 export { Transaction } from './transaction.entity.js';
 export * from './enums.js';
-
-import { Attendance } from './attendance.entity.js';
-import { Class } from './class.entity.js';
-import { ClassSchedule } from './class-schedule.entity.js';
-import { DiscordMessageRecipient } from './discord-message-recipient.entity.js';
-import { DiscordMessage } from './discord-message.entity.js';
-import { DiscordServer } from './discord-server.entity.js';
-import { Enrollment } from './enrollment.entity.js';
-import { FeeRecord } from './fee-record.entity.js';
-import { Session } from './session.entity.js';
-import { Student } from './student.entity.js';
-import { Teacher } from './teacher.entity.js';
-import { TopicProblem } from './topic-problem.entity.js';
-import { Topic } from './topic.entity.js';
-import { TopicStanding } from './topic-standing.entity.js';
-import { TransactionAuditLog } from './transaction-audit-log.entity.js';
-import { Transaction } from './transaction.entity.js';
-
-export const appEntities = [
-  Teacher,
-  Student,
-  Class,
-  ClassSchedule,
-  Session,
-  Enrollment,
-  Attendance,
-  FeeRecord,
-  Transaction,
-  DiscordServer,
-  DiscordMessage,
-  DiscordMessageRecipient,
-  Topic,
-  TopicProblem,
-  TopicStanding,
-  TransactionAuditLog,
-];

@@ -1,9 +1,11 @@
-export class AppError extends Error {
+import { DomainError } from './domain.error.js';
+
+export class AppError extends DomainError {
   constructor(
     message: string,
     public readonly statusCode = 400,
   ) {
-    super(message);
+    super(message, statusCode);
   }
 }
 

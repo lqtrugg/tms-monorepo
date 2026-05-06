@@ -1,8 +1,10 @@
-export class AuthError extends Error {
+import { DomainError } from './domain.error.js';
+
+export class AuthError extends DomainError {
   constructor(
     message: string,
     public readonly statusCode: number,
   ) {
-    super(message);
+    super(message, statusCode);
   }
 }

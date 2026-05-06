@@ -112,3 +112,72 @@ export function findActiveFeeRecordsBySessionIds(
 export function saveFeeRecords(manager: EntityManager, feeRecords: FeeRecord[]): Promise<FeeRecord[]> {
   return feeRecordRepository(manager).save(feeRecords);
 }
+
+export class FinanceRepository {
+  constructor(private readonly manager: EntityManager = AppDataSource.manager) {}
+
+  transactions() {
+    return transactionRepository(this.manager);
+  }
+
+  transactionAuditLogs() {
+    return transactionAuditLogRepository(this.manager);
+  }
+
+  feeRecords() {
+    return feeRecordRepository(this.manager);
+  }
+
+  students() {
+    return studentRepository(this.manager);
+  }
+
+  enrollments() {
+    return enrollmentRepository(this.manager);
+  }
+
+  findOwnedStudent(teacherId: number, studentId: number): Promise<Student | null> {
+    return this.students().findOneBy({
+      id: studentId,
+      teacher_id: teacherId,
+    });
+  }
+
+  findOwnedTransaction(teacherId: number, transactionId: number): Promise<Transaction | null> {
+    return this.transactions().findOneBy({
+      id: transactionId,
+      teacher_id: teacherId,
+    });
+  }
+
+  findOwnedFeeRecord(teacherId: number, feeRecordId: number): Promise<FeeRecord | null> {
+    return this.feeRecords().findOneBy({
+      id: feeRecordId,
+      teacher_id: teacherId,
+    });
+  }
+
+  findFeeRecordForAttendance(
+    teacherId: number,
+    sessionId: number,
+    studentId: number,
+  ): Promise<FeeRecord | null> {
+    return findFeeRecordForAttendance(this.manager, teacherId, sessionId, studentId);
+  }
+
+  createFeeRecord(input: Parameters<typeof createFeeRecord>[1]): FeeRecord {
+    return createFeeRecord(this.manager, input);
+  }
+
+  saveFeeRecord(feeRecord: FeeRecord): Promise<FeeRecord> {
+    return saveFeeRecord(this.manager, feeRecord);
+  }
+
+  findActiveFeeRecordsBySessionIds(teacherId: number, sessionIds: number[]): Promise<FeeRecord[]> {
+    return findActiveFeeRecordsBySessionIds(this.manager, teacherId, sessionIds);
+  }
+
+  saveFeeRecords(feeRecords: FeeRecord[]): Promise<FeeRecord[]> {
+    return saveFeeRecords(this.manager, feeRecords);
+  }
+}

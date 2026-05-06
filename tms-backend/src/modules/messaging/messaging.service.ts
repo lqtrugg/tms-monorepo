@@ -9,6 +9,7 @@ import {
   DiscordClient,
 } from '../../integrations/discord/discord-api.service.js';
 import { DiscordRecipientResolver } from '../../integrations/discord/discord-recipient-resolver.js';
+import type { DbContext } from '../../infrastructure/database/db-context.js';
 import {
   countRecipientsByMessageIds,
   createChannelPostMessages,
@@ -33,7 +34,7 @@ function normalizeIdArray(values: number[] | undefined): number[] {
 
   return Array.from(new Set(values.filter((item) => Number.isInteger(item) && item > 0)));
 }
-
+  
 function normalizeBotToken(value: string | null | undefined): string | null {
   if (typeof value !== 'string') {
     return null;
@@ -406,4 +407,40 @@ export async function sendChannelPost(teacherId: number, input: {
     failed: failures.length,
     failures,
   };
+}
+
+export class MessagingService {
+  constructor(private readonly db?: DbContext) {}
+
+  listDiscordServers(teacherId: number): ReturnType<typeof listDiscordServers> {
+    void this.db;
+    return listDiscordServers(teacherId);
+  }
+
+  deleteDiscordServer(teacherId: number, classId: number): ReturnType<typeof deleteDiscordServer> {
+    return deleteDiscordServer(teacherId, classId);
+  }
+
+  upsertDiscordServerByClass(
+    teacherId: number,
+    classId: number,
+    input: Parameters<typeof upsertDiscordServerByClass>[2],
+  ): ReturnType<typeof upsertDiscordServerByClass> {
+    return upsertDiscordServerByClass(teacherId, classId, input);
+  }
+
+  listMessages(teacherId: number, filters: Parameters<typeof listMessages>[1]): ReturnType<typeof listMessages> {
+    return listMessages(teacherId, filters);
+  }
+
+  sendBulkDm(teacherId: number, input: Parameters<typeof sendBulkDm>[1]): ReturnType<typeof sendBulkDm> {
+    return sendBulkDm(teacherId, input);
+  }
+
+  sendChannelPost(
+    teacherId: number,
+    input: Parameters<typeof sendChannelPost>[1],
+  ): ReturnType<typeof sendChannelPost> {
+    return sendChannelPost(teacherId, input);
+  }
 }

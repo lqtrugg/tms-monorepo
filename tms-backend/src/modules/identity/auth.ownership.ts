@@ -1,7 +1,6 @@
 import type { RequestHandler } from 'express';
 import { In, type EntityManager } from 'typeorm';
 
-import { AppDataSource } from '../../data-source.js';
 import { Class, FeeRecord, Session, Student, Teacher, Topic, Transaction } from '../../entities/index.js';
 import { ServiceError } from '../../shared/errors/service.error.js';
 
@@ -21,6 +20,10 @@ function getTeacherId(req: Parameters<RequestHandler>[0]): number {
 function getValidatedScope(res: Parameters<RequestHandler>[1], scope: ValidatedScope): unknown {
   const validated = res.locals.validated as ValidatedRequestData | undefined;
   return validated?.[scope];
+}
+
+function getManager(req: Parameters<RequestHandler>[0]): EntityManager {
+  return req.dbContext.manager;
 }
 
 function normalizeIds(value: number | number[] | null | undefined): number[] {
@@ -46,7 +49,7 @@ export function authorizeOwnedClasses(
         return;
       }
 
-      const ownedCount = await AppDataSource.getRepository(Class).countBy({
+      const ownedCount = await getManager(req).getRepository(Class).countBy({
         id: In(classIds),
         teacher_id: teacherId,
       });
@@ -90,7 +93,7 @@ function authorizeOwnedEntity(
         return;
       }
 
-      const ownedCount = await AppDataSource.getRepository(entity).countBy({
+      const ownedCount = await getManager(req).getRepository(entity).countBy({
         id: In(ids),
         teacher_id: teacherId,
       });

@@ -17,17 +17,11 @@ import {
 } from './messaging.schemas.js';
 import { asyncHandler } from '../../shared/middlewares/async-handler.js';
 import { getValidatedBody, getValidatedParams, getValidatedQuery, validate } from '../../shared/middlewares/validate.js';
-import {
-  deleteDiscordServer,
-  listDiscordServers,
-  listMessages,
-  sendChannelPost,
-  sendBulkDm,
-  upsertDiscordServerByClass,
-} from './messaging.service.js';
+import { MessagingService } from './messaging.service.js';
 import { authorizeOwnedClassBody, authorizeOwnedClassParam, requireRoles } from '../identity/index.js';
 
 export const messagingRouter = Router();
+const messagingService = new MessagingService();
 
 messagingRouter.use(passport.authenticate('jwt', { session: false }));
 messagingRouter.use(requireRoles([TeacherRole.Teacher]));
@@ -44,7 +38,7 @@ function getTeacherId(req: Request): number {
 
 messagingRouter.get('/discord/servers', asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
-  const servers = await listDiscordServers(teacherId);
+  const servers = await messagingService.listDiscordServers(teacherId);
 
   res.json({ servers });
 }));
@@ -56,7 +50,7 @@ messagingRouter.put('/classes/:classId/discord-server', validate({
   const teacherId = getTeacherId(req);
   const { classId } = getValidatedParams<ClassIdParam>(res);
   const body = getValidatedBody<UpsertDiscordServerBody>(res);
-  const server = await upsertDiscordServerByClass(teacherId, classId, body);
+  const server = await messagingService.upsertDiscordServerByClass(teacherId, classId, body);
 
   res.json({ server });
 }));
@@ -64,7 +58,7 @@ messagingRouter.put('/classes/:classId/discord-server', validate({
 messagingRouter.delete('/classes/:classId/discord-server', validate({ params: classIdParamSchema }), authorizeOwnedClassParam(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { classId } = getValidatedParams<ClassIdParam>(res);
-  const result = await deleteDiscordServer(teacherId, classId);
+  const result = await messagingService.deleteDiscordServer(teacherId, classId);
 
   res.json(result);
 }));
@@ -72,7 +66,7 @@ messagingRouter.delete('/classes/:classId/discord-server', validate({ params: cl
 messagingRouter.get('/discord/messages', validate({ query: messageListQuerySchema }), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const query = getValidatedQuery<MessageListQuery>(res);
-  const messages = await listMessages(teacherId, {
+  const messages = await messagingService.listMessages(teacherId, {
     type: query.type,
   });
 
@@ -82,7 +76,7 @@ messagingRouter.get('/discord/messages', validate({ query: messageListQuerySchem
 messagingRouter.post('/discord/messages/bulk-dm', validate({ body: bulkDmBodySchema }), authorizeOwnedClassBody('class_id'), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const body = getValidatedBody<BulkDmBody>(res);
-  const result = await sendBulkDm(teacherId, body);
+  const result = await messagingService.sendBulkDm(teacherId, body);
 
   res.status(201).json(result);
 }));
@@ -90,7 +84,7 @@ messagingRouter.post('/discord/messages/bulk-dm', validate({ body: bulkDmBodySch
 messagingRouter.post('/discord/messages/channel-post', validate({ body: channelPostBodySchema }), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const body = getValidatedBody<ChannelPostBody>(res);
-  const result = await sendChannelPost(teacherId, body);
+  const result = await messagingService.sendChannelPost(teacherId, body);
 
   res.status(201).json(result);
 }));

@@ -3,7 +3,7 @@ import { DataSource } from 'typeorm';
 
 import config from './config.js';
 import { installDatabaseIntegrityRules } from './database-integrity.js';
-import { appEntities } from './entities/index.js';
+import { appEntities } from './modules/entities.js';
 
 const connectionOptions = {
   host: config.database.host,

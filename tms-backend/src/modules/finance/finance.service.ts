@@ -12,6 +12,8 @@ import {
   TransactionType,
 } from '../../entities/index.js';
 import { ServiceError } from '../../shared/errors/service.error.js';
+import { parseAmountToBigInt } from '../../shared/helpers/money.js';
+import type { DbContext } from '../../infrastructure/database/db-context.js';
 import {
   createFeeRecord,
   findActiveFeeRecordsBySessionIds,
@@ -19,14 +21,6 @@ import {
   saveFeeRecord,
   saveFeeRecords,
 } from './finance.repository.js';
-
-function parseAmountToBigInt(value: string | null | undefined): bigint {
-  if (!value) {
-    return 0n;
-  }
-
-  return BigInt(value);
-}
 
 function isRefundBalanceConstraintError(error: unknown): boolean {
   if (!(error instanceof QueryFailedError)) {
@@ -612,4 +606,88 @@ export async function getFinanceSummary(teacherId: number, filters: {
     net_revenue: netRevenue.toString(),
     projected_revenue: projectedRevenue.toString(),
   };
+}
+
+export interface IFinanceFeeSync {
+  syncAttendanceFeeRecord(
+    manager: EntityManager,
+    input: Parameters<typeof syncAttendanceFeeRecord>[1],
+  ): Promise<void>;
+
+  cancelFeeRecordsForSessions(
+    manager: EntityManager,
+    teacherId: number,
+    sessionIds: number[],
+    cancelledAt?: Date,
+  ): Promise<number>;
+}
+
+export class FinanceService implements IFinanceFeeSync {
+  constructor(private readonly db?: DbContext) {}
+
+  syncAttendanceFeeRecord(
+    manager: EntityManager,
+    input: Parameters<typeof syncAttendanceFeeRecord>[1],
+  ): Promise<void> {
+    void this.db;
+    return syncAttendanceFeeRecord(manager, input);
+  }
+
+  cancelFeeRecordsForSessions(
+    manager: EntityManager,
+    teacherId: number,
+    sessionIds: number[],
+    cancelledAt?: Date,
+  ): Promise<number> {
+    return cancelFeeRecordsForSessions(manager, teacherId, sessionIds, cancelledAt);
+  }
+
+  listTransactions(teacherId: number, filters: Parameters<typeof listTransactions>[1]): ReturnType<typeof listTransactions> {
+    return listTransactions(teacherId, filters);
+  }
+
+  createTransaction(teacherId: number, input: Parameters<typeof createTransaction>[1]): ReturnType<typeof createTransaction> {
+    return createTransaction(teacherId, input);
+  }
+
+  updateTransaction(
+    teacherId: number,
+    transactionId: number,
+    input: Parameters<typeof updateTransaction>[2],
+  ): ReturnType<typeof updateTransaction> {
+    return updateTransaction(teacherId, transactionId, input);
+  }
+
+  listFeeRecords(teacherId: number, filters: Parameters<typeof listFeeRecords>[1]): ReturnType<typeof listFeeRecords> {
+    return listFeeRecords(teacherId, filters);
+  }
+
+  listTransactionAuditLogs(
+    teacherId: number,
+    transactionId: number,
+  ): ReturnType<typeof listTransactionAuditLogs> {
+    return listTransactionAuditLogs(teacherId, transactionId);
+  }
+
+  updateFeeRecordStatus(
+    teacherId: number,
+    feeRecordId: number,
+    status: Parameters<typeof updateFeeRecordStatus>[2],
+  ): ReturnType<typeof updateFeeRecordStatus> {
+    return updateFeeRecordStatus(teacherId, feeRecordId, status);
+  }
+
+  listStudentBalances(
+    teacherId: number,
+    filters: Parameters<typeof listStudentBalances>[1],
+  ): ReturnType<typeof listStudentBalances> {
+    return listStudentBalances(teacherId, filters);
+  }
+
+  getFinanceSummary(
+    teacherId: number,
+    filters: Parameters<typeof getFinanceSummary>[1],
+  ): ReturnType<typeof getFinanceSummary> {
+    return getFinanceSummary(teacherId, filters);
+  }
 }

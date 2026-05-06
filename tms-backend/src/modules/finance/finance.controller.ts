@@ -23,16 +23,7 @@ import {
 } from './finance.schemas.js';
 import { asyncHandler } from '../../shared/middlewares/async-handler.js';
 import { getValidatedBody, getValidatedParams, getValidatedQuery, validate } from '../../shared/middlewares/validate.js';
-import {
-  createTransaction,
-  getFinanceSummary,
-  listFeeRecords,
-  listTransactionAuditLogs,
-  listStudentBalances,
-  listTransactions,
-  updateFeeRecordStatus,
-  updateTransaction,
-} from './finance.service.js';
+import { FinanceService } from './finance.service.js';
 import {
   authorizeOwnedClasses,
   authorizeOwnedFeeRecordParam,
@@ -43,6 +34,7 @@ import {
 } from '../identity/index.js';
 
 export const financeRouter = Router();
+const financeService = new FinanceService();
 
 financeRouter.use(passport.authenticate('jwt', { session: false }));
 financeRouter.use(requireRoles([TeacherRole.Teacher]));
@@ -60,7 +52,7 @@ function getTeacherId(req: Request): number {
 financeRouter.get('/finance/transactions', validate({ query: financeTransactionListQuerySchema }), authorizeOwnedStudentQuery(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const query = getValidatedQuery<FinanceTransactionListQuery>(res);
-  const result = await listTransactions(teacherId, {
+  const result = await financeService.listTransactions(teacherId, {
     student_id: query.student_id,
     type: query.type,
     from: query.from,
@@ -82,7 +74,7 @@ financeRouter.get('/finance/transactions', validate({ query: financeTransactionL
 financeRouter.post('/finance/transactions', validate({ body: financeTransactionBodySchema }), authorizeOwnedStudentBody('student_id'), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const body = getValidatedBody<FinanceTransactionBody>(res);
-  const transaction = await createTransaction(teacherId, body);
+  const transaction = await financeService.createTransaction(teacherId, body);
 
   res.status(201).json({ transaction });
 }));
@@ -94,7 +86,7 @@ financeRouter.patch('/finance/transactions/:id', validate({
   const teacherId = getTeacherId(req);
   const { id: transactionId } = getValidatedParams<IdParam>(res);
   const body = getValidatedBody<UpdateFinanceTransactionBody>(res);
-  const transaction = await updateTransaction(teacherId, transactionId, body);
+  const transaction = await financeService.updateTransaction(teacherId, transactionId, body);
 
   res.json({ transaction });
 }));
@@ -102,7 +94,7 @@ financeRouter.patch('/finance/transactions/:id', validate({
 financeRouter.get('/finance/fee-records', validate({ query: financeFeeRecordListQuerySchema }), authorizeOwnedStudentQuery(), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const query = getValidatedQuery<FinanceFeeRecordListQuery>(res);
-  const result = await listFeeRecords(teacherId, {
+  const result = await financeService.listFeeRecords(teacherId, {
     student_id: query.student_id,
     session_id: query.session_id,
     status: query.status,
@@ -125,7 +117,7 @@ financeRouter.get('/finance/fee-records', validate({ query: financeFeeRecordList
 financeRouter.get('/finance/transactions/:id/audit-logs', validate({ params: idParamSchema }), authorizeOwnedTransactionParam('id'), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const { id: transactionId } = getValidatedParams<IdParam>(res);
-  const auditLogs = await listTransactionAuditLogs(teacherId, transactionId);
+  const auditLogs = await financeService.listTransactionAuditLogs(teacherId, transactionId);
 
   res.json({ audit_logs: auditLogs });
 }));
@@ -137,7 +129,7 @@ financeRouter.patch('/finance/fee-records/:id/status', validate({
   const teacherId = getTeacherId(req);
   const { id: feeRecordId } = getValidatedParams<IdParam>(res);
   const { status } = getValidatedBody<UpdateFeeRecordStatusBody>(res);
-  const feeRecord = await updateFeeRecordStatus(teacherId, feeRecordId, status);
+  const feeRecord = await financeService.updateFeeRecordStatus(teacherId, feeRecordId, status);
 
   res.json({ fee_record: feeRecord });
 }));
@@ -145,7 +137,7 @@ financeRouter.patch('/finance/fee-records/:id/status', validate({
 financeRouter.get('/finance/balances', validate({ query: studentBalancesQuerySchema }), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const query = getValidatedQuery<StudentBalancesQuery>(res);
-  const balances = await listStudentBalances(teacherId, {
+  const balances = await financeService.listStudentBalances(teacherId, {
     status: query.status,
     include_pending_archive: query.include_pending_archive,
   });
@@ -156,7 +148,7 @@ financeRouter.get('/finance/balances', validate({ query: studentBalancesQuerySch
 financeRouter.get('/finance/summary', validate({ query: financeSummaryQuerySchema }), authorizeOwnedClasses('query', (query) => (query as { class_ids?: number[] } | undefined)?.class_ids), asyncHandler(async (req, res) => {
   const teacherId = getTeacherId(req);
   const query = getValidatedQuery<FinanceSummaryQuery>(res);
-  const summary = await getFinanceSummary(teacherId, {
+  const summary = await financeService.getFinanceSummary(teacherId, {
     from: query.from,
     to: query.to,
     class_ids: query.class_ids,
