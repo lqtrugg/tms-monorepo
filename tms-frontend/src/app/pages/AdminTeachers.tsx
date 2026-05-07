@@ -4,9 +4,12 @@ import { KeyRound, Plus, Settings, Shield, UserCheck, UserX } from "lucide-react
 import { ApiError } from "../services/apiClient";
 import {
   createTeacherByAdmin,
+  getSysadminDiscordBotCredential,
   listTeachersForAdmin,
+  upsertSysadminDiscordBotCredential,
   updateTeacherByAdmin,
   type BackendAdminTeacher,
+  type BackendSysadminDiscordBotCredential,
 } from "../services/adminService";
 import { getMe, type AuthTeacher, updateMe } from "../services/authService";
 import { setStoredTeacher } from "../services/authStorage";
@@ -38,10 +41,12 @@ export function AdminTeachers() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showResetModalFor, setShowResetModalFor] = useState<BackendAdminTeacher | null>(null);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showDiscordBotModal, setShowDiscordBotModal] = useState(false);
   const [requestError, setRequestError] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [updatingTeacherId, setUpdatingTeacherId] = useState<number | null>(null);
+  const [discordBotCredential, setDiscordBotCredential] = useState<BackendSysadminDiscordBotCredential | null>(null);
 
   const loadData = async (): Promise<void> => {
     setLoading(true);
@@ -56,6 +61,7 @@ export function AdminTeachers() {
       setTeachers(teacherList);
       setAccount(me);
       setStoredTeacher(me);
+      setDiscordBotCredential(await getSysadminDiscordBotCredential());
     } catch (error) {
       setRequestError(toErrorMessage(error));
     } finally {
@@ -175,6 +181,26 @@ export function AdminTeachers() {
     }
   };
 
+  const handleSaveDiscordBotCredential = async (payload: {
+    bot_token: string;
+    client_id: string;
+    permissions?: string | null;
+    scopes?: string | null;
+  }) => {
+    setSubmitting(true);
+    setRequestError("");
+
+    try {
+      const saved = await upsertSysadminDiscordBotCredential(payload);
+      setDiscordBotCredential(saved);
+      setShowDiscordBotModal(false);
+    } catch (error) {
+      setRequestError(toErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
@@ -218,6 +244,28 @@ export function AdminTeachers() {
         <div className="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
           <p className="text-sm text-zinc-600 mb-2">System admin</p>
           <p className="text-3xl font-semibold text-zinc-900">{loading ? "..." : stats.sysadmin}</p>
+        </div>
+      </div>
+
+      <div className="mb-8 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-zinc-900">Discord bot của hệ thống</h2>
+            <p className="mt-1 text-sm text-zinc-600">
+              Credential của bot được cấu hình một lần ở đây. Giáo viên chỉ nhận invite link và chọn server/channel đã đồng bộ.
+            </p>
+            <div className="mt-4 space-y-1 text-sm text-zinc-700">
+              <p>Bot token: {discordBotCredential?.has_bot_token ? "đã cấu hình" : "chưa cấu hình"}</p>
+              <p>Client ID: {discordBotCredential?.client_id || "chưa cấu hình"}</p>
+              <p>Invite link: {discordBotCredential?.invite_link || "chưa có"}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowDiscordBotModal(true)}
+            className="rounded-lg bg-zinc-900 px-4 py-3 text-sm font-medium text-white hover:bg-zinc-800"
+          >
+            Cấu hình bot
+          </button>
         </div>
       </div>
 
@@ -331,6 +379,114 @@ export function AdminTeachers() {
           onSubmit={handleUpdateMyAccount}
         />
       )}
+
+      {showDiscordBotModal && (
+        <DiscordBotCredentialModal
+          credential={discordBotCredential}
+          submitting={submitting}
+          onClose={() => setShowDiscordBotModal(false)}
+          onSubmit={handleSaveDiscordBotCredential}
+        />
+      )}
+    </div>
+  );
+}
+
+function DiscordBotCredentialModal({
+  credential,
+  submitting,
+  onClose,
+  onSubmit,
+}: {
+  credential: BackendSysadminDiscordBotCredential | null;
+  submitting: boolean;
+  onClose: () => void;
+  onSubmit: (payload: {
+    bot_token: string;
+    client_id: string;
+    permissions?: string | null;
+    scopes?: string | null;
+  }) => Promise<void>;
+}) {
+  const [botToken, setBotToken] = useState("");
+  const [clientId, setClientId] = useState(credential?.client_id ?? "");
+  const [permissions, setPermissions] = useState(credential?.permissions ?? "");
+  const [scopes, setScopes] = useState(credential?.scopes ?? "bot applications.commands");
+  const [localError, setLocalError] = useState("");
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLocalError("");
+
+    if (!clientId.trim()) {
+      setLocalError("Client ID là bắt buộc");
+      return;
+    }
+
+    if (!credential?.has_bot_token && !botToken.trim()) {
+      setLocalError("Bot token là bắt buộc ở lần cấu hình đầu");
+      return;
+    }
+
+    await onSubmit({
+      bot_token: botToken.trim() || "__KEEP_EXISTING__",
+      client_id: clientId.trim(),
+      permissions: permissions.trim() || null,
+      scopes: scopes.trim() || null,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 shadow-xl">
+        <h2 className="mb-6 text-xl font-semibold text-zinc-900">Cấu hình Discord bot</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-2 block text-sm text-zinc-700">Bot token</label>
+            <input
+              type="password"
+              value={botToken}
+              onChange={(event) => setBotToken(event.target.value)}
+              className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              placeholder={credential?.has_bot_token ? "Để trống nếu giữ token hiện tại" : "Nhập bot token"}
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm text-zinc-700">Client ID</label>
+            <input
+              value={clientId}
+              onChange={(event) => setClientId(event.target.value)}
+              className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm text-zinc-700">Permissions</label>
+            <input
+              value={permissions}
+              onChange={(event) => setPermissions(event.target.value)}
+              className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              placeholder="8"
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm text-zinc-700">Scopes</label>
+            <input
+              value={scopes}
+              onChange={(event) => setScopes(event.target.value)}
+              className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            />
+          </div>
+          {localError && <p className="text-sm text-red-600">{localError}</p>}
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 rounded-lg bg-zinc-100 px-4 py-3 text-zinc-900 hover:bg-zinc-200">
+              Hủy
+            </button>
+            <button type="submit" disabled={submitting} className="flex-1 rounded-lg bg-zinc-900 px-4 py-3 text-white hover:bg-zinc-800 disabled:opacity-60">
+              {submitting ? "Đang lưu..." : "Lưu bot"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

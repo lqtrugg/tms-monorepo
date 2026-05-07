@@ -37,4 +37,37 @@ export interface MessagingReadRepository {
   }>>;
   countRecipientsByMessageIds(teacherId: number, messageIds: number[]): Promise<MessageRecipientCount[]>;
   listFailedRecipientsByMessageIds(teacherId: number, messageIds: number[]): Promise<FailedMessageRecipient[]>;
+  findCommunityServerForTeacher(teacherId: number): Promise<{
+    id: number;
+    teacher_id: number;
+    discord_server_id: string;
+    name: string | null;
+    notification_channel_id: string | null;
+    voice_channel_id: string | null;
+  } | null>;
+  listTeacherDiscordServers(teacherId: number): Promise<Array<{
+    id: number;
+    teacher_id: number;
+    discord_server_id: string;
+    name: string;
+    synced_at: Date;
+    binding_server_id: number | null;
+    binding_role: 'unbound' | 'community' | 'class';
+    binding_class_id: number | null;
+    binding_class_name: string | null;
+  }>>;
+  listTeacherDiscordChannelsForServer(teacherId: number, discordServerId: string): Promise<Array<{
+    id: number;
+    teacher_id: number;
+    discord_server_id: string;
+    discord_channel_id: string;
+    name: string;
+    type: 'text' | 'voice';
+    synced_at: Date;
+  }>>;
+  countActiveStudentsForTeacher(teacherId: number): Promise<number>;
+  countActiveStudentsWithDiscordUsernameForTeacher(teacherId: number): Promise<number>;
+  countActiveClassesForTeacher(teacherId: number): Promise<number>;
+  countConfiguredDiscordServersForTeacher(teacherId: number): Promise<number>;
+  listActiveClassesMissingDiscordServerNamesForTeacher(teacherId: number): Promise<string[]>;
 }

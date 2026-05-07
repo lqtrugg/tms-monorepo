@@ -30,3 +30,20 @@ export type AdminTeacher = {
   has_codeforces_api_secret: boolean;
   created_at: Date;
 };
+
+export type SysadminDiscordBotCredentialInput = {
+  bot_token: string;
+  client_id: string;
+  permissions?: string | null;
+  scopes?: string | null;
+};
+
+export type SysadminDiscordBotCredentialView = {
+  id: number;
+  client_id: string;
+  permissions: string | null;
+  scopes: string | null;
+  invite_link: string;
+  has_bot_token: boolean;
+  updated_at: Date;
+};

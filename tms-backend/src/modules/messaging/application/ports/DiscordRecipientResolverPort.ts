@@ -1,7 +1,7 @@
 export type DiscordServerContext = {
   id: number;
   teacher_id: number;
-  class_id: number;
+  class_id: number | null;
   discord_server_id: string;
   name: string | null;
   bot_token: string | null;

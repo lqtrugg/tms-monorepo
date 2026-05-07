@@ -18,14 +18,24 @@ import { listClasses, listSessions } from "../services/classService";
 import { listSessionAttendance } from "../services/attendanceService";
 import { listStudentBalances } from "../services/financeService";
 import {
+  listDiscordChannels,
   deleteDiscordServer,
+  deleteCommunityServer,
+  getCommunityServer,
+  getDiscordBotInviteLink,
+  getDiscordSetupStatus,
   listDiscordServers,
   listMessages,
   sendChannelPost,
   sendBulkDm,
+  syncDiscordServers,
+  upsertCommunityServer,
   upsertDiscordServerByClass,
+  type BackendCommunityServer,
+  type BackendDiscordChannel,
   type BackendDiscordServer,
   type BackendMessageListRow,
+  type DiscordSetupStatus,
 } from "../services/messagingService";
 import { getStudentLearningProfile } from "../services/reportingService";
 import { listStudents } from "../services/studentService";
@@ -115,6 +125,7 @@ function parseAmount(value: string): number {
 export function Messaging() {
   const [selectedTab, setSelectedTab] = useState<"servers" | "messages">("servers");
   const [showAddServerModal, setShowAddServerModal] = useState(false);
+  const [showCommunityModal, setShowCommunityModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showSendMessageModal, setShowSendMessageModal] = useState(false);
   const [selectedServer, setSelectedServer] = useState<BackendDiscordServer | null>(null);
@@ -125,13 +136,29 @@ export function Messaging() {
   const [messages, setMessages] = useState<BackendMessageListRow[]>([]);
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [students, setStudents] = useState<StudentOption[]>([]);
+  const [communityServer, setCommunityServer] = useState<BackendCommunityServer | null>(null);
+  const [discordStatus, setDiscordStatus] = useState<DiscordSetupStatus | null>(null);
+  const [botInviteLink, setBotInviteLink] = useState<string | null>(null);
 
   const loadData = async () => {
     setRequestError("");
     try {
-      const [serverList, messageList, classList, studentList, balances, sessions] = await Promise.all([
+      const [
+        serverList,
+        messageList,
+        communityServerConfig,
+        setupStatus,
+        inviteLink,
+        classList,
+        studentList,
+        balances,
+        sessions,
+      ] = await Promise.all([
         listDiscordServers(),
         listMessages(),
+        getCommunityServer(),
+        getDiscordSetupStatus(),
+        getDiscordBotInviteLink(),
         listClasses("active"),
         listStudents({ status: "active" }),
         listStudentBalances({ status: "active", include_pending_archive: false }),
@@ -179,6 +206,9 @@ export function Messaging() {
 
       setServers(serverList);
       setMessages(messageList);
+      setCommunityServer(communityServerConfig);
+      setDiscordStatus(setupStatus);
+      setBotInviteLink(inviteLink);
       setClasses(classList.map((item) => ({ id: item.id, name: item.name })));
       setStudents(studentList.map((item) => ({
         id: item.id,
@@ -202,6 +232,11 @@ export function Messaging() {
     [classes],
   );
 
+  const classBoundServers = useMemo(
+    () => servers.filter((server) => server.binding.role === "class" && server.binding.class_id !== null),
+    [servers],
+  );
+
   const filteredMessages = useMemo(
     () => messageFilter === "all" ? messages : messages.filter((item) => item.type === messageFilter),
     [messages, messageFilter],
@@ -214,18 +249,85 @@ export function Messaging() {
           <h1 className="text-3xl font-semibold text-zinc-900 mb-2">Tin nhắn</h1>
           <p className="text-zinc-600">Quản lý Discord servers và tin nhắn tự động</p>
         </div>
-        <button
-          onClick={() => setShowSendMessageModal(true)}
-          className="flex items-center gap-2 px-4 py-3 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 transition-colors"
-        >
-          <Send className="w-5 h-5" />
-          Gửi tin nhắn
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              if (botInviteLink) {
+                window.open(botInviteLink, "_blank", "noopener,noreferrer");
+              }
+            }}
+            disabled={!botInviteLink}
+            className="flex items-center gap-2 px-4 py-3 bg-zinc-100 text-zinc-900 rounded-lg font-medium hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:hover:bg-zinc-100"
+          >
+            <Server className="w-5 h-5" />
+            Mời bot
+          </button>
+          <button
+            onClick={() => setShowSendMessageModal(true)}
+            className="flex items-center gap-2 px-4 py-3 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 transition-colors"
+          >
+            <Send className="w-5 h-5" />
+            Gửi tin nhắn
+          </button>
+        </div>
       </div>
 
       {requestError && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {requestError}
+        </div>
+      )}
+
+      {discordStatus && (
+        <div className="mb-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="rounded-xl border border-zinc-200 bg-white p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-zinc-900">Trạng thái thiết lập</h2>
+                <p className="text-sm text-zinc-600">Các bước còn thiếu để Discord chạy ổn định.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCommunityModal(true)}
+                className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+              >
+                {communityServer ? "Sửa server chung" : "Tạo server chung"}
+              </button>
+            </div>
+            <div className="space-y-3">
+              {discordStatus.issues.map((issue) => (
+                <div
+                  key={issue.code}
+                  className={`rounded-lg border p-4 ${
+                    issue.severity === "critical"
+                      ? "border-red-200 bg-red-50"
+                      : issue.severity === "warning"
+                      ? "border-amber-200 bg-amber-50"
+                      : "border-zinc-200 bg-zinc-50"
+                  }`}
+                >
+                  <div className="mb-1 flex items-center justify-between gap-3">
+                    <p className="font-medium text-zinc-900">{issue.title}</p>
+                    <span className="text-xs uppercase tracking-wide text-zinc-500">{issue.severity}</span>
+                  </div>
+                  <p className="text-sm text-zinc-700">{issue.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-zinc-200 bg-white p-5">
+            <h2 className="mb-4 text-lg font-semibold text-zinc-900">Tổng quan</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <MetricCard label="Học sinh active" value={discordStatus.metrics.active_students} />
+              <MetricCard label="Có Discord username" value={discordStatus.metrics.students_with_discord_username} />
+              <MetricCard label="Thiếu Discord username" value={discordStatus.metrics.students_missing_discord_username} />
+              <MetricCard label="Lớp active" value={discordStatus.metrics.active_classes} />
+              <MetricCard label="Đã có server lớp" value={discordStatus.metrics.configured_class_servers} />
+              <MetricCard label="Thiếu server lớp" value={discordStatus.metrics.classes_missing_server} />
+            </div>
+          </div>
         </div>
       )}
 
@@ -256,10 +358,85 @@ export function Messaging() {
 
       {selectedTab === "servers" && (
         <div>
-          {servers.length > 0 ? (
+          <div className="mb-6 rounded-xl border border-zinc-200 bg-white p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="mb-1 text-sm font-medium text-zinc-500">Server chung</p>
+                <h3 className="text-xl font-semibold text-zinc-900">
+                  {communityServer?.name || "Chưa cấu hình"}
+                </h3>
+                <p className="mt-2 text-sm text-zinc-600">
+                  {communityServer
+                    ? `Guild ID: ${communityServer.discord_server_id}`
+                    : "Đây là server mặc định để add bot, gửi DM, gửi invite và làm trung tâm vận hành Discord."}
+                </p>
+                {communityServer && (
+                  <div className="mt-3 space-y-1 text-sm text-zinc-600">
+                    <p>Text channel: {communityServer.notification_channel_id || "chưa chọn"}</p>
+                    <p>Voice channel: {communityServer.voice_channel_id || "chưa chọn"}</p>
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setSubmitting(true);
+                    setRequestError("");
+                    try {
+                      await syncDiscordServers();
+                      await loadData();
+                    } catch (error) {
+                      setRequestError(toErrorMessage(error));
+                    } finally {
+                      setSubmitting(false);
+                    }
+                  }}
+                  className="rounded-lg bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-200"
+                >
+                  Đồng bộ server
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCommunityModal(true)}
+                  className="rounded-lg bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-200"
+                >
+                  {communityServer ? "Cấu hình" : "Tạo server chung"}
+                </button>
+                {communityServer && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!confirm("Xóa cấu hình server chung hiện tại?")) return;
+                      setSubmitting(true);
+                      setRequestError("");
+                      try {
+                        await deleteCommunityServer();
+                        await loadData();
+                      } catch (error) {
+                        setRequestError(toErrorMessage(error));
+                      } finally {
+                        setSubmitting(false);
+                      }
+                    }}
+                    className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+                  >
+                    Xóa
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {classBoundServers.length > 0 ? (
             <>
+              {discordStatus && discordStatus.missing_class_server_names.length > 0 && (
+                <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  Chưa có server cho: {discordStatus.missing_class_server_names.join(", ")}
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                {servers.map((server) => (
+                {classBoundServers.map((server) => (
                   <div key={server.id} className="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
                     <div className="flex items-start gap-4">
                       <div className="w-12 h-12 bg-zinc-100 rounded-xl flex items-center justify-center">
@@ -267,10 +444,10 @@ export function Messaging() {
                       </div>
                       <div className="flex-1">
                         <h3 className="text-lg font-semibold text-zinc-900 mb-1">
-                          {server.name || classNameById.get(server.class_id) || `Lớp #${server.class_id}`}
+                          {server.name || classNameById.get(server.binding.class_id ?? 0) || `Lớp #${server.binding.class_id}`}
                         </h3>
                         <p className="text-sm text-zinc-600 font-mono mb-2">ID: {server.discord_server_id}</p>
-                        <p className="text-sm text-zinc-600 mb-4">Lớp: {classNameById.get(server.class_id) ?? `#${server.class_id}`}</p>
+                        <p className="text-sm text-zinc-600 mb-4">Lớp: {classNameById.get(server.binding.class_id ?? 0) ?? `#${server.binding.class_id}`}</p>
 
                         <div className="flex gap-2">
                           <button
@@ -285,11 +462,11 @@ export function Messaging() {
                           </button>
                           <button
                             onClick={async () => {
-                              if (!confirm(`Xóa server cấu hình cho lớp ${classNameById.get(server.class_id) ?? server.class_id}?`)) return;
+                              if (!confirm(`Xóa server cấu hình cho lớp ${classNameById.get(server.binding.class_id ?? 0) ?? server.binding.class_id}?`)) return;
                               setSubmitting(true);
                               setRequestError("");
                               try {
-                                await deleteDiscordServer(server.class_id);
+                                await deleteDiscordServer(server.binding.class_id ?? 0);
                                 await loadData();
                               } catch (error) {
                                 setRequestError(toErrorMessage(error));
@@ -314,7 +491,7 @@ export function Messaging() {
                 onClick={() => setShowAddServerModal(true)}
                 className="w-full p-4 border-2 border-dashed border-zinc-300 rounded-xl text-zinc-600 hover:border-zinc-400 hover:text-zinc-900 transition-colors"
               >
-                + Thêm server
+                + Gắn server cho lớp
               </button>
             </>
           ) : (
@@ -422,8 +599,9 @@ export function Messaging() {
 
       {showAddServerModal && (
         <ServerModal
-          title="Thêm Discord Server"
+          title="Gắn server cho lớp"
           classes={classes}
+          servers={servers}
           submitting={submitting}
           onClose={() => setShowAddServerModal(false)}
           onSubmit={async (payload) => {
@@ -442,16 +620,43 @@ export function Messaging() {
         />
       )}
 
+      {showCommunityModal && (
+        <CommunityServerModal
+          title={communityServer ? "Cấu hình server chung" : "Tạo server chung"}
+          servers={servers}
+          initialValues={communityServer ? {
+            discord_server_id: communityServer.discord_server_id,
+            voice_channel_id: "",
+            notification_channel_id: "",
+          } : undefined}
+          submitting={submitting}
+          onClose={() => setShowCommunityModal(false)}
+          onSubmit={async (payload) => {
+            setSubmitting(true);
+            setRequestError("");
+            try {
+              await upsertCommunityServer(payload);
+              setShowCommunityModal(false);
+              await loadData();
+            } catch (error) {
+              setRequestError(toErrorMessage(error));
+            } finally {
+              setSubmitting(false);
+            }
+          }}
+        />
+      )}
+
       {showConfigModal && selectedServer && (
         <ServerModal
           title="Cấu hình server"
           classes={classes}
+          servers={servers}
           initialValues={{
-            class_id: selectedServer.class_id,
+            class_id: selectedServer.binding.class_id ?? 0,
             discord_server_id: selectedServer.discord_server_id,
-            bot_token: "",
-            attendance_voice_channel_id: selectedServer.attendance_voice_channel_id ?? "",
-            notification_channel_id: selectedServer.notification_channel_id ?? "",
+            attendance_voice_channel_id: "",
+            notification_channel_id: "",
           }}
           submitting={submitting}
           onClose={() => {
@@ -477,7 +682,7 @@ export function Messaging() {
 
       {showSendMessageModal && (
         <SendMessageModal
-          servers={servers}
+          servers={classBoundServers}
           students={students}
           submitting={submitting}
           onClose={() => setShowSendMessageModal(false)}
@@ -513,6 +718,7 @@ export function Messaging() {
 function ServerModal({
   title,
   classes,
+  servers,
   initialValues,
   submitting,
   onClose,
@@ -520,10 +726,10 @@ function ServerModal({
 }: {
   title: string;
   classes: ClassOption[];
+  servers: BackendDiscordServer[];
   initialValues?: {
     class_id: number;
     discord_server_id: string;
-    bot_token: string;
     attendance_voice_channel_id: string;
     notification_channel_id: string;
   };
@@ -531,18 +737,42 @@ function ServerModal({
   onClose: () => void;
   onSubmit: (payload: {
     class_id: number;
-    discord_server_id: string;
-    bot_token?: string | null;
+    server_id: number;
     attendance_voice_channel_id?: string | null;
     notification_channel_id?: string | null;
   }) => Promise<void>;
 }) {
+  const initialServer = initialValues
+    ? servers.find((server) => server.discord_server_id === initialValues.discord_server_id)
+    : undefined;
   const [classId, setClassId] = useState(initialValues ? String(initialValues.class_id) : "");
-  const [serverId, setServerId] = useState(initialValues?.discord_server_id ?? "");
-  const [botToken, setBotToken] = useState(initialValues?.bot_token ?? "");
+  const [serverId, setServerId] = useState(initialServer ? String(initialServer.id) : "");
   const [voiceChannelId, setVoiceChannelId] = useState(initialValues?.attendance_voice_channel_id ?? "");
   const [textChannelId, setTextChannelId] = useState(initialValues?.notification_channel_id ?? "");
+  const [channels, setChannels] = useState<BackendDiscordChannel[]>([]);
   const [localError, setLocalError] = useState("");
+
+  useEffect(() => {
+    if (!serverId) {
+      setChannels([]);
+      return;
+    }
+
+    let cancelled = false;
+    void listDiscordChannels(Number(serverId)).then((nextChannels) => {
+      if (!cancelled) {
+        setChannels(nextChannels);
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setChannels([]);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [serverId]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -554,20 +784,15 @@ function ServerModal({
       return;
     }
 
-    if (!serverId.trim()) {
-      setLocalError("Discord Server ID là bắt buộc");
-      return;
-    }
-
-    if (!initialValues && !botToken.trim()) {
-      setLocalError("Bot token là bắt buộc khi thêm server");
+    const parsedServerId = Number(serverId);
+    if (!Number.isInteger(parsedServerId) || parsedServerId <= 0) {
+      setLocalError("Vui lòng chọn server hợp lệ");
       return;
     }
 
     await onSubmit({
       class_id: parsedClassId,
-      discord_server_id: serverId.trim(),
-      bot_token: botToken.trim() || null,
+      server_id: parsedServerId,
       attendance_voice_channel_id: voiceChannelId.trim() || null,
       notification_channel_id: textChannelId.trim() || null,
     });
@@ -593,47 +818,51 @@ function ServerModal({
           </div>
 
           <div>
-            <label className="block text-sm text-zinc-700 mb-2">Discord Server ID</label>
-            <input
-              type="text"
+            <label className="block text-sm text-zinc-700 mb-2">Discord server</label>
+            <select
               value={serverId}
               onChange={(event) => setServerId(event.target.value)}
               className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
-              placeholder="123456789012345678"
-            />
+            >
+              <option value="">Chọn server đã đồng bộ</option>
+              {servers.map((server) => (
+                <option key={server.id} value={server.id}>
+                  {server.name} {server.binding.role !== "unbound" ? `(${server.binding.role})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-600">
+            Bot credential do hệ thống quản lý. Giáo viên chỉ cần mời bot vào server rồi cấu hình server và channel trong màn hình này.
           </div>
 
           <div>
-            <label className="block text-sm text-zinc-700 mb-2">Bot token</label>
-            <input
-              type="password"
-              value={botToken}
-              onChange={(event) => setBotToken(event.target.value)}
-              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
-              placeholder={initialValues ? "Để trống nếu giữ token hiện tại" : "Nhập Discord bot token"}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm text-zinc-700 mb-2">Voice channel ID (điểm danh)</label>
-            <input
-              type="text"
+            <label className="block text-sm text-zinc-700 mb-2">Voice channel</label>
+            <select
               value={voiceChannelId}
               onChange={(event) => setVoiceChannelId(event.target.value)}
               className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
-              placeholder="voice-channel-id"
-            />
+            >
+              <option value="">Chọn voice channel</option>
+              {channels.filter((channel) => channel.type === "voice").map((channel) => (
+                <option key={channel.id} value={channel.id}>{channel.name}</option>
+              ))}
+            </select>
           </div>
 
           <div>
-            <label className="block text-sm text-zinc-700 mb-2">Text channel ID (thông báo)</label>
-            <input
-              type="text"
+            <label className="block text-sm text-zinc-700 mb-2">Text channel</label>
+            <select
               value={textChannelId}
               onChange={(event) => setTextChannelId(event.target.value)}
               className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
-              placeholder="text-channel-id"
-            />
+            >
+              <option value="">Chọn text channel</option>
+              {channels.filter((channel) => channel.type === "text").map((channel) => (
+                <option key={channel.id} value={channel.id}>{channel.name}</option>
+              ))}
+            </select>
           </div>
 
           {localError && <p className="text-sm text-red-600">{localError}</p>}
@@ -657,6 +886,164 @@ function ServerModal({
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+function CommunityServerModal({
+  title,
+  servers,
+  initialValues,
+  submitting,
+  onClose,
+  onSubmit,
+}: {
+  title: string;
+  servers: BackendDiscordServer[];
+  initialValues?: {
+    discord_server_id: string;
+    voice_channel_id: string;
+    notification_channel_id: string;
+  };
+  submitting: boolean;
+  onClose: () => void;
+  onSubmit: (payload: {
+    server_id: number;
+    notification_channel_id?: string | null;
+    voice_channel_id?: string | null;
+  }) => Promise<void>;
+}) {
+  const initialServer = initialValues
+    ? servers.find((server) => server.discord_server_id === initialValues.discord_server_id)
+    : undefined;
+  const [serverId, setServerId] = useState(initialServer ? String(initialServer.id) : "");
+  const [voiceChannelId, setVoiceChannelId] = useState(initialValues?.voice_channel_id ?? "");
+  const [notificationChannelId, setNotificationChannelId] = useState(initialValues?.notification_channel_id ?? "");
+  const [channels, setChannels] = useState<BackendDiscordChannel[]>([]);
+  const [localError, setLocalError] = useState("");
+
+  useEffect(() => {
+    if (!serverId) {
+      setChannels([]);
+      return;
+    }
+
+    let cancelled = false;
+    void listDiscordChannels(Number(serverId)).then((nextChannels) => {
+      if (!cancelled) {
+        setChannels(nextChannels);
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setChannels([]);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [serverId]);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLocalError("");
+
+    const parsedServerId = Number(serverId);
+    if (!Number.isInteger(parsedServerId) || parsedServerId <= 0) {
+      setLocalError("Server chung là bắt buộc");
+      return;
+    }
+
+    await onSubmit({
+      server_id: parsedServerId,
+      notification_channel_id: notificationChannelId.trim() || null,
+      voice_channel_id: voiceChannelId.trim() || null,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 shadow-xl">
+        <h2 className="mb-6 text-xl font-semibold text-zinc-900">{title}</h2>
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-600">
+            Bước đúng là: mời bot bằng invite link của hệ thống, add bot vào server chung, bấm đồng bộ, rồi chọn server và channel từ danh sách này.
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm text-zinc-700">Server chung</label>
+            <select
+              value={serverId}
+              onChange={(event) => setServerId(event.target.value)}
+              className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            >
+              <option value="">Chọn server đã đồng bộ</option>
+              {servers.map((server) => (
+                <option key={server.id} value={server.id}>
+                  {server.name} {server.binding.role !== "unbound" ? `(${server.binding.role})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm text-zinc-700">Text channel</label>
+            <select
+              value={notificationChannelId}
+              onChange={(event) => setNotificationChannelId(event.target.value)}
+              className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            >
+              <option value="">Chọn text channel</option>
+              {channels.filter((channel) => channel.type === "text").map((channel) => (
+                <option key={channel.id} value={channel.id}>{channel.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm text-zinc-700">Voice channel</label>
+            <select
+              value={voiceChannelId}
+              onChange={(event) => setVoiceChannelId(event.target.value)}
+              className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            >
+              <option value="">Chọn voice channel</option>
+              {channels.filter((channel) => channel.type === "voice").map((channel) => (
+                <option key={channel.id} value={channel.id}>{channel.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {localError && <p className="text-sm text-red-600">{localError}</p>}
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 rounded-lg bg-zinc-100 px-4 py-3 text-zinc-900 hover:bg-zinc-200"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 rounded-lg bg-zinc-900 px-4 py-3 font-medium text-white hover:bg-zinc-800"
+            >
+              {submitting ? "Đang lưu..." : "Lưu server chung"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function MetricCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</p>
+      <p className="mt-2 text-2xl font-semibold text-zinc-900">{value}</p>
     </div>
   );
 }
@@ -853,8 +1240,12 @@ function SendMessageModal({
                     </div>
                     <input
                       type="checkbox"
-                      checked={selectedServers.includes(server.id)}
-                      onChange={() => toggleServer(server.id)}
+                      checked={selectedServers.includes(server.binding.server_binding_id ?? -1)}
+                      onChange={() => {
+                        if (server.binding.server_binding_id) {
+                          toggleServer(server.binding.server_binding_id);
+                        }
+                      }}
                     />
                   </label>
                 ))}

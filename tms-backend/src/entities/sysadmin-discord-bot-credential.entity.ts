@@ -1,0 +1,29 @@
+import { Column, Entity, PrimaryGeneratedColumn, Unique } from 'typeorm';
+
+@Entity('sysadmin_discord_bot_credentials')
+@Unique('uq_sysadmin_discord_bot_credentials_singleton', ['singleton_key'])
+export class SysadminDiscordBotCredential {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ type: 'varchar', length: 32, default: 'default' })
+  singleton_key!: string;
+
+  @Column({ type: 'text' })
+  bot_token!: string;
+
+  @Column({ type: 'varchar', length: 64 })
+  client_id!: string;
+
+  @Column({ type: 'varchar', length: 128, nullable: true })
+  permissions!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  scopes!: string | null;
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  created_at!: Date;
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  updated_at!: Date;
+}

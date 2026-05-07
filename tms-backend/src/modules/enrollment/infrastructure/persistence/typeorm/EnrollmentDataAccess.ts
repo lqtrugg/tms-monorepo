@@ -81,13 +81,15 @@ export async function listStudentsForTeacher(
 
 export async function codeforcesHandleExists(
   manager: EntityManager,
+  teacherId: number,
   codeforcesHandle: string,
   excludeStudentId?: number,
 ): Promise<boolean> {
   const queryBuilder = manager
     .getRepository(Student)
     .createQueryBuilder('student')
-    .where('student.codeforces_handle IS NOT NULL')
+    .where('student.teacher_id = :teacherId', { teacherId })
+    .andWhere('student.codeforces_handle IS NOT NULL')
     .andWhere('LOWER(student.codeforces_handle) = LOWER(:handle)', {
       handle: codeforcesHandle,
     });

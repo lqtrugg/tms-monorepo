@@ -12,6 +12,16 @@ export interface BackendAdminTeacher {
   created_at: string;
 }
 
+export interface BackendSysadminDiscordBotCredential {
+  id: number;
+  client_id: string;
+  permissions: string | null;
+  scopes: string | null;
+  invite_link: string;
+  has_bot_token: boolean;
+  updated_at: string;
+}
+
 export async function listTeachersForAdmin(): Promise<BackendAdminTeacher[]> {
   const data = await apiRequest<{ teachers: BackendAdminTeacher[] }>("/admin/teachers");
   return data.teachers;
@@ -50,4 +60,23 @@ export async function updateTeacherByAdmin(
     body: JSON.stringify(payload),
   });
   return data.teacher;
+}
+
+export async function getSysadminDiscordBotCredential(): Promise<BackendSysadminDiscordBotCredential | null> {
+  const data = await apiRequest<{ credential: BackendSysadminDiscordBotCredential | null }>("/admin/discord-bot");
+  return data.credential;
+}
+
+export async function upsertSysadminDiscordBotCredential(payload: {
+  bot_token: string;
+  client_id: string;
+  permissions?: string | null;
+  scopes?: string | null;
+}): Promise<BackendSysadminDiscordBotCredential> {
+  const data = await apiRequest<{ credential: BackendSysadminDiscordBotCredential }>("/admin/discord-bot", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+
+  return data.credential;
 }

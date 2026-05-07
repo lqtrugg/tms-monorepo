@@ -1,11 +1,20 @@
+import { ServiceError } from '../../../../shared/errors/service.error.js';
 import { DiscordClient } from '../../../../integrations/discord/discord-api.service.js';
 import type { DiscordGateway, DiscordGatewayFactory } from '../../application/ports/DiscordGateway.js';
 
 class DiscordClientGateway implements DiscordGateway {
   constructor(private readonly discordClient: DiscordClient) {}
 
+  listGuilds() {
+    return this.discordClient.listGuilds();
+  }
+
   fetchGuildMetadata(discordServerId: string) {
     return this.discordClient.fetchGuildMetadata(discordServerId);
+  }
+
+  listGuildChannels(guildId: string) {
+    return this.discordClient.listGuildChannels(guildId);
   }
 
   ensureChannelBelongsToGuild(input: {
@@ -26,7 +35,14 @@ class DiscordClientGateway implements DiscordGateway {
 }
 
 export class DefaultDiscordGatewayFactory implements DiscordGatewayFactory {
-  create(botToken: string): DiscordGateway {
-    return new DiscordClientGateway(new DiscordClient(botToken));
+  constructor(private readonly defaultBotToken: string | null | undefined = null) {}
+
+  create(botToken?: string | null): DiscordGateway {
+    const resolvedBotToken = botToken?.trim() || this.defaultBotToken?.trim() || null;
+    if (!resolvedBotToken) {
+      throw new ServiceError('discord bot is not configured by sysadmin', 503);
+    }
+
+    return new DiscordClientGateway(new DiscordClient(resolvedBotToken));
   }
 }

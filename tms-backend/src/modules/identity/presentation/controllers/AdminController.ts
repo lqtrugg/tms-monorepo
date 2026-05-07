@@ -4,18 +4,29 @@ import type { HttpRequest } from '../../../../shared/presentation/HttpRequest.js
 import type { HttpResponse } from '../../../../shared/presentation/HttpResponse.js';
 import type {
   CreateTeacherByAdminInput,
+  SysadminDiscordBotCredentialInput,
   UpdateTeacherByAdminInput,
 } from '../../application/dto/AdminDto.js';
 import { AdminTeacherReadService } from '../../application/queries/AdminTeacherReadService.js';
+import { SysadminDiscordBotCredentialReadService } from '../../application/queries/SysadminDiscordBotCredentialReadService.js';
 import { getTeacher } from './request-context.js';
 
-type AdminControllerAction = 'listTeachers' | 'createTeacher' | 'updateTeacher';
+type AdminControllerAction =
+  | 'listTeachers'
+  | 'createTeacher'
+  | 'updateTeacher'
+  | 'getDiscordBotCredential'
+  | 'upsertDiscordBotCredential';
 
 type AdminControllerDependencies = {
   readService: AdminTeacherReadService;
+  discordBotReadService: SysadminDiscordBotCredentialReadService;
   createTeacher: { execute(input: CreateTeacherByAdminInput): Promise<unknown> };
   updateTeacher: {
     execute(actorTeacherId: number, teacherId: number, input: UpdateTeacherByAdminInput): Promise<unknown>;
+  };
+  upsertDiscordBotCredential: {
+    execute(input: SysadminDiscordBotCredentialInput): Promise<unknown>;
   };
 };
 
@@ -34,6 +45,10 @@ export class AdminController implements Controller {
           return this.createTeacher(request);
         case 'updateTeacher':
           return this.updateTeacher(request);
+        case 'getDiscordBotCredential':
+          return this.getDiscordBotCredential();
+        case 'upsertDiscordBotCredential':
+          return this.upsertDiscordBotCredential(request);
       }
     } catch (error) {
       if (error instanceof ServiceError) {
@@ -79,6 +94,26 @@ export class AdminController implements Controller {
     return {
       statusCode: 200,
       body: { teacher },
+    };
+  }
+
+  private async getDiscordBotCredential(): Promise<HttpResponse> {
+    const credential = await this.dependencies.discordBotReadService.get();
+
+    return {
+      statusCode: 200,
+      body: { credential },
+    };
+  }
+
+  private async upsertDiscordBotCredential(request: HttpRequest): Promise<HttpResponse> {
+    const credential = await this.dependencies.upsertDiscordBotCredential.execute(
+      request.body as SysadminDiscordBotCredentialInput,
+    );
+
+    return {
+      statusCode: 200,
+      body: { credential },
     };
   }
 }

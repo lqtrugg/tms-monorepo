@@ -43,6 +43,12 @@ const config = {
     sysAdminUsername: process.env.SYSADMIN_USERNAME ?? 'admin',
     sysAdminPassword: parseOptionalString(process.env.SYSADMIN_PASSWORD),
   },
+  discord: {
+    botToken: parseOptionalString(process.env.DISCORD_BOT_TOKEN),
+    botClientId: parseOptionalString(process.env.DISCORD_BOT_CLIENT_ID),
+    botPermissions: parseOptionalString(process.env.DISCORD_BOT_PERMISSIONS),
+    botScopes: parseOptionalString(process.env.DISCORD_BOT_SCOPES) ?? 'bot applications.commands',
+  },
   database: {
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT),

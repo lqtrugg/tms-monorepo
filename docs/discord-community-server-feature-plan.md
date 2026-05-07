@@ -10,32 +10,19 @@ Tài liệu này mô tả kế hoạch cho feature Discord mới:
   - gửi thông báo học phí
   - gửi thông báo hệ thống
 
-Tài liệu này **không phải kế hoạch implement ngay**. Đây là feature backlog sau khi refactor codebase về kiến trúc mới ổn định hơn.
-
-## 1. Thứ tự ưu tiên
-
-Thứ tự đúng:
-
-1. Hoàn tất refactor kiến trúc backend theo [oop-driven-refactor-plan.md](/Users/lequangtrung123/Documents/tms-monorepo/docs/oop-driven-refactor-plan.md)
-2. Ổn định lại module boundaries, composition root, presentation/application/infrastructure
-3. Sau đó mới implement feature Discord community server này
-
-Lý do:
-
-- feature này chạm nhiều module: `messaging`, `enrollment`, `finance`, `identity`, frontend `Messaging`
-- nếu implement ngay trên codebase nửa cũ nửa mới, coupling sẽ tăng mạnh
-- logic `invite / kick / DM / reminder / sync status` sẽ tiếp tục bị nhét vào service procedural và khó dọn về sau
-
-## 2. Mục tiêu sản phẩm
+## 1. Mục tiêu sản phẩm
 
 User goal:
 
 - giáo viên không cần hiểu Discord API
 - không cần biết `guild id`, `channel id`, `invite endpoint`, `bot permissions`
 - chỉ cần:
-  - kết nối bot
-  - chọn server chung
-  - gắn server lớp nếu có
+  - nhận `link mời bot` từ admin hệ thống
+  - tự add bot đó vào server Discord của mình
+  - vào app và bấm `Đồng bộ server`
+  - chọn `server chung` từ danh sách server đã sync
+  - chọn `server lớp` từ danh sách server đã sync nếu cần
+  - chọn 1 `text channel` và 1 `voice channel` tương ứng
   - bấm các action như:
     - `Gửi lời mời`
     - `Kick khỏi lớp`
@@ -51,6 +38,32 @@ System goal:
   - vào server lớp
   - rời server lớp khi transfer/withdraw/archive
   - có hoặc không giữ lại ở server chung tùy policy
+
+## 2. Onboarding flow cho giáo viên
+
+Flow mong muốn:
+
+1. sysadmin cấu hình bot credential trong UI quản trị của hệ thống
+2. hệ thống generate `invite link` từ bot đó
+3. sysadmin gửi cho giáo viên `invite link`
+4. giáo viên tự mở link đó và add bot vào:
+   - server chung của mình
+   - các server lớp nếu có
+5. trong app, giáo viên chỉ cần:
+   - bấm `Đồng bộ server Discord`
+   - chọn `server chung` từ danh sách server đã sync
+   - chọn `server lớp` từ danh sách server đã sync
+   - chọn `text channel`
+   - chọn `voice channel`
+   - bấm `Lưu`
+
+Nguyên tắc:
+
+- app không yêu cầu giáo viên tự tạo bot
+- app không yêu cầu giáo viên tự lấy bot token từ Discord Developer Portal
+- bot credential nằm trong phạm vi quản trị `sysadmin`, không expose cho giáo viên
+- app không yêu cầu giáo viên paste `server id`, `channel id`, hay `bot token`
+- app phải tự sync danh sách `discord servers` và `channels` sau khi bot đã được giáo viên add vào server
 
 ## 3. Non-goals cho phase đầu
 
@@ -87,7 +100,6 @@ id
 teacher_id
 discord_server_id
 name
-bot_token
 notification_channel_id nullable
 invite_channel_id nullable
 created_at
@@ -97,7 +109,9 @@ updated_at
 Rule:
 
 - một giáo viên có tối đa một community server active
-- bot token mặc định nên attach tại đây
+- bot identity là bot chung do hệ thống cấp
+- bot credential thuộc ownership của `sysadmin`
+- giáo viên không tự quản lý bot token trong UI
 
 ### `ClassDiscordServerBinding`
 
@@ -106,7 +120,7 @@ Rule:
 Khái niệm hiện tại `DiscordServer` đang mang cả meaning:
 
 - server của lớp
-- bot credential
+- bot installation/binding
 - guild metadata
 
 Khi implement feature mới, nên tách nghĩa:
@@ -162,15 +176,17 @@ Phải chốt một trong 2:
 - archive vẫn giữ trong community server
 - archive có option `kick khỏi community server`
 
-### Rule 5. Bot token UX
+### Rule 5. Bot UX
 
-Không yêu cầu user nhập token ở nhiều màn hình.
+Không yêu cầu user nhập token ở bất kỳ màn hình nào.
 
 Khuyến nghị:
 
-- community server giữ bot token mặc định
-- class server có thể reuse bot token đó
-- chỉ nhập token riêng khi dùng bot riêng
+- bot credential được cấu hình trong UI của `sysadmin`
+- giáo viên chỉ add bot bằng invite link
+- UI chỉ cho giáo viên chọn server và channel từ danh sách đã sync
+- mọi validate đều dựa trên bot đã được giáo viên add vào server qua invite link của admin
+- không còn use case `giáo viên tự add discord server bằng tay` trong app
 
 ### Rule 6. Template message
 
@@ -186,19 +202,20 @@ Phase đầu nên có:
 
 ## 6. Kiến trúc backend target cho feature này
 
-Feature này nên được implement sau khi `messaging` được kéo gần hơn với kiến trúc đích.
-
 ## 6.1. Module ownership
 
 ### `messaging`
 
 Chịu trách nhiệm:
 
-- setup Discord servers
+- đồng bộ danh sách Discord servers mà bot đang thấy theo từng giáo viên
+- đồng bộ danh sách channels / voice channels của từng server
+- binding `server chung` và `server lớp` dựa trên dữ liệu đã sync
 - validate bot/server/channel
 - send DM / channel post
 - invite generation
 - delivery log
+- giữ mapping giữa teacher/class và các Discord server mà bot đã được add vào
 
 ### `enrollment`
 
@@ -217,16 +234,18 @@ Chịu trách nhiệm:
 Chịu trách nhiệm:
 
 - teacher ownership / auth / permission
+- sysadmin-owned bot credential
+- sysadmin UI để cấu hình bot credential
+- invite link distribution
 
 ## 6.2. Backend use cases dự kiến
 
-Sau khi `messaging` được refactor theo kiến trúc mới, feature này nên có các use case riêng:
-
 ```txt
 messaging/application/commands/
-  UpsertCommunityServerUseCase
-  DeleteCommunityServerUseCase
-  ValidateCommunityServerUseCase
+  SyncTeacherDiscordServersUseCase
+  SelectCommunityServerUseCase
+  BindClassDiscordServerUseCase
+  UnbindClassDiscordServerUseCase
   InviteStudentsToCommunityServerUseCase
   KickStudentsFromCommunityServerUseCase
   SendCommunityCustomDmUseCase
@@ -234,9 +253,17 @@ messaging/application/commands/
   SendCommunityInviteReminderUseCase
 
 messaging/application/queries/
-  GetCommunityServerUseCase
+  GetDiscordWorkspaceStatusUseCase
+  ListTeacherDiscordServersUseCase
+  ListTeacherDiscordChannelsUseCase
   ListCommunityStudentStatusesUseCase
   ListMessagingTemplatesUseCase
+
+identity/application/commands/
+  UpsertSysadminDiscordBotCredentialUseCase
+
+identity/application/queries/
+  GetSysadminDiscordBotCredentialUseCase
 ```
 
 ## 6.3. Backend ports / adapters dự kiến
@@ -244,19 +271,28 @@ messaging/application/queries/
 ```txt
 messaging/application/ports/
   DiscordGateway.ts
-  InviteLinkGenerator.ts
   RecipientResolver.ts
   TuitionReminderDataPort.ts
+  SysadminBotCredentialPort.ts
 
 messaging/infrastructure/persistence/typeorm/
   TeacherCommunityServerOrmEntity.ts
+  TeacherDiscordServerCacheOrmEntity.ts
+  TeacherDiscordChannelCacheOrmEntity.ts
   TypeOrmTeacherCommunityServerRepository.ts
+  TypeOrmTeacherDiscordServerCacheRepository.ts
+  TypeOrmTeacherDiscordChannelCacheRepository.ts
   TypeOrmMessagingLogRepository.ts
 
 messaging/infrastructure/integrations/discord/
   DiscordGatewayAdapter.ts
-  DiscordInviteLinkGeneratorAdapter.ts
   DiscordRecipientResolverAdapter.ts
+
+identity/infrastructure/persistence/typeorm/
+  SysadminDiscordBotCredentialOrmEntity.ts
+
+identity/presentation/routes/
+  sysadmin-discord-bot.routes.ts
 ```
 
 ## 6.4. Backend API contract dự kiến
@@ -264,10 +300,12 @@ messaging/infrastructure/integrations/discord/
 ### Community server setup
 
 ```txt
+GET    /discord/bot-invite-link
 GET    /discord/community-server
-PUT    /discord/community-server
-DELETE /discord/community-server
-POST   /discord/community-server/validate
+PUT    /discord/community-server/select
+POST   /discord/servers/sync
+GET    /discord/servers
+GET    /discord/servers/:serverId/channels
 ```
 
 ### Community membership actions
@@ -288,12 +326,20 @@ POST /discord/community-server/messages/invite-reminder
 
 ### Class server binding
 
-Class server APIs hiện có có thể giữ lại, nhưng nên refactor dần sang naming rõ hơn:
+Teacher không tự nhập server nữa. Teacher chọn class server từ danh sách server đã sync:
 
 ```txt
 GET    /discord/class-servers
-PUT    /classes/:classId/discord-server
+PUT    /classes/:classId/discord-server/select
 DELETE /classes/:classId/discord-server
+```
+
+### Sysadmin bot config
+
+```txt
+GET  /admin/discord-bot
+PUT  /admin/discord-bot
+GET  /admin/discord-bot/invite-link
 ```
 
 ## 7. Frontend plan
@@ -309,6 +355,8 @@ Mục tiêu UX:
 - có validate trước khi save
 - có preview trước khi send
 - lỗi phải dịch sang ngôn ngữ nghiệp vụ
+- không lộ bot credential ra UI
+- phải chỉ ra rõ giáo viên đang thiếu bước nào để workflow chạy được
 
 User không nên thấy:
 
@@ -318,32 +366,92 @@ User không nên thấy:
 
 User nên thấy:
 
+- `Link mời bot`
+- `Bot đã được thêm vào server chưa`
 - `Server chung`
 - `Server lớp`
+- `Danh sách server đã đồng bộ`
+- `Danh sách text channel`
+- `Danh sách voice channel`
 - `Bot đã kết nối`
-- `Kênh dùng để mời`
-- `Kênh dùng để thông báo`
+- `Text channel dùng để thông báo`
+- `Voice channel dùng để điểm danh`
 - `Học sinh chưa vào Discord`
 - `Gửi lời mời thất bại vì bot chưa thấy user`
+- `Việc cần làm tiếp theo`
+
+### Nguyên tắc trạng thái vận hành
+
+UI phải có một lớp trạng thái tổng quan, không bắt giáo viên tự suy luận từ nhiều tab.
+
+Ít nhất phải chỉ ra được các tình huống:
+
+- chưa có `server chung`
+- bot chưa được add vào `server chung`
+- `server chung` chưa chọn đủ `text channel` / `voice channel`
+- còn học sinh active chưa vào `server chung`
+- còn học sinh thiếu `discord_username`
+- có lớp active chưa có `server lớp`
+- có `server lớp` nhưng bot chưa được add vào đó
+- có lời mời / DM / reminder gửi lỗi gần đây
+
+Mỗi trạng thái phải đi kèm:
+
+- mức độ ưu tiên: `cần làm ngay`, `nên làm`, `thông tin`
+- mô tả ngắn, dễ hiểu
+- CTA rõ ràng, ví dụ:
+  - `Thiết lập server chung`
+  - `Mở link mời bot`
+  - `Chọn kênh invite`
+  - `Mời 12 học sinh còn thiếu`
+  - `Gắn server cho 3 lớp`
+  - `Xem 5 lỗi gần nhất`
 
 ## 7.2. Cấu trúc UI đề xuất
+
+### Dải trạng thái tổng quan ở đầu trang
+
+Trang `Messaging` nên có một vùng đầu trang kiểu `Setup status / Next actions`.
+
+Ví dụ các card hoặc checklist:
+
+- `Chưa có server chung`
+- `Server chung đã kết nối`
+- `Còn 8 học sinh chưa tham gia server chung`
+- `Có 2 lớp chưa gắn server riêng`
+- `Có 3 lỗi gửi lời mời cần kiểm tra`
+
+Mỗi item phải bấm được để dẫn user vào đúng tab / modal tương ứng.
+
+Mục tiêu là:
+
+- giáo viên mở trang lên là biết ngay hệ thống đang thiếu gì
+- không phải tự vào từng tab để dò
+- không phải đọc tài liệu để hiểu bước tiếp theo
 
 ### Tab 1. `Server chung`
 
 Chức năng:
 
-- kết nối community server
-- kiểm tra bot token
-- chọn kênh thông báo
-- chọn kênh để tạo invite
+- hướng dẫn add bot vào server chung
+- đồng bộ danh sách server Discord của giáo viên
+- chọn community server từ danh sách server đã sync
+- chọn `1 text channel`
+- chọn `1 voice channel`
 - xem trạng thái kết nối
 
 Hiển thị:
 
-- tên server
+- danh sách server đã sync
+- tên server đang chọn
 - trạng thái bot
-- kênh thông báo
-- kênh tạo invite
+- text channel đã chọn
+- voice channel đã chọn
+- trạng thái setup tổng quát:
+  - `chưa cấu hình`
+  - `đã cấu hình nhưng bot chưa ở trong server`
+  - `thiếu channel`
+  - `sẵn sàng`
 - số học sinh:
   - thiếu discord username
   - chưa mời
@@ -352,8 +460,9 @@ Hiển thị:
 
 Actions:
 
-- `Kết nối server chung`
-- `Kiểm tra kết nối`
+- `Mở link mời bot`
+- `Đồng bộ server Discord`
+- `Chọn server chung`
 - `Lưu cấu hình`
 - `Gửi lời mời cho cả lớp`
 - `Gửi lời mời cho học sinh chưa tham gia`
@@ -362,20 +471,29 @@ Actions:
 
 Chức năng:
 
-- map lớp sang server riêng
-- cấu hình voice channel / notification channel
+- map lớp sang server riêng từ danh sách server đã sync
+- chọn `1 text channel` và `1 voice channel`
 
 Hiển thị theo table:
 
 - lớp
 - server riêng
-- bot đang dùng:
-  - `bot server chung`
-  - `bot riêng`
+- text channel
+- voice channel
 - trạng thái
+
+Trạng thái lớp nên phân biệt rõ:
+
+- `chưa gắn server`
+- `đã gắn nhưng bot chưa có trong server`
+- `thiếu voice channel`
+- `thiếu notification channel`
+- `sẵn sàng`
 
 Actions:
 
+- `Mở link mời bot`
+- `Đồng bộ server Discord`
 - `Gắn server`
 - `Chỉnh sửa`
 - `Gỡ`
@@ -395,6 +513,14 @@ Hiển thị:
 - trạng thái server chung
 - trạng thái server lớp
 - lỗi gần nhất
+
+Phải có filter nhanh cho các nhóm hành động:
+
+- `Thiếu discord username`
+- `Chưa ở server chung`
+- `Chưa ở server lớp`
+- `Lời mời lỗi`
+- `Có thể nhắn tin`
 
 Bulk actions:
 
@@ -427,22 +553,25 @@ Templates phase đầu:
 
 ## 7.3. UX details bắt buộc
 
-### 1. Chấp nhận link, không ép ID thô
+### 1. Không bắt nhập ID thô
 
-UI input nên ghi:
+Teacher không nhập tay `server id` hay `channel id`.
 
-- `Link server hoặc Server ID`
-- `Link kênh hoặc Channel ID`
+UI phải cho:
 
-Backend đã có parser từ URL/text, nên tận dụng để giảm friction.
+- `Đồng bộ server Discord`
+- chọn server từ dropdown/list
+- chọn text channel từ dropdown/list
+- chọn voice channel từ dropdown/list
 
-### 2. Có nút `Kiểm tra`
+### 2. Có nút `Đồng bộ` và `Kiểm tra`
 
-Trước khi save, user phải bấm kiểm tra để biết:
+Trước khi save, user phải thấy rõ:
 
-- bot token có hợp lệ không
 - bot đã ở trong server chưa
-- channel có thuộc server không
+- hệ thống đã sync được server chưa
+- text channel có thuộc server không
+- voice channel có thuộc server không
 - bot thiếu quyền gì
 
 ### 3. Error message phải business-friendly
@@ -463,6 +592,19 @@ Trước khi gửi hàng loạt, UI phải cho thấy:
 - số người có khả năng fail
 - nội dung preview
 
+### 5. Empty state và warning state phải có hành động tiếp theo
+
+Ví dụ:
+
+- nếu chưa có `server chung`:
+  - hiện empty state với CTA `Thiết lập server chung`
+- nếu có server chung nhưng bot chưa được add:
+  - hiện warning state với CTA `Mở link mời bot`
+- nếu có server chung nhưng chưa đủ học sinh:
+  - hiện warning state với CTA `Mời học sinh còn thiếu`
+- nếu có lớp active chưa có server:
+  - hiện warning state với CTA `Gắn server cho lớp`
+
 ## 8. Data / persistence changes dự kiến
 
 ## 8.1. Bảng mới
@@ -474,11 +616,32 @@ id
 teacher_id unique
 discord_server_id
 name
-bot_token
 notification_channel_id nullable
-invite_channel_id nullable
+voice_channel_id nullable
 created_at
 updated_at
+```
+
+### `teacher_discord_server_caches`
+
+```txt
+id
+teacher_id
+discord_server_id
+name
+synced_at
+```
+
+### `teacher_discord_channel_caches`
+
+```txt
+id
+teacher_id
+discord_server_id
+discord_channel_id
+name
+type text|voice
+synced_at
 ```
 
 ## 8.2. Bảng phase 2
@@ -507,19 +670,15 @@ Không bắt buộc cho phase đầu, nhưng rất hữu ích cho vận hành.
 
 Không thay toàn bộ hệ thống Discord trong một lần.
 
-## Phase 0. Refactor prerequisite
-
-Hoàn tất trước:
-
-- refactor `messaging` khỏi service procedural lớn
-- chuẩn hóa controller/use-case/adapter structure
-- làm rõ boundary giữa `messaging`, `enrollment`, `finance`
-
 ## Phase 1. Community server foundation
 
 - thêm entity `teacher_community_servers`
-- thêm setup API
-- thêm validate API
+- thêm cache bảng `teacher_discord_server_caches`
+- thêm cache bảng `teacher_discord_channel_caches`
+- thêm sysadmin UI để cấu hình bot credential
+- thêm endpoint `GET /discord/bot-invite-link`
+- thêm `sync servers/channels` API
+- thêm `select server/channel` API
 - thêm UI tab `Server chung`
 
 ## Phase 2. Community invite & DM
@@ -557,7 +716,7 @@ Nếu bot và học sinh không có shared guild context, DM có thể fail.
 
 ### 2. Bot permission mismatch
 
-Nếu user tự paste token/server/channel sai, failure rate sẽ cao.
+Nếu giáo viên chưa add bot vào đúng server hoặc bot thiếu quyền, failure rate sẽ cao.
 
 Do đó:
 
@@ -568,7 +727,7 @@ Do đó:
 
 Nếu implement vội, logic `kick / invite` sẽ quay lại nhét trong controller/service.
 
-Phải đi qua use case/port rõ ràng sau refactor.
+Phải đi qua use case/port rõ ràng.
 
 ### 4. Restore/fallback complexity
 
@@ -576,7 +735,7 @@ Nhiều flow cần fallback:
 
 - có community server nhưng không có class server
 - có class server nhưng chưa có community server
-- bot token chung hay bot token riêng
+- bot đã được add ở server chung nhưng chưa được add ở server lớp
 
 Phase đầu cần giữ rule đơn giản.
 
@@ -584,22 +743,31 @@ Phase đầu cần giữ rule đơn giản.
 
 Feature này chỉ được coi là done khi:
 
-- giáo viên setup được server chung mà không cần hiểu Discord API
+- giáo viên setup được server chung mà không cần hiểu Discord API hoặc Discord Developer Portal
+- giáo viên chỉ cần dùng invite link bot do admin cung cấp để add bot vào server
+- UI chỉ ra trực quan giáo viên đang thiếu bước nào:
+  - chưa có server chung
+  - chưa add bot
+  - thiếu channel
+  - thiếu học sinh trong server chung
+  - lớp chưa có server
 - có validate bot/server/channel trước khi save
 - có thể mời học sinh vào server chung bằng 1 action rõ ràng
 - có thể gửi DM hàng loạt từ community server context
 - có template `nhắc học phí`
 - UI hiển thị học sinh nào fail vì thiếu discord username hoặc resolve thất bại
+- mọi warning/empty state chính đều có CTA dẫn tới hành động tiếp theo
 - transfer student không kick khỏi community server ngoài ý muốn
 - class server và community server có boundary rõ ràng trong code
 
 ## 12. Kết luận
 
-Feature này nên làm, nhưng **không phải việc kế tiếp**.
+Mục tiêu của plan này là làm cho Discord trở thành một workflow vận hành đơn giản:
 
-Việc kế tiếp vẫn là:
+- admin hệ thống quản lý bot
+- bot credential do sysadmin quản lý
+- giáo viên chỉ add bot bằng invite link
+- giáo viên chỉ cấu hình server/channel trong app
+- bot xử lý invite, DM, thông báo và membership flow ở dưới
 
-- hoàn tất refactor codebase cho bám kiến trúc mới
-- đặc biệt là các module `messaging`, `identity`, `classroom`, `finance`
-
-Sau khi kiến trúc ổn hơn, feature Discord community server này sẽ dễ implement hơn, ít procedural residue hơn, và UX cũng sẽ bền hơn thay vì vá chỗ này thủng chỗ kia.
+Nếu giữ đúng boundary đó, feature này sẽ dễ dùng hơn nhiều và tránh biến giáo viên thành người phải tự vận hành Discord infrastructure.

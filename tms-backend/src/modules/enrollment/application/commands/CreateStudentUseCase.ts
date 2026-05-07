@@ -25,7 +25,7 @@ export class CreateStudentUseCase implements UseCase<CreateStudentCommand, Stude
     await this.classroom.ensureActiveClass(command.classId);
 
     const codeforcesHandle = CodeforcesHandle.fromNullable(command.codeforcesHandle);
-    if (codeforcesHandle && await this.students.codeforcesHandleExists(codeforcesHandle.value)) {
+    if (codeforcesHandle && await this.students.codeforcesHandleExists(command.teacherId, codeforcesHandle.value)) {
       throw new DomainError('codeforces_handle_already_exists', 'codeforces_handle already exists');
     }
 

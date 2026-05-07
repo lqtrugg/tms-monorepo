@@ -1,6 +1,23 @@
 import type { DataSource } from 'typeorm';
 
 export async function installDatabaseIntegrityRules(dataSource: DataSource): Promise<void> {
+  // Student identities are scoped by teacher. The old global unique index on
+  // codeforces_handle incorrectly prevented the same handle from existing under
+  // different teachers.
+  await dataSource.query(`
+    DROP INDEX IF EXISTS uq_students_codeforces_handle
+  `);
+
+  await dataSource.query(`
+    DROP INDEX IF EXISTS uq_students_teacher_codeforces_handle
+  `);
+
+  await dataSource.query(`
+    CREATE UNIQUE INDEX uq_students_teacher_codeforces_handle
+    ON students (teacher_id, LOWER(codeforces_handle))
+    WHERE codeforces_handle IS NOT NULL
+  `);
+
   await dataSource.query(`
     ALTER TABLE attendance
     DROP CONSTRAINT IF EXISTS chk_attendance_override

@@ -13,11 +13,16 @@ export class TypeOrmStudentRepository implements StudentRepository {
     private readonly mapper = new StudentMapper(),
   ) {}
 
-  async codeforcesHandleExists(codeforcesHandle: string, excludeStudentId?: number): Promise<boolean> {
+  async codeforcesHandleExists(
+    teacherId: number,
+    codeforcesHandle: string,
+    excludeStudentId?: number,
+  ): Promise<boolean> {
     const queryBuilder = this.manager
       .getRepository(StudentOrmEntity)
       .createQueryBuilder('student')
-      .where('student.codeforces_handle IS NOT NULL')
+      .where('student.teacher_id = :teacherId', { teacherId })
+      .andWhere('student.codeforces_handle IS NOT NULL')
       .andWhere('LOWER(student.codeforces_handle) = LOWER(:handle)', {
         handle: codeforcesHandle,
       });

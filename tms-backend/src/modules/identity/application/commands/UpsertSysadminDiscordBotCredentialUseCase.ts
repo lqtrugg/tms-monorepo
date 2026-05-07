@@ -1,0 +1,55 @@
+import type {
+  SysadminDiscordBotCredentialInput,
+  SysadminDiscordBotCredentialView,
+} from '../dto/AdminDto.js';
+import type { SysadminDiscordBotCredentialStore } from '../../infrastructure/persistence/typeorm/SysadminDiscordBotCredentialStore.js';
+
+function buildInviteLink(input: {
+  clientId: string;
+  permissions: string | null;
+  scopes: string | null;
+}): string {
+  const search = new URLSearchParams({
+    client_id: input.clientId,
+    scope: input.scopes?.trim() || 'bot applications.commands',
+  });
+
+  if (input.permissions?.trim()) {
+    search.set('permissions', input.permissions.trim());
+  }
+
+  return `https://discord.com/oauth2/authorize?${search.toString()}`;
+}
+
+export class UpsertSysadminDiscordBotCredentialUseCase {
+  constructor(private readonly store: SysadminDiscordBotCredentialStore) {}
+
+  async execute(input: SysadminDiscordBotCredentialInput): Promise<SysadminDiscordBotCredentialView> {
+    const existing = await this.store.findDefault();
+    const normalizedBotToken = input.bot_token.trim();
+    const botToken = normalizedBotToken && normalizedBotToken !== '__KEEP_EXISTING__'
+      ? normalizedBotToken
+      : existing?.bot_token ?? '';
+
+    const saved = await this.store.saveDefault({
+      bot_token: botToken,
+      client_id: input.client_id.trim(),
+      permissions: input.permissions ?? null,
+      scopes: input.scopes ?? null,
+    });
+
+    return {
+      id: saved.id,
+      client_id: saved.client_id,
+      permissions: saved.permissions,
+      scopes: saved.scopes,
+      invite_link: buildInviteLink({
+        clientId: saved.client_id,
+        permissions: saved.permissions,
+        scopes: saved.scopes,
+      }),
+      has_bot_token: true,
+      updated_at: saved.updated_at,
+    };
+  }
+}

@@ -29,7 +29,10 @@ export class UpdateStudentUseCase implements UseCase<UpdateStudentCommand, Stude
 
     if (command.codeforcesHandle !== undefined) {
       const codeforcesHandle = CodeforcesHandle.fromNullable(command.codeforcesHandle);
-      if (codeforcesHandle && await this.students.codeforcesHandleExists(codeforcesHandle.value, command.studentId)) {
+      if (
+        codeforcesHandle
+        && await this.students.codeforcesHandleExists(command.teacherId, codeforcesHandle.value, command.studentId)
+      ) {
         throw new DomainError('codeforces_handle_already_exists', 'codeforces_handle already exists');
       }
 

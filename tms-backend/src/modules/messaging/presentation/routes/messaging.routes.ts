@@ -11,11 +11,20 @@ import {
   channelPostBodySchema,
   classIdParamSchema,
   messageListQuerySchema,
+  serverIdParamSchema,
+  upsertCommunityServerBodySchema,
   upsertDiscordServerBodySchema,
 } from './messaging.schema.js';
 
 type MessagingRouteControllers = {
   listDiscordServers: MessagingController;
+  syncDiscordServers: MessagingController;
+  listDiscordChannels: MessagingController;
+  getCommunityServer: MessagingController;
+  upsertCommunityServer: MessagingController;
+  deleteCommunityServer: MessagingController;
+  getBotInviteLink: MessagingController;
+  getSetupStatus: MessagingController;
   upsertDiscordServer: MessagingController;
   deleteDiscordServer: MessagingController;
   listMessages: MessagingController;
@@ -29,9 +38,24 @@ export function createMessagingRouter(controllers: MessagingRouteControllers): R
   router.use(passport.authenticate('jwt', { session: false }));
   router.use(requireRoles([TeacherRole.Teacher]));
 
+  router.get('/discord/bot-invite-link', adaptExpressRoute(controllers.getBotInviteLink));
+  router.get('/discord/setup-status', adaptExpressRoute(controllers.getSetupStatus));
   router.get('/discord/servers', adaptExpressRoute(controllers.listDiscordServers));
+  router.post('/discord/servers/sync', adaptExpressRoute(controllers.syncDiscordServers));
+  router.get(
+    '/discord/servers/:serverId/channels',
+    validate({ params: serverIdParamSchema }),
+    adaptExpressRoute(controllers.listDiscordChannels),
+  );
+  router.get('/discord/community-server', adaptExpressRoute(controllers.getCommunityServer));
   router.put(
-    '/classes/:classId/discord-server',
+    '/discord/community-server/select',
+    validate({ body: upsertCommunityServerBodySchema }),
+    adaptExpressRoute(controllers.upsertCommunityServer),
+  );
+  router.delete('/discord/community-server', adaptExpressRoute(controllers.deleteCommunityServer));
+  router.put(
+    '/classes/:classId/discord-server/select',
     validate({ params: classIdParamSchema, body: upsertDiscordServerBodySchema }),
     authorizeOwnedClassParam(),
     adaptExpressRoute(controllers.upsertDiscordServer),

@@ -97,17 +97,6 @@ export class SendBulkDmUseCase {
         continue;
       }
 
-      if (!server.bot_token) {
-        deliveryResults.push({
-          student_id: recipient.student_id,
-          student_name: recipient.student_name,
-          status: DiscordSendStatus.Failed,
-          sent_at: null,
-          error_detail: 'bot_token is missing for this class server',
-        });
-        continue;
-      }
-
       const resolvedRecipient = await this.discordRecipientResolver.resolve(
         server,
         recipient.discord_username,

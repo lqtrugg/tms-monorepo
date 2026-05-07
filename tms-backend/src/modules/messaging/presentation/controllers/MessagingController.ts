@@ -6,12 +6,20 @@ import type {
   BulkDmInput,
   ChannelPostInput,
   MessageListFilters,
-  UpsertDiscordServerInput,
+  SelectClassDiscordServerInput,
+  UpsertCommunityServerInput,
 } from '../../application/dto/MessagingDto.js';
 import { getClassId, getTeacherId } from './request-context.js';
 
 type MessagingControllerAction =
   | 'listDiscordServers'
+  | 'syncDiscordServers'
+  | 'listDiscordChannels'
+  | 'getCommunityServer'
+  | 'upsertCommunityServer'
+  | 'deleteCommunityServer'
+  | 'getBotInviteLink'
+  | 'getSetupStatus'
   | 'upsertDiscordServer'
   | 'deleteDiscordServer'
   | 'listMessages'
@@ -20,10 +28,17 @@ type MessagingControllerAction =
 
 type MessagingControllerDependencies = {
   listDiscordServers(teacherId: number): Promise<unknown>;
+  syncDiscordServers(teacherId: number): Promise<unknown>;
+  listDiscordChannels(teacherId: number, serverId: number): Promise<unknown>;
+  getCommunityServer(teacherId: number): Promise<unknown>;
+  upsertCommunityServer(teacherId: number, input: UpsertCommunityServerInput): Promise<unknown>;
+  deleteCommunityServer(teacherId: number): Promise<unknown>;
+  getBotInviteLink(): Promise<unknown> | unknown;
+  getSetupStatus(teacherId: number): Promise<unknown>;
   upsertDiscordServerByClass(
     teacherId: number,
     classId: number,
-    input: UpsertDiscordServerInput,
+    input: SelectClassDiscordServerInput,
   ): Promise<unknown>;
   deleteDiscordServer(teacherId: number, classId: number): Promise<unknown>;
   listMessages(teacherId: number, filters: MessageListFilters): Promise<unknown>;
@@ -32,8 +47,8 @@ type MessagingControllerDependencies = {
 };
 
 type MessagingHttpRequest = HttpRequest<
-  UpsertDiscordServerInput | BulkDmInput | ChannelPostInput,
-  { classId?: number },
+  SelectClassDiscordServerInput | UpsertCommunityServerInput | BulkDmInput | ChannelPostInput,
+  { classId?: number; serverId?: number },
   MessageListFilters
 >;
 
@@ -48,6 +63,20 @@ export class MessagingController implements Controller {
       switch (this.action) {
         case 'listDiscordServers':
           return this.listDiscordServers(request);
+        case 'syncDiscordServers':
+          return this.syncDiscordServers(request);
+        case 'listDiscordChannels':
+          return this.listDiscordChannels(request);
+        case 'getCommunityServer':
+          return this.getCommunityServer(request);
+        case 'upsertCommunityServer':
+          return this.upsertCommunityServer(request);
+        case 'deleteCommunityServer':
+          return this.deleteCommunityServer(request);
+        case 'getBotInviteLink':
+          return this.getBotInviteLink();
+        case 'getSetupStatus':
+          return this.getSetupStatus(request);
         case 'upsertDiscordServer':
           return this.upsertDiscordServer(request);
         case 'deleteDiscordServer':
@@ -77,12 +106,84 @@ export class MessagingController implements Controller {
     };
   }
 
-  private async upsertDiscordServer(request: MessagingHttpRequest): Promise<HttpResponse> {
-    const server = await this.dependencies.upsertDiscordServerByClass(
+  private async syncDiscordServers(request: MessagingHttpRequest): Promise<HttpResponse> {
+    const result = await this.dependencies.syncDiscordServers(getTeacherId(request));
+
+    return {
+      statusCode: 200,
+      body: result,
+    };
+  }
+
+  private async listDiscordChannels(request: MessagingHttpRequest): Promise<HttpResponse> {
+    const serverId = (request.params as { serverId?: number }).serverId;
+
+    if (typeof serverId !== 'number') {
+      throw new ServiceError('serverId is required', 400);
+    }
+
+    const channels = await this.dependencies.listDiscordChannels(getTeacherId(request), serverId);
+
+    return {
+      statusCode: 200,
+      body: { channels },
+    };
+  }
+
+  private async getCommunityServer(request: MessagingHttpRequest): Promise<HttpResponse> {
+    const server = await this.dependencies.getCommunityServer(getTeacherId(request));
+
+    return {
+      statusCode: 200,
+      body: { server },
+    };
+  }
+
+  private async upsertCommunityServer(request: MessagingHttpRequest): Promise<HttpResponse> {
+    const server = await this.dependencies.upsertCommunityServer(
       getTeacherId(request),
-      getClassId(request),
-      request.body as UpsertDiscordServerInput,
+      request.body as UpsertCommunityServerInput,
     );
+
+    return {
+      statusCode: 200,
+      body: { server },
+    };
+  }
+
+  private async deleteCommunityServer(request: MessagingHttpRequest): Promise<HttpResponse> {
+    const result = await this.dependencies.deleteCommunityServer(getTeacherId(request));
+
+    return {
+      statusCode: 200,
+      body: result,
+    };
+  }
+
+  private async getBotInviteLink(): Promise<HttpResponse> {
+    const inviteLink = await this.dependencies.getBotInviteLink();
+
+    return {
+      statusCode: 200,
+      body: { invite_link: inviteLink },
+    };
+  }
+
+  private async getSetupStatus(request: MessagingHttpRequest): Promise<HttpResponse> {
+    const status = await this.dependencies.getSetupStatus(getTeacherId(request));
+
+    return {
+      statusCode: 200,
+      body: status,
+    };
+  }
+
+  private async upsertDiscordServer(request: MessagingHttpRequest): Promise<HttpResponse> {
+      const server = await this.dependencies.upsertDiscordServerByClass(
+        getTeacherId(request),
+        getClassId(request),
+        request.body as SelectClassDiscordServerInput,
+      );
 
     return {
       statusCode: 200,

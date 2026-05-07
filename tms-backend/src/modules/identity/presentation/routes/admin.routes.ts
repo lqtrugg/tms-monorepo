@@ -9,6 +9,7 @@ import { requireRoles } from '../middlewares/rbac.js';
 import {
   createTeacherByAdminBodySchema,
   teacherIdParamSchema,
+  upsertSysadminDiscordBotCredentialBodySchema,
   updateTeacherByAdminBodySchema,
 } from './admin.schema.js';
 
@@ -16,6 +17,8 @@ type AdminRouteControllers = {
   listTeachers: AdminController;
   createTeacher: AdminController;
   updateTeacher: AdminController;
+  getDiscordBotCredential: AdminController;
+  upsertDiscordBotCredential: AdminController;
 };
 
 export function createAdminRouter(controllers: AdminRouteControllers): Router {
@@ -25,6 +28,12 @@ export function createAdminRouter(controllers: AdminRouteControllers): Router {
   router.use(requireRoles([TeacherRole.SysAdmin]));
 
   router.get('/teachers', adaptExpressRoute(controllers.listTeachers));
+  router.get('/discord-bot', adaptExpressRoute(controllers.getDiscordBotCredential));
+  router.put(
+    '/discord-bot',
+    validate({ body: upsertSysadminDiscordBotCredentialBodySchema }),
+    adaptExpressRoute(controllers.upsertDiscordBotCredential),
+  );
   router.post('/teachers', validate({ body: createTeacherByAdminBodySchema }), adaptExpressRoute(controllers.createTeacher));
   router.patch(
     '/teachers/:teacherId',

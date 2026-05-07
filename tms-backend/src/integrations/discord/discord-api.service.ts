@@ -15,6 +15,7 @@ type DiscordChannelPayload = {
   id?: string;
   guild_id?: string | null;
   name?: string;
+  type?: number;
 };
 
 type DiscordUserPayload = {
@@ -36,6 +37,11 @@ type DiscordMessagePayload = {
 
 type DiscordInvitePayload = {
   guild?: DiscordGuildPayload | null;
+};
+
+type DiscordGuildListItemPayload = {
+  id?: string;
+  name?: string;
 };
 
 function isDiscordSnowflake(value: string): boolean {
@@ -357,6 +363,90 @@ export async function fetchDiscordChannelMetadata(channelId: string, botToken: s
   };
 }
 
+export async function listDiscordGuilds(botToken: string): Promise<Array<{ id: string; name: string }>> {
+  const response = await discordApiRequest('/users/@me/guilds', botToken);
+
+  if (response.status === 401 || response.status === 403) {
+    throw new ServiceError('invalid bot_token or bot cannot list guilds', 400);
+  }
+
+  if (!response.ok) {
+    const detail = await getDiscordErrorMessage(response);
+    throw new ServiceError(
+      detail ? `failed to list Discord guilds: ${detail}` : 'failed to list Discord guilds',
+      502,
+    );
+  }
+
+  const payload = await parseJsonSafe(response);
+  if (!Array.isArray(payload)) {
+    throw new ServiceError('discord guild list response is invalid', 502);
+  }
+
+  return payload
+    .map((item) => {
+      const guild = item as DiscordGuildListItemPayload | null;
+      if (!guild || typeof guild.id !== 'string' || typeof guild.name !== 'string') {
+        return null;
+      }
+
+      return {
+        id: guild.id,
+        name: guild.name.trim(),
+      };
+    })
+    .filter((item): item is { id: string; name: string } => item !== null);
+}
+
+export async function listDiscordGuildChannels(input: {
+  guildId: string;
+  botToken: string;
+}): Promise<Array<{ id: string; name: string; type: 'text' | 'voice' }>> {
+  const guildId = normalizeRequiredString(input.guildId, 'guild_id');
+  const response = await discordApiRequest(`/guilds/${encodeURIComponent(guildId)}/channels`, input.botToken);
+
+  if (response.status === 401 || response.status === 403) {
+    throw new ServiceError('invalid bot_token or bot cannot list guild channels', 400);
+  }
+
+  if (response.status === 404) {
+    throw new ServiceError('discord server not found or bot is not in this server', 404);
+  }
+
+  if (!response.ok) {
+    const detail = await getDiscordErrorMessage(response);
+    throw new ServiceError(
+      detail ? `failed to list Discord guild channels: ${detail}` : 'failed to list Discord guild channels',
+      502,
+    );
+  }
+
+  const payload = await parseJsonSafe(response);
+  if (!Array.isArray(payload)) {
+    throw new ServiceError('discord guild channel list response is invalid', 502);
+  }
+
+  return payload
+    .map((item) => {
+      const channel = item as DiscordChannelPayload | null;
+      if (!channel || typeof channel.id !== 'string' || typeof channel.name !== 'string') {
+        return null;
+      }
+
+      const type = channel.type === 2 ? 'voice' : channel.type === 0 ? 'text' : null;
+      if (!type) {
+        return null;
+      }
+
+      return {
+        id: channel.id,
+        name: channel.name.trim(),
+        type,
+      };
+    })
+    .filter((item): item is { id: string; name: string; type: 'text' | 'voice' } => item !== null);
+}
+
 export async function ensureDiscordChannelBelongsToGuild(input: {
   channelId: string;
   guildId: string;
@@ -646,11 +736,22 @@ export async function createGuildInvite(input: {
 export class DiscordClient {
   constructor(private readonly botToken: string) {}
 
+  listGuilds(): Promise<Array<{ id: string; name: string }>> {
+    return listDiscordGuilds(this.botToken);
+  }
+
   fetchGuildMetadata(discordServerId: string): Promise<{
     id: string;
     name: string;
   }> {
     return fetchDiscordGuildMetadata(discordServerId, this.botToken);
+  }
+
+  listGuildChannels(guildId: string): Promise<Array<{ id: string; name: string; type: 'text' | 'voice' }>> {
+    return listDiscordGuildChannels({
+      guildId,
+      botToken: this.botToken,
+    });
   }
 
   fetchChannelMetadata(channelId: string): Promise<{

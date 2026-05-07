@@ -33,3 +33,10 @@ export const updateTeacherByAdminBodySchema = z.object({
 }).refine((value) => Object.keys(value).length > 0, {
   message: 'at least one field is required',
 });
+
+export const upsertSysadminDiscordBotCredentialBodySchema = z.object({
+  bot_token: requiredTrimmedStringSchema,
+  client_id: requiredTrimmedStringSchema,
+  permissions: nullableOptionalTrimmedStringSchema,
+  scopes: nullableOptionalTrimmedStringSchema,
+});

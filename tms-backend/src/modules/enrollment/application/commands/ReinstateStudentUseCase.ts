@@ -34,7 +34,10 @@ export class ReinstateStudentUseCase implements UseCase<ReinstateStudentCommand,
     }
 
     const codeforcesHandle = student.toSnapshot().codeforcesHandle;
-    if (codeforcesHandle && await this.students.codeforcesHandleExists(codeforcesHandle, command.studentId)) {
+    if (
+      codeforcesHandle
+      && await this.students.codeforcesHandleExists(command.teacherId, codeforcesHandle, command.studentId)
+    ) {
       throw new DomainError('codeforces_handle_already_exists', 'codeforces_handle already exists');
     }
 

@@ -8,15 +8,20 @@ import { FeeRecordOrmEntity as FeeRecord } from './finance/infrastructure/persis
 import { TransactionAuditLogOrmEntity as TransactionAuditLog } from './finance/infrastructure/persistence/typeorm/TransactionAuditLogOrmEntity.js';
 import { TransactionOrmEntity as Transaction } from './finance/infrastructure/persistence/typeorm/TransactionOrmEntity.js';
 import { TeacherOrmEntity as Teacher } from './identity/infrastructure/persistence/typeorm/TeacherOrmEntity.js';
+import { SysadminDiscordBotCredentialOrmEntity as SysadminDiscordBotCredential } from './identity/infrastructure/persistence/typeorm/SysadminDiscordBotCredentialOrmEntity.js';
 import { DiscordMessageRecipientOrmEntity as DiscordMessageRecipient } from './messaging/infrastructure/persistence/typeorm/DiscordMessageRecipientOrmEntity.js';
 import { DiscordMessageOrmEntity as DiscordMessage } from './messaging/infrastructure/persistence/typeorm/DiscordMessageOrmEntity.js';
 import { DiscordServerOrmEntity as DiscordServer } from './messaging/infrastructure/persistence/typeorm/DiscordServerOrmEntity.js';
+import { TeacherDiscordChannelCacheOrmEntity as TeacherDiscordChannelCache } from './messaging/infrastructure/persistence/typeorm/TeacherDiscordChannelCacheOrmEntity.js';
+import { TeacherDiscordServerCacheOrmEntity as TeacherDiscordServerCache } from './messaging/infrastructure/persistence/typeorm/TeacherDiscordServerCacheOrmEntity.js';
+import { TeacherCommunityServerOrmEntity as TeacherCommunityServer } from './messaging/infrastructure/persistence/typeorm/TeacherCommunityServerOrmEntity.js';
 import { TopicProblemOrmEntity as TopicProblem } from './topic/infrastructure/persistence/typeorm/TopicProblemOrmEntity.js';
 import { TopicStandingOrmEntity as TopicStanding } from './topic/infrastructure/persistence/typeorm/TopicStandingOrmEntity.js';
 import { TopicOrmEntity as Topic } from './topic/infrastructure/persistence/typeorm/TopicOrmEntity.js';
 
 export const appEntities = [
   Teacher,
+  SysadminDiscordBotCredential,
   Student,
   Class,
   ClassSchedule,
@@ -26,6 +31,9 @@ export const appEntities = [
   FeeRecord,
   Transaction,
   DiscordServer,
+  TeacherDiscordServerCache,
+  TeacherDiscordChannelCache,
+  TeacherCommunityServer,
   DiscordMessage,
   DiscordMessageRecipient,
   Topic,

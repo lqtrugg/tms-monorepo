@@ -48,11 +48,6 @@ export class SendChannelPostUseCase {
     const failures: Array<{ server_id: number; error: string }> = [];
 
     for (const server of orderedServers) {
-      if (!server.bot_token) {
-        failures.push({ server_id: server.id, error: 'bot_token is missing' });
-        continue;
-      }
-
       if (!server.notification_channel_id) {
         failures.push({ server_id: server.id, error: 'notification_channel_id is missing' });
         continue;
