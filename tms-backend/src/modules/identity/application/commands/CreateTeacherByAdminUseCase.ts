@@ -1,0 +1,39 @@
+import { TeacherRole } from '../../../../entities/enums.js';
+import { ServiceError } from '../../../../shared/errors/service.error.js';
+import { isUniqueViolation } from '../mappers/AuthMapper.js';
+import { toAdminTeacher } from '../mappers/AdminMapper.js';
+import type { CreateTeacherByAdminInput } from '../dto/AdminDto.js';
+import type { PasswordHasher } from '../ports/PasswordHasher.js';
+import type { TeacherRepository } from '../../infrastructure/persistence/typeorm/TeacherRepository.js';
+
+export class CreateTeacherByAdminUseCase {
+  constructor(
+    private readonly teacherRepository: TeacherRepository,
+    private readonly passwordHasher: PasswordHasher,
+  ) {}
+
+  async execute(input: CreateTeacherByAdminInput) {
+    const passwordHash = await this.passwordHasher.hash(input.password);
+
+    const teacher = this.teacherRepository.create({
+      username: input.username,
+      password_hash: passwordHash,
+      role: input.role ?? TeacherRole.Teacher,
+      is_active: input.is_active ?? true,
+      codeforces_handle: input.codeforces_handle,
+      codeforces_api_key: input.codeforces_api_key,
+      codeforces_api_secret: input.codeforces_api_secret,
+    });
+
+    try {
+      const saved = await this.teacherRepository.save(teacher);
+      return toAdminTeacher(saved);
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ServiceError('username already exists', 409);
+      }
+
+      throw error;
+    }
+  }
+}

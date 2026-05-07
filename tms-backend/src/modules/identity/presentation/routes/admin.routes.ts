@@ -1,0 +1,36 @@
+import { Router } from 'express';
+import passport from 'passport';
+
+import { TeacherRole } from '../../../../entities/enums.js';
+import { validate } from '../../../../shared/middlewares/validate.js';
+import { adaptExpressRoute } from '../../../../shared/presentation/adapt-express-route.js';
+import { AdminController } from '../controllers/AdminController.js';
+import { requireRoles } from '../middlewares/rbac.js';
+import {
+  createTeacherByAdminBodySchema,
+  teacherIdParamSchema,
+  updateTeacherByAdminBodySchema,
+} from './admin.schema.js';
+
+type AdminRouteControllers = {
+  listTeachers: AdminController;
+  createTeacher: AdminController;
+  updateTeacher: AdminController;
+};
+
+export function createAdminRouter(controllers: AdminRouteControllers): Router {
+  const router = Router();
+
+  router.use(passport.authenticate('jwt', { session: false }));
+  router.use(requireRoles([TeacherRole.SysAdmin]));
+
+  router.get('/teachers', adaptExpressRoute(controllers.listTeachers));
+  router.post('/teachers', validate({ body: createTeacherByAdminBodySchema }), adaptExpressRoute(controllers.createTeacher));
+  router.patch(
+    '/teachers/:teacherId',
+    validate({ params: teacherIdParamSchema, body: updateTeacherByAdminBodySchema }),
+    adaptExpressRoute(controllers.updateTeacher),
+  );
+
+  return router;
+}

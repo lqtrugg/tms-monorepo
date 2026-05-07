@@ -2,8 +2,8 @@ import { Router, type NextFunction, type Request, type Response } from 'express'
 import passport from 'passport';
 
 import type { DbContext } from '../database/db-context.js';
+import type { Teacher } from '../../entities/teacher.entity.js';
 import { DomainError } from '../../shared/errors/domain.error.js';
-import type { Teacher } from '../../modules/identity/domain/teacher.entity.js';
 
 export abstract class BaseController {
   readonly router = Router();

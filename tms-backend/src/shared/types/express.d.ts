@@ -1,5 +1,5 @@
 import type { DbContext } from '../../infrastructure/database/db-context.js';
-import type { Teacher } from '../../modules/identity/domain/teacher.entity.js';
+import type { Teacher } from '../../entities/teacher.entity.js';
 
 declare global {
   namespace Express {

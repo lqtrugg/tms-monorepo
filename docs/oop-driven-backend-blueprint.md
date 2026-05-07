@@ -792,6 +792,7 @@ Domain/application objects quan trọng:
 - `EnrollmentPolicy`
 - `StudentRepository`
 - `EnrollmentRepository`
+  - with the current enrollment direction, these live under `infrastructure/persistence/typeorm/`, not `domain/`
 
 ### 14.3 Classroom
 

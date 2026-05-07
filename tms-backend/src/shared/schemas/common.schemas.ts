@@ -34,8 +34,8 @@ export const optionalTrimmedStringSchema = z.preprocess((value) => {
 
 export const nullableOptionalTrimmedStringSchema = z.preprocess(
   optionalTrimmedStringToNull,
-  z.string().nullable(),
-);
+  z.string().nullable().optional(),
+).optional();
 
 export const dateTimeSchema = z.coerce.date();
 

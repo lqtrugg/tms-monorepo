@@ -1,19 +1,19 @@
-import { Attendance } from './classroom/domain/attendance.entity.js';
-import { ClassSchedule } from './classroom/domain/class-schedule.entity.js';
-import { Class } from './classroom/domain/class.entity.js';
-import { Session } from './classroom/domain/session.entity.js';
-import { Enrollment } from './enrollment/domain/enrollment.entity.js';
-import { Student } from './enrollment/domain/student.entity.js';
-import { FeeRecord } from './finance/domain/fee-record.entity.js';
-import { TransactionAuditLog } from './finance/domain/transaction-audit-log.entity.js';
-import { Transaction } from './finance/domain/transaction.entity.js';
-import { Teacher } from './identity/domain/teacher.entity.js';
-import { DiscordMessageRecipient } from './messaging/domain/discord-message-recipient.entity.js';
-import { DiscordMessage } from './messaging/domain/discord-message.entity.js';
-import { DiscordServer } from './messaging/domain/discord-server.entity.js';
-import { TopicProblem } from './topic/domain/topic-problem.entity.js';
-import { TopicStanding } from './topic/domain/topic-standing.entity.js';
-import { Topic } from './topic/domain/topic.entity.js';
+import { AttendanceOrmEntity as Attendance } from './classroom/infrastructure/persistence/typeorm/AttendanceOrmEntity.js';
+import { ClassScheduleOrmEntity as ClassSchedule } from './classroom/infrastructure/persistence/typeorm/ClassScheduleOrmEntity.js';
+import { ClassOrmEntity as Class } from './classroom/infrastructure/persistence/typeorm/ClassOrmEntity.js';
+import { SessionOrmEntity as Session } from './classroom/infrastructure/persistence/typeorm/SessionOrmEntity.js';
+import { Enrollment } from './enrollment/infrastructure/persistence/typeorm/EnrollmentOrmEntity.js';
+import { Student } from './enrollment/infrastructure/persistence/typeorm/StudentOrmEntity.js';
+import { FeeRecordOrmEntity as FeeRecord } from './finance/infrastructure/persistence/typeorm/FeeRecordOrmEntity.js';
+import { TransactionAuditLogOrmEntity as TransactionAuditLog } from './finance/infrastructure/persistence/typeorm/TransactionAuditLogOrmEntity.js';
+import { TransactionOrmEntity as Transaction } from './finance/infrastructure/persistence/typeorm/TransactionOrmEntity.js';
+import { TeacherOrmEntity as Teacher } from './identity/infrastructure/persistence/typeorm/TeacherOrmEntity.js';
+import { DiscordMessageRecipientOrmEntity as DiscordMessageRecipient } from './messaging/infrastructure/persistence/typeorm/DiscordMessageRecipientOrmEntity.js';
+import { DiscordMessageOrmEntity as DiscordMessage } from './messaging/infrastructure/persistence/typeorm/DiscordMessageOrmEntity.js';
+import { DiscordServerOrmEntity as DiscordServer } from './messaging/infrastructure/persistence/typeorm/DiscordServerOrmEntity.js';
+import { TopicProblemOrmEntity as TopicProblem } from './topic/infrastructure/persistence/typeorm/TopicProblemOrmEntity.js';
+import { TopicStandingOrmEntity as TopicStanding } from './topic/infrastructure/persistence/typeorm/TopicStandingOrmEntity.js';
+import { TopicOrmEntity as Topic } from './topic/infrastructure/persistence/typeorm/TopicOrmEntity.js';
 
 export const appEntities = [
   Teacher,
@@ -33,4 +33,3 @@ export const appEntities = [
   TopicStanding,
   TransactionAuditLog,
 ];
-

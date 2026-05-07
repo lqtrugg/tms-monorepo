@@ -1,0 +1,41 @@
+import { ClassServiceError } from '../../../../shared/errors/class.error.js';
+import type { SessionSummary } from '../dto/ClassDto.js';
+import type { SessionFinancePort } from '../ports/SessionFinancePort.js';
+import type { SessionRepository } from '../../infrastructure/persistence/typeorm/SessionRepository.js';
+import { SessionMapper } from '../../infrastructure/persistence/typeorm/SessionMapper.js';
+
+type CancelSessionCommand = {
+  teacherId: number;
+  sessionId: number;
+  cancelledAt: Date;
+};
+
+export class CancelSessionUseCase {
+  constructor(
+    private readonly sessions: SessionRepository,
+    private readonly finance: SessionFinancePort,
+  ) {}
+
+  async execute(command: CancelSessionCommand): Promise<SessionSummary> {
+    const session = await this.sessions.findById(command.teacherId, command.sessionId);
+
+    if (!session) {
+      throw new ClassServiceError('session not found', 404);
+    }
+
+    if (session.isCancelled()) {
+      return SessionMapper.toSummary(session);
+    }
+
+    session.cancel(command.cancelledAt);
+    const saved = await this.sessions.save(session);
+
+    await this.finance.cancelFeeRecordsForSessions(
+      command.teacherId,
+      [saved.id],
+      command.cancelledAt,
+    );
+
+    return SessionMapper.toSummary(saved);
+  }
+}

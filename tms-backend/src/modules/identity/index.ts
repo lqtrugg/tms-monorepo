@@ -1,6 +1,4 @@
-export { adminRouter } from './admin.controller.js';
-export { authRouter } from './auth.controller.js';
-export { configurePassport } from './auth.passport.js';
+export { configurePassport } from './infrastructure/auth/configurePassport.js';
 export {
   authorizeOwnedClassBody,
   authorizeOwnedClassParam,
@@ -13,7 +11,6 @@ export {
   authorizeOwnedStudentQuery,
   authorizeOwnedTopicParam,
   authorizeOwnedTransactionParam,
-} from './auth.ownership.js';
-export { requireRoles } from './auth.rbac.js';
-export { ensureSystemAdminAccount } from './auth.service.js';
-export { IdentityService, identityService } from './identity.service.js';
+} from './presentation/middlewares/ownership.js';
+export { requireRoles } from './presentation/middlewares/rbac.js';
+export { ensureSystemAdminAccount } from './infrastructure/bootstrap/ensureSystemAdminAccount.js';

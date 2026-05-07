@@ -33,6 +33,26 @@ Business logic nên nằm ở:
 - Domain service/policy: rule nghiệp vụ không thuộc riêng một entity.
 - Use case: workflow điều phối nhiều object/repository/port.
 
+## 1.1. Thứ tự ưu tiên giữa refactor và feature mới
+
+Trong giai đoạn hiện tại, ưu tiên là:
+
+1. refactor codebase về kiến trúc đích
+2. ổn định boundary của các module chính
+3. sau đó mới implement feature lớn mới
+
+Đặc biệt, feature Discord mới với mô hình:
+
+- `server chung` cho toàn bộ học sinh của giáo viên
+- `server riêng` cho từng lớp
+- workflow `kick / invite / DM / tuition reminder`
+
+được tách riêng thành tài liệu backlog tại:
+
+- [discord-community-server-feature-plan.md](/Users/lequangtrung123/Documents/tms-monorepo/docs/discord-community-server-feature-plan.md)
+
+Feature đó không nên được implement trước khi `messaging`, `identity`, `finance`, `enrollment` được kéo gần hơn với kiến trúc mới. Nếu làm ngược thứ tự, procedural residue sẽ tăng trở lại ngay trong lúc refactor đang dang dở.
+
 ## 2. Có phải “go-to” khi muốn code OOP-driven không?
 
 Không phải lúc nào cũng là go-to.
@@ -171,9 +191,6 @@ tms-backend/
             EnrollmentId.ts
             CodeforcesHandle.ts
             EnrollmentPeriod.ts
-          repositories/
-            StudentRepository.ts
-            EnrollmentRepository.ts
           services/
             EnrollmentPolicy.ts
           events/
@@ -202,6 +219,8 @@ tms-backend/
         infrastructure/
           persistence/
             typeorm/
+              StudentRepository.ts
+              EnrollmentRepository.ts
               StudentOrmEntity.ts
               EnrollmentOrmEntity.ts
               StudentMapper.ts
