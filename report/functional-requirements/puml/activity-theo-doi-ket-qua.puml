@@ -1,0 +1,16 @@
+@startuml
+start
+:Giáo viên chọn học sinh;
+if (Học sinh tồn tại?) then (Không)
+  :Thông báo không tìm thấy dữ liệu;
+  stop
+else (Có)
+  :Lấy hồ sơ học sinh;
+endif
+:Tổng hợp ghi danh;
+:Tổng hợp điểm danh;
+:Tổng hợp tài chính;
+:Tổng hợp kết quả liên quan;
+:Hiển thị hồ sơ học tập;
+stop
+@enduml

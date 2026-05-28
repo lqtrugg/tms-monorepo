@@ -1,0 +1,18 @@
+@startuml
+start
+:Giáo viên nhập thông tin lớp học;
+:Nhập học phí và lịch học định kỳ;
+if (Thông tin lớp hợp lệ?) then (Không)
+  :Thông báo lỗi thông tin lớp;
+  stop
+else (Có)
+  :Lưu thông tin lớp học;
+endif
+if (Có lịch học định kỳ?) then (Có)
+  :Lưu danh sách lịch học;
+else (Không)
+  :Bỏ qua lưu lịch học;
+endif
+:Hiển thị lớp học đã cập nhật;
+stop
+@enduml

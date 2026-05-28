@@ -1,0 +1,13 @@
+@startuml
+left to right direction
+skinparam rectangle {
+  RoundCorner 8
+}
+actor "Giáo viên" as Actor
+rectangle "Ghi nhận giao dịch tài chính" as Process
+database "Giao dịch, khoản học phí, học sinh" as Store
+Actor --> Process : Thông tin giao dịch\nTrạng thái khoản học phí
+Process --> Store : Dữ liệu cần lưu/tra cứu
+Store --> Process : Dữ liệu nghiệp vụ
+Process --> Actor : Danh sách giao dịch\nSố dư học sinh
+@enduml

@@ -1,0 +1,17 @@
+@startuml
+actor "Người dùng" as User
+participant "Giao diện đăng nhập" as UI
+participant "Hệ thống" as System
+database "Cơ sở dữ liệu" as DB
+User -> UI : Nhập tên đăng nhập và mật khẩu
+UI -> System : Gửi yêu cầu đăng nhập
+System -> DB : Tra cứu tài khoản
+DB --> System : Thông tin tài khoản
+alt Thông tin không hợp lệ
+  System --> UI : Trả lỗi đăng nhập
+  UI --> User : Hiển thị thông báo lỗi
+else Hợp lệ
+  System --> UI : Trả phiên đăng nhập và quyền sử dụng
+  UI --> User : Chuyển vào hệ thống
+end
+@enduml

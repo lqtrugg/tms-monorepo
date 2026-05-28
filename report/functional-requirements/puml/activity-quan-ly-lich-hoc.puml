@@ -1,0 +1,13 @@
+@startuml
+start
+:Giáo viên mở lịch học của lớp;
+:Thêm, sửa hoặc thay thế lịch định kỳ;
+if (Lịch học hợp lệ?) then (Không)
+  :Yêu cầu chỉnh sửa lịch;
+  stop
+else (Có)
+  :Lưu lịch học mới;
+  :Hiển thị danh sách lịch học đã cập nhật;
+endif
+stop
+@enduml

@@ -1,0 +1,25 @@
+@startuml
+start
+:Giáo viên mở thiết lập Discord của lớp;
+if (Giáo viên đã liên kết Discord?) then (Không)
+  :Yêu cầu liên kết Discord trước;
+  stop
+else (Có)
+  :Lấy danh sách guild và channel;
+endif
+:Chọn guild, kênh thông báo và kênh voice;
+if (Guild đã gắn với lớp khác?) then (Có)
+  :Từ chối gắn guild;
+  stop
+else (Không)
+  :Kiểm tra loại kênh;
+endif
+if (Sai loại kênh text/voice?) then (Có)
+  :Yêu cầu chọn lại kênh;
+  stop
+else (Không)
+  :Lưu thiết lập Discord cho lớp;
+  :Hiển thị cấu hình đã lưu;
+endif
+stop
+@enduml

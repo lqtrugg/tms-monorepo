@@ -1,0 +1,13 @@
+@startuml
+left to right direction
+skinparam rectangle {
+  RoundCorner 8
+}
+actor "Giáo viên" as Actor
+rectangle "Quản lý hồ sơ học sinh" as Process
+database "Học sinh, ghi danh, lớp học" as Store
+Actor --> Process : Thông tin học sinh\nThông tin lớp ghi danh
+Process --> Store : Dữ liệu cần lưu/tra cứu
+Store --> Process : Dữ liệu nghiệp vụ
+Process --> Actor : Hồ sơ học sinh\nThông báo lỗi
+@enduml

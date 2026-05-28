@@ -1,0 +1,61 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+actor "Giáo viên" as Teacher
+actor "Quản trị viên" as Admin
+actor "Học sinh" as Student
+actor "Discord" as Discord
+actor "Codeforces" as Codeforces
+rectangle "Hệ thống TMS" {
+  usecase "Đăng nhập" as UC1
+  usecase "Xem tổng quan giảng dạy" as UC2
+  usecase "Cập nhật hồ sơ cá nhân" as UC3
+  usecase "Liên kết tài khoản Discord" as UC4
+  usecase "Quản lý học sinh" as UC5
+  usecase "Quản lý ghi danh học sinh" as UC6
+  usecase "Xử lý học sinh chờ lưu trữ" as UC7
+  usecase "Quản lý lớp học" as UC8
+  usecase "Quản lý lịch học định kỳ" as UC9
+  usecase "Quản lý buổi học" as UC10
+  usecase "Điểm danh buổi học" as UC11
+  usecase "Theo dõi kết quả học tập" as UC12
+  usecase "Quản lý giao dịch tài chính" as UC13
+  usecase "Xem báo cáo tài chính" as UC14
+  usecase "Thiết lập Discord cho lớp học" as UC15
+  usecase "Gửi thông báo cho học sinh" as UC16
+  usecase "Gắn Gym Codeforces cho lớp học" as UC17
+  usecase "Xem bảng xếp hạng Gym" as UC18
+  usecase "Quản lý tài khoản giáo viên" as UC19
+  usecase "Cấu hình bot Discord" as UC20
+  usecase "Uỷ quyền quản lý Discord Guild" as UC21
+}
+Teacher --> UC1
+Teacher --> UC2
+Teacher --> UC3
+Teacher --> UC4
+Teacher --> UC5
+Teacher --> UC6
+Teacher --> UC7
+Teacher --> UC8
+Teacher --> UC9
+Teacher --> UC10
+Teacher --> UC11
+Teacher --> UC12
+Teacher --> UC13
+Teacher --> UC14
+Teacher --> UC15
+Teacher --> UC16
+Teacher --> UC17
+Teacher --> UC18
+Admin --> UC1
+Admin --> UC19
+Admin --> UC20
+Student --> UC21
+Discord --> UC4
+Discord --> UC11
+Discord --> UC15
+Discord --> UC16
+Discord --> UC21
+Codeforces --> UC17
+Codeforces --> UC18
+@enduml

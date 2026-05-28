@@ -1,0 +1,21 @@
+@startuml
+start
+:Giáo viên chọn liên kết Discord;
+:Tạo yêu cầu xác thực Discord;
+:Chuyển sang Discord OAuth;
+if (Giáo viên đồng ý cấp quyền?) then (Không)
+  :Ghi nhận hủy liên kết;
+  stop
+else (Có)
+  :Discord trả mã xác thực;
+endif
+if (Mã xác thực và state hợp lệ?) then (Không)
+  :Thông báo liên kết thất bại;
+  stop
+else (Có)
+  :Đổi mã lấy thông tin Discord;
+  :Lưu định danh Discord của giáo viên;
+  :Thông báo liên kết thành công;
+endif
+stop
+@enduml

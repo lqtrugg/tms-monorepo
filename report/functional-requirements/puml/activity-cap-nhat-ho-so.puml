@@ -1,0 +1,14 @@
+@startuml
+start
+:Giáo viên mở hồ sơ cá nhân;
+:Chỉnh sửa thông tin hồ sơ;
+:Gửi yêu cầu cập nhật;
+if (Dữ liệu hợp lệ?) then (Không)
+  :Hiển thị lỗi nhập liệu;
+  stop
+else (Có)
+  :Lưu thông tin hồ sơ mới;
+  :Hiển thị hồ sơ đã cập nhật;
+endif
+stop
+@enduml

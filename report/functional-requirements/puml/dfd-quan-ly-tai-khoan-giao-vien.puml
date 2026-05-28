@@ -1,0 +1,13 @@
+@startuml
+left to right direction
+skinparam rectangle {
+  RoundCorner 8
+}
+actor "Quản trị viên" as Actor
+rectangle "Quản lý tài khoản giáo viên" as Process
+database "Tài khoản giáo viên" as Store
+Actor --> Process : Thông tin tài khoản cần cập nhật
+Process --> Store : Dữ liệu cần lưu/tra cứu
+Store --> Process : Dữ liệu nghiệp vụ
+Process --> Actor : Danh sách tài khoản\nTài khoản đã cập nhật
+@enduml

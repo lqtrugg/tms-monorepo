@@ -1,0 +1,13 @@
+@startuml
+state "Đã lên lịch" as Scheduled
+state "Đang diễn ra" as InProgress
+state "Đã hoàn tất" as Completed
+state "Đã huỷ" as Cancelled
+[*] --> Scheduled
+Scheduled --> InProgress : Đến giờ học
+InProgress --> Completed : Hết giờ học
+Scheduled --> Cancelled : Giáo viên huỷ
+InProgress --> Cancelled : Giáo viên huỷ
+Completed --> [*]
+Cancelled --> [*]
+@enduml

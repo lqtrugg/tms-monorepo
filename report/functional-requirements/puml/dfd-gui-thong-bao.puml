@@ -1,0 +1,13 @@
+@startuml
+left to right direction
+skinparam rectangle {
+  RoundCorner 8
+}
+actor "Giáo viên, Discord" as Actor
+rectangle "Gửi thông báo" as Process
+database "Học sinh, thiết lập Discord lớp, định danh Discord" as Store
+Actor --> Process : Nội dung thông báo\nDanh sách người nhận
+Process --> Store : Dữ liệu cần lưu/tra cứu
+Store --> Process : Dữ liệu nghiệp vụ
+Process --> Actor : Tin nhắn Discord\nKết quả gửi
+@enduml

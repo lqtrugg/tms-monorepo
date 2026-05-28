@@ -1,0 +1,22 @@
+@startuml
+start
+:Giáo viên nhập nội dung thông báo;
+:Chọn lớp hoặc học sinh nhận thông báo;
+:Xác định danh sách đích gửi;
+if (Có đích gửi hợp lệ?) then (Không)
+  :Hiển thị không có người nhận hợp lệ;
+  stop
+else (Có)
+  :Kiểm tra cấu hình Discord từng đích;
+endif
+while (Còn đích cần gửi?) is (Có)
+  if (Đích có Discord hợp lệ?) then (Không)
+    :Ghi nhận gửi thất bại cho đích đó;
+  else (Có)
+    :Gửi tin nhắn qua Discord;
+    :Ghi nhận kết quả Discord trả về;
+  endif
+endwhile (Không)
+:Hiển thị tổng hợp kết quả gửi;
+stop
+@enduml

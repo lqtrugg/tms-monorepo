@@ -1,0 +1,14 @@
+@startuml
+start
+:Giáo viên mở bảng xếp hạng Gym;
+:Đọc Gym đã gắn với lớp;
+if (Có dữ liệu standing?) then (Không)
+  :Hiển thị trạng thái chưa có dữ liệu;
+  stop
+else (Có)
+  :Đọc danh sách bài tập và standing;
+endif
+:Ghép standing với học sinh trong lớp;
+:Hiển thị ma trận kết quả;
+stop
+@enduml

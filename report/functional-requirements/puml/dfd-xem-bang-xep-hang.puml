@@ -1,0 +1,13 @@
+@startuml
+left to right direction
+skinparam rectangle {
+  RoundCorner 8
+}
+actor "Giáo viên, Codeforces" as Actor
+rectangle "Tổng hợp bảng xếp hạng Gym" as Process
+database "Gym, bài tập, standing, học sinh" as Store
+Actor --> Process : Yêu cầu xem standing
+Process --> Store : Dữ liệu cần lưu/tra cứu
+Store --> Process : Dữ liệu nghiệp vụ
+Process --> Actor : Bảng xếp hạng Gym
+@enduml

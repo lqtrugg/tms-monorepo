@@ -1,0 +1,23 @@
+@startuml
+start
+:Giáo viên chọn buổi học;
+if (Buổi học đã huỷ?) then (Có)
+  :Từ chối cập nhật điểm danh;
+  stop
+else (Không)
+  :Chọn học sinh và trạng thái điểm danh;
+endif
+if (Học sinh có ghi danh hợp lệ?) then (Không)
+  :Thông báo lỗi;
+  stop
+else (Có)
+  :Lưu điểm danh;
+endif
+if (Có mặt hoặc vắng không phép?) then (Có)
+  :Tạo/kích hoạt khoản học phí;
+else (Không)
+  :Huỷ khoản học phí nếu có;
+endif
+:Hiển thị kết quả điểm danh;
+stop
+@enduml

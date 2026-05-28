@@ -1,0 +1,13 @@
+@startuml
+left to right direction
+skinparam rectangle {
+  RoundCorner 8
+}
+actor "Giáo viên, Discord" as Actor
+rectangle "Thiết lập Discord lớp học" as Process
+database "Discord guild/channel, thiết lập Discord lớp" as Store
+Actor --> Process : Guild đã chọn\nKênh thông báo\nKênh voice
+Process --> Store : Dữ liệu cần lưu/tra cứu
+Store --> Process : Dữ liệu nghiệp vụ
+Process --> Actor : Cấu hình Discord lớp học
+@enduml

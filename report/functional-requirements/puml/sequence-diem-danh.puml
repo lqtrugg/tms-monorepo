@@ -1,0 +1,17 @@
+@startuml
+actor "Giáo viên" as Teacher
+participant "Hệ thống" as System
+database "Buổi học" as SessionStore
+database "Ghi danh" as EnrollmentStore
+database "Điểm danh" as AttendanceStore
+database "Tài chính" as FinanceStore
+Teacher -> System : Cập nhật điểm danh
+System -> SessionStore : Kiểm tra buổi học
+SessionStore --> System : Trạng thái buổi học
+System -> EnrollmentStore : Kiểm tra học sinh thuộc lớp tại thời điểm học
+EnrollmentStore --> System : Ghi danh hợp lệ
+System -> AttendanceStore : Lưu trạng thái điểm danh
+System -> FinanceStore : Đồng bộ khoản học phí
+FinanceStore --> System : Kết quả đồng bộ
+System --> Teacher : Trả bản ghi điểm danh mới
+@enduml

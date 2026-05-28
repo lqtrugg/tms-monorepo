@@ -1,0 +1,13 @@
+@startuml
+left to right direction
+skinparam rectangle {
+  RoundCorner 8
+}
+actor "Giáo viên" as Actor
+rectangle "Quản lý lớp học" as Process
+database "Lớp học, lịch học" as Store
+Actor --> Process : Thông tin lớp học\nLịch học định kỳ
+Process --> Store : Dữ liệu cần lưu/tra cứu
+Store --> Process : Dữ liệu nghiệp vụ
+Process --> Actor : Thông tin lớp học đã lưu
+@enduml

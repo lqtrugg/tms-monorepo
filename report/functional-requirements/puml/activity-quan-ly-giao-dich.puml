@@ -1,0 +1,19 @@
+@startuml
+start
+:Giáo viên nhập giao dịch tài chính;
+:Chọn học sinh, loại giao dịch, số tiền và ngày ghi nhận;
+if (Dữ liệu giao dịch hợp lệ?) then (Không)
+  :Thông báo lỗi giao dịch;
+  stop
+else (Có)
+  :Lưu giao dịch;
+endif
+if (Có cập nhật khoản học phí?) then (Có)
+  :Cập nhật trạng thái khoản học phí;
+else (Không)
+  :Giữ trạng thái khoản học phí hiện tại;
+endif
+:Tính lại số dư học sinh;
+:Hiển thị danh sách giao dịch mới;
+stop
+@enduml
