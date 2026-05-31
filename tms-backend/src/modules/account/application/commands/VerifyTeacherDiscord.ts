@@ -3,7 +3,7 @@ import {
   exchangeDiscordOAuthCode,
   fetchDiscordCurrentUser,
 } from '../../../../infrastructure/external/discord/discord.js';
-import { signDiscordVerificationState, verifyDiscordVerificationState, discordApiUrl, discordFrontendUrl } from '../../../../infrastructure/security/discord-oauth.js';
+import { discordApiUrl, discordFrontendUrl } from '../../../../infrastructure/security/discord-oauth.js';
 import type { DiscordBotCredentialStore } from '../../infrastructure/persistence/typeorm/Writer.js';
 import type { TypeOrmTeacherWriter } from '../../infrastructure/persistence/typeorm/Writer.js';
 
@@ -38,7 +38,7 @@ export class VerifyTeacherDiscord {
       response_type: 'code',
       redirect_uri: discordApiUrl('/discord/verification/callback'),
       scope: 'identify',
-      state: signDiscordVerificationState({ teacher_id: teacherId }),
+      state: String(teacherId),
     });
 
     return `https://discord.com/oauth2/authorize?${search.toString()}`;
@@ -49,28 +49,40 @@ export class VerifyTeacherDiscord {
       return discordFrontendUrl('/settings?discord_verification=cancelled');
     }
 
-    if (!input.code || !input.state) {
-      throw new HttpError('discord verification callback is missing required parameters', 400);
+    const teacherId = Number(input.state);
+    if (!input.code || !Number.isInteger(teacherId) || teacherId <= 0) {
+      return discordFrontendUrl('/settings?discord_verification=failed');
     }
 
     const credential = await this.credentialStore.findDefault();
     if (!credential?.client_id || !credential.client_secret) {
-      throw new HttpError('discord is not available right now', 503);
+      return discordFrontendUrl('/settings?discord_verification=failed');
     }
 
-    const verificationState = verifyDiscordVerificationState(input.state);
-    const teacher = await this.teacherWriter.findById(verificationState.teacher_id);
+    const teacher = await this.teacherWriter.findById(teacherId);
     if (!teacher) {
-      throw new HttpError('teacher not found', 404);
+      return discordFrontendUrl('/settings?discord_verification=failed');
     }
 
-    const accessToken = await exchangeDiscordCode({
-      code: input.code,
-      clientId: credential.client_id,
-      clientSecret: credential.client_secret,
-      redirectUri: discordApiUrl('/discord/verification/callback'),
-    });
-    const discordUser = await fetchDiscordCurrentUser(accessToken);
+    const redirectUri = discordApiUrl('/discord/verification/callback');
+    let discordUser: Awaited<ReturnType<typeof fetchDiscordCurrentUser>>;
+
+    try {
+      const accessToken = await exchangeDiscordCode({
+        code: input.code,
+        clientId: credential.client_id,
+        clientSecret: credential.client_secret,
+        redirectUri,
+      });
+      discordUser = await fetchDiscordCurrentUser(accessToken);
+    } catch (error) {
+      console.error('[teacher-discord-verification] failed to complete OAuth callback', {
+        error: error instanceof Error ? error.message : String(error),
+        redirectUri,
+      });
+      return discordFrontendUrl('/settings?discord_verification=failed');
+    }
+
     if (teacher.discord_user_id && teacher.discord_user_id !== discordUser.id) {
       await this.teacherWriter.clearDiscordWorkspaceData(teacher.id, teacher.discord_user_id);
     }

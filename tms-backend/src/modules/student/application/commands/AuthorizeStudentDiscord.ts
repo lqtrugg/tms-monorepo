@@ -6,8 +6,6 @@ import type {
 import {
   exchangeStudentDiscordCode,
   fetchStudentDiscordUser,
-  signStudentDiscordAuthorizationState,
-  verifyStudentDiscordAuthorizationState,
   discordApiUrl,
 } from '../../../../infrastructure/security/discord-oauth.js';
 
@@ -32,10 +30,7 @@ export class AuthorizeStudentDiscord {
       response_type: 'code',
       redirect_uri: discordApiUrl('/discord/student/callback'),
       scope: 'identify guilds.join',
-      state: signStudentDiscordAuthorizationState({
-        teacher_id: teacherId,
-        student_id: studentId,
-      }),
+      state: `${teacherId}:${studentId}`,
     });
 
     return `https://discord.com/oauth2/authorize?${search.toString()}`;
@@ -46,20 +41,22 @@ export class AuthorizeStudentDiscord {
       return 'cancelled';
     }
 
-    if (!input.code || !input.state) {
+    const [rawTeacherId, rawStudentId] = input.state?.split(':') ?? [];
+    const teacherId = Number(rawTeacherId);
+    const studentId = Number(rawStudentId);
+    if (
+      !input.code
+      || !Number.isInteger(teacherId)
+      || teacherId <= 0
+      || !Number.isInteger(studentId)
+      || studentId <= 0
+    ) {
       return 'failed';
     }
 
     const credential = await this.credentialStore.findDefault();
     if (!credential?.client_id || !credential.client_secret) {
       return 'failed';
-    }
-
-    let authState: ReturnType<typeof verifyStudentDiscordAuthorizationState>;
-    try {
-      authState = verifyStudentDiscordAuthorizationState(input.state);
-    } catch {
-      return 'unauthorized';
     }
 
     const redirectUri = discordApiUrl('/discord/student/callback');
@@ -83,8 +80,8 @@ export class AuthorizeStudentDiscord {
     }
 
     const updated = await this.repository.updateStudentDiscordAuthorization({
-      teacherId: authState.teacher_id,
-      studentId: authState.student_id,
+      teacherId,
+      studentId,
       discordUserId: discordUser.id,
       discordUsername: discordUser.username,
       accessToken: tokenSet.accessToken,

@@ -12,7 +12,6 @@ export function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [codeforcesHandle, setCodeforcesHandle] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -42,7 +41,6 @@ export function Login() {
         : await registerAccount({
           username: normalizedUsername,
           password,
-          codeforces_handle: codeforcesHandle.trim() || null,
         });
 
       saveAuthSession({
@@ -119,19 +117,6 @@ export function Login() {
                 required
               />
             </div>
-
-            {mode === "register" && (
-              <div>
-                <label className="block text-sm text-zinc-700 mb-2">Codeforces owner handle (tùy chọn)</label>
-                <input
-                  type="text"
-                  value={codeforcesHandle}
-                  onChange={(event) => setCodeforcesHandle(event.target.value)}
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400"
-                  placeholder="tourist"
-                />
-              </div>
-            )}
 
             <div>
               <label className="block text-sm text-zinc-700 mb-2">Mật khẩu</label>

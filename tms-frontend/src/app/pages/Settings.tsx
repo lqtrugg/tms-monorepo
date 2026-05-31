@@ -170,6 +170,12 @@ export function Settings() {
     } else if (verificationStatus === "cancelled") {
       setRequestMessage("");
       setRequestError("Bạn đã hủy xác thực Discord.");
+    } else if (verificationStatus === "failed") {
+      setRequestMessage("");
+      setRequestError("Không hoàn tất được Discord verification. Kiểm tra Verification redirect URI trong Discord Developer Portal rồi thử lại.");
+    } else if (verificationStatus === "invalid_state") {
+      setRequestMessage("");
+      setRequestError("Liên kết xác thực Discord không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.");
     } else {
       setRequestMessage("");
       setRequestError("Không xác thực được Discord. Vui lòng thử lại.");
@@ -355,11 +361,6 @@ export function Settings() {
               icon={discordVerified ? CheckCircle2 : XCircle}
               label="Tài khoản"
               value={discordVerified ? `@${teacher?.discord_username ?? "Discord"}` : "Chưa xác thực"}
-            />
-            <StatusRow
-              icon={botInviteLink ? CheckCircle2 : XCircle}
-              label="Bot"
-              value={botInviteLink ? "Đã cấu hình invite" : "Admin chưa cấu hình bot"}
             />
           </div>
           <div className="mt-5 flex flex-wrap gap-3">
