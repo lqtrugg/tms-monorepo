@@ -65,6 +65,26 @@
     dfdarrow/.style={-Stealth, semithick},
     dfdbluearrow/.style={-Stealth, semithick, draw=uitblue}
 }
+\newcommand{\dfddiagram}[4]{%
+\begin{center}
+\resizebox{0.96\textwidth}{!}{%
+\begin{tikzpicture}[node distance=1.8cm and 2.6cm]
+    \node[dfdprocess] (process) {#1};
+    \node[dfdentity, above=of process] (actor) {#2};
+    \node[dfdentity, left=of process] (input) {#3};
+    \node[dfdentity, right=of process] (output) {Thiết bị xuất};
+    \node[dfddatastore, below=of process] (storage) {#4};
+
+    \draw[dfdarrow] ([xshift=-0.4cm]actor.south) -- node[left] {D1} ([xshift=-0.4cm]process.north);
+    \draw[dfdbluearrow] ([xshift=0.4cm]process.north) -- node[right] {D6} ([xshift=0.4cm]actor.south);
+    \draw[dfdbluearrow] (input.east) -- node[above] {D2} (process.west);
+    \draw[dfdarrow] (process.east) -- node[above] {D5} (output.west);
+    \draw[dfdarrow] ([xshift=-0.4cm]storage.north) -- node[left] {D3} ([xshift=-0.4cm]process.south);
+    \draw[dfdarrow] ([xshift=0.4cm]process.south) -- node[right] {D4} ([xshift=0.4cm]storage.north);
+\end{tikzpicture}%
+}
+\end{center}
+}
 
 \newcolumntype{C}[1]{>{\Centering\hspace{0pt}\arraybackslash}p{#1}}
 \newcolumntype{L}[1]{>{\RaggedRight\hspace{0pt}\arraybackslash}p{#1}}
@@ -175,7 +195,7 @@ Những bất cập chính của cách quản lý bán thủ công gồm:
 \item \textbf{Quản lý buổi học và điểm danh phức tạp:} Lớp học có lịch định kỳ nhưng thực tế có thể phát sinh buổi học thủ công, hủy buổi học hoặc thay đổi trạng thái điểm danh. Nếu xử lý bằng tay, giáo viên dễ bỏ sót dữ liệu.
 \item \textbf{Đối soát tài chính dễ sai lệch:} Học phí phát sinh theo buổi học và trạng thái điểm danh, trong khi tiền thu hoặc hoàn tiền lại được ghi nhận theo từng giao dịch. Nếu không có hệ thống liên kết giữa khoản phí và giao dịch, việc tính số dư học sinh dễ nhầm lẫn.
 \item \textbf{Thiếu tích hợp Discord:} Việc mời học sinh vào server lớp, chọn channel thông báo, gửi thông báo chung hoặc tin nhắn riêng thường phải thao tác thủ công, khó kiểm soát kết quả gửi.
-\item \textbf{Thiếu liên kết với Codeforces Gym:} Codeforces có dữ liệu Gym và bảng xếp hạng, nhưng giáo viên cần một nơi gắn Gym với lớp học, đồng bộ bài tập và xem kết quả theo danh sách học sinh đang học.
+\item \textbf{Thiếu liên kết với Codeforces Gym:} Codeforces có dữ liệu Gym và bảng xếp hạng, nhưng giáo viên cần một nơi gắn Gym với lớp học, đồng bộ danh sách \code{GymProblem} và xem kết quả theo danh sách học sinh đang học.
 \end{itemize}
 
 Vì vậy, đề tài ``Hệ thống giúp giáo viên quản lý lớp học lập trình thi đấu'' được xây dựng nhằm tập
@@ -224,8 +244,8 @@ Phần mềm được xây dựng với các mục tiêu chính sau:
 
 \begin{itemize}[leftmargin=*]
 \item Cho phép giáo viên cấu hình Codeforces credential để đồng bộ dữ liệu Gym.
-\item Cho phép gắn Codeforces Gym vào lớp học, đồng bộ danh sách bài trong Gym và bảng xếp hạng.
-\item Hiển thị kết quả theo ma trận học sinh - bài tập để giáo viên theo dõi tiến độ luyện tập.
+\item Cho phép gắn Codeforces Gym vào lớp học, đồng bộ danh sách \code{GymProblem} và bảng xếp hạng.
+\item Hiển thị kết quả theo ma trận học sinh - \code{GymProblem} để giáo viên theo dõi tiến độ luyện tập.
 \end{itemize}
 
 \subsection{Phạm vi phần mềm}
@@ -239,9 +259,11 @@ Hệ thống tập trung vào các phân hệ chức năng sau:
 \item \textbf{Quản lý điểm danh:} Xem và cập nhật trạng thái điểm danh theo từng buổi học.
 \item \textbf{Quản lý tài chính:} Ghi nhận giao dịch, quản lý khoản phí phát sinh, xem số dư học sinh, tổng quan tài chính và báo cáo thu nhập.
 \item \textbf{Quản lý Discord:} Cấu hình bot, xác minh Discord của giáo viên, uỷ quyền Discord của học sinh, liên kết guild/channel cho lớp và gửi thông báo.
-\item \textbf{Quản lý Codeforces Gym:} Gắn/gỡ Gym khỏi lớp, đồng bộ bài tập và xem bảng xếp hạng Gym.
-\item \textbf{Dashboard và báo cáo học tập:} Cung cấp số liệu tổng quan và hồ sơ học tập của từng học sinh.
+\item \textbf{Quản lý Codeforces Gym:} Gắn/gỡ Gym khỏi lớp, đồng bộ \code{GymProblem} và xem bảng xếp hạng Gym.
+\item \textbf{Dashboard và báo cáo học tập:} Cung cấp dashboard tổng quan và hồ sơ học tập của từng học sinh dựa trên dữ liệu đang có trong hệ thống.
 \end{itemize}
+
+Ngoài phạm vi hiện tại, hệ thống không có module giao homework riêng, không có luồng học sinh nộp bài trực tiếp lên hệ thống, không có chức năng giáo viên chấm điểm hoặc nhận xét bài làm. Việc theo dõi tiến độ lập trình chỉ dựa trên dữ liệu Codeforces Gym đã đồng bộ.
 
 \section{Xác định và thu thập yêu cầu}
 
@@ -322,7 +344,7 @@ hiện qua Discord bằng thao tác thủ công. Giáo viên cần một cách c
 channel thông báo và gửi tin nhắn từ hệ thống để giảm sai sót.
 
 \paragraph{6. Theo dõi Codeforces Gym}
-Codeforces cung cấp Gym, bài tập và standing, nhưng giáo viên vẫn phải tự mở
+Codeforces cung cấp Gym, \code{GymProblem} và standing, nhưng giáo viên vẫn phải tự mở
 Codeforces để đối chiếu. Chưa có nơi gắn Gym với lớp học và xem bảng kết quả
 theo đúng danh sách học sinh đang ghi danh.
 
@@ -340,7 +362,7 @@ Internet. Học sinh sử dụng máy tính cá nhân để học, dùng Discord
 \begin{itemize}[leftmargin=*]
 \item Google Sheets hoặc Microsoft Excel để lưu danh sách học sinh, lịch học và công nợ.
 \item Discord để quản lý server lớp học, trao đổi và gửi thông báo.
-\item Codeforces để tổ chức hoặc theo dõi Gym, bài tập và standing.
+\item Codeforces để tổ chức hoặc theo dõi Gym, \code{GymProblem} và standing.
 \item Các công cụ ghi chú hoặc lịch cá nhân để lưu thông tin vận hành phát sinh.
 \end{itemize}
 
@@ -417,8 +439,8 @@ cần tập trung vào các nhóm yêu cầu chính sau:
 \item \textbf{Quản lý điểm danh:} Cập nhật trạng thái điểm danh theo từng học sinh trong buổi học.
 \item \textbf{Quản lý tài chính và công nợ:} Quản lý \code{FeeRecord}, \code{Transaction}, số dư học sinh và báo cáo thu nhập.
 \item \textbf{Quản lý Discord:} Cấu hình bot, liên kết Discord của giáo viên, uỷ quyền Discord của học sinh, chọn guild/channel và gửi thông báo.
-\item \textbf{Quản lý Codeforces Gym:} Gắn Gym cho lớp, đồng bộ bài tập và xem bảng xếp hạng Gym.
-\item \textbf{Dashboard và báo cáo:} Tổng hợp số liệu lớp học, học sinh, tài chính và hồ sơ học tập.
+\item \textbf{Quản lý Codeforces Gym:} Gắn Gym cho lớp, đồng bộ \code{GymProblem} và xem bảng xếp hạng Gym.
+\item \textbf{Dashboard và báo cáo:} Tổng hợp số liệu lớp học, học sinh, tài chính và hồ sơ học tập dựa trên buổi học, điểm danh, giao dịch và Codeforces Gym.
 \end{itemize}
 
 Kế hoạch thu thập yêu cầu được thực hiện thông qua phỏng vấn giáo viên, quan sát
@@ -1210,9 +1232,7 @@ trình duyệt, hệ điều hành và dịch vụ ngoài mà hệ thống cần
 \hline
 3 & Discord & Discord OAuth, bot token, guild, text channel, voice channel và DM. & Phụ thuộc API ngoài. \\
 \hline
-4 & Codeforces & Codeforces credential, Gym, bài trong Gym và standing. & Phụ thuộc API ngoài. \\
-\hline
-5 & Báo cáo & Trình duyệt và công cụ đọc dữ liệu kết xuất như CSV/Excel nếu triển khai xuất file. & Phục vụ đối soát. \\
+4 & Codeforces & Codeforces credential, Gym, \code{GymProblem} và standing. & Phụ thuộc API ngoài. \\
 \hline
 \end{tabularx}
 \end{table}
@@ -1466,290 +1486,628 @@ ngoài hệ thống.
 \item \textbf{Rủi ro mở rộng:} Khi số lượng buổi học, điểm danh, \code{FeeRecord} và \code{GymStanding} tăng, các màn hình báo cáo cần được phân trang, lọc theo thời gian/lớp và tối ưu truy vấn. Những tác vụ đồng bộ Codeforces hoặc Discord nên được xử lý nền hoặc dùng cache để giao diện không phụ thuộc hoàn toàn vào thời gian phản hồi của API ngoài.
 \end{itemize}
 
+\setcounter{secnumdepth}{5}
+\renewcommand{\theparagraph}{\thesubsubsection.\arabic{paragraph}}
+\renewcommand{\thesubparagraph}{\theparagraph.\arabic{subparagraph}}
+\titleformat{\paragraph}[block]{\normalsize\itshape\bfseries}{\theparagraph.}{0.5em}{}
+\titlespacing*{\paragraph}{0pt}{6pt}{0pt}
+\titleformat{\subparagraph}[block]{\normalsize\itshape\bfseries}{\thesubparagraph.}{0.5em}{}
+\titlespacing*{\subparagraph}{0pt}{6pt}{0pt}
+
 \section{Mô hình hoá yêu cầu chức năng}
 
 \subsection{Tổng quan về mô hình hoá yêu cầu}
 
-Phần mô hình hoá yêu cầu chức năng dùng để diễn đạt trực quan cách các tác nhân
-tương tác với hệ thống và cách dữ liệu đi qua các nghiệp vụ chính. Dựa trên dự
-án hiện tại, hệ thống tập trung vào quản lý lớp học lập trình thi đấu cho giáo
-viên, có thêm quản trị viên để vận hành tài khoản và bot Discord, học sinh tham
-gia luồng uỷ quyền Discord, đồng thời có hai hệ thống ngoài là Discord và
-Codeforces.
+Mục III là tiền đề trực tiếp để xây dựng mục IV. Các biểu mẫu BM 1.1 đến BM
+1.25, các quy định QĐ 1.1 đến QĐ 1.25 và bảng trách nhiệm yêu cầu nghiệp vụ ở
+mục III được dùng để xác định tác nhân, dữ liệu nhập, dữ liệu xuất, kho dữ liệu,
+điều kiện kiểm tra và các nhánh lỗi của từng mô hình. Vì vậy, phần mô hình hoá
+không mô tả lại một hệ thống cũ mà bám theo dự án hiện tại: hệ thống giúp giáo
+viên quản lý lớp học lập trình thi đấu.
 
-Mục III là tiền đề trực tiếp cho phần mô hình hoá này. Các biểu mẫu, quy định,
-bảng trách nhiệm và phân tích yêu cầu ở mục III được dùng để xác định tác nhân,
-dữ liệu vào, dữ liệu ra, kho dữ liệu và điều kiện xử lý trong từng sơ đồ. Vì
-vậy, mỗi DFD và Use Case ở mục IV đều bám theo các nhóm nghiệp vụ đã đặc tả:
-tài khoản, học sinh và ghi danh, lớp học và buổi học, điểm danh, tài chính,
-Discord, Codeforces Gym và báo cáo.
-
-Những nghiệp vụ có cùng bản chất xử lý như thêm/sửa/xóa dữ liệu được mô tả theo
-cùng một mẫu luồng dữ liệu để báo cáo gọn và tránh lặp lại, nhưng vẫn giữ đúng
-các ràng buộc đã nêu ở mục III.
+Hệ thống có năm nhóm tác nhân chính:
 
 \begin{table}[!htbp]
 \centering
 \tablesetup
-\begin{tabularx}{\textwidth}{|C{0.8cm}|L{2.8cm}|Y|}
+\begin{tabularx}{\textwidth}{|C{0.8cm}|L{2.6cm}|Y|}
 \hline
-\textbf{STT} & \textbf{Tác nhân} & \textbf{Vai trò trong mô hình} \\
+\textbf{STT} & \textbf{Tác nhân} & \textbf{Vai trò} \\
 \hline
-1 & Giáo viên & Người dùng chính, thực hiện quản lý học sinh, lớp học, lịch học, buổi học, điểm danh, tài chính, Discord và Codeforces Gym. \\
+1 & Giáo viên & Người dùng chính, quản lý học sinh, ghi danh, lớp học, lịch học, buổi học, điểm danh, tài chính, Discord và Codeforces Gym. \\
 \hline
-2 & Quản trị viên & Quản lý tài khoản giáo viên và cấu hình bot Discord dùng chung cho hệ thống. \\
+2 & Quản trị viên & Quản lý tài khoản giáo viên và cấu hình bot Discord toàn hệ thống. \\
 \hline
-3 & Học sinh & Thực hiện uỷ quyền Discord OAuth để hệ thống có thể lưu danh tính Discord và hỗ trợ tham gia guild lớp học. \\
+3 & Học sinh & Thực hiện uỷ quyền Discord OAuth để hệ thống lưu \code{StudentDiscordCredential}. \\
 \hline
-4 & Discord & Hệ thống ngoài cung cấp OAuth, guild, channel, member API, voice state và gửi tin nhắn. \\
+4 & Discord & Hệ thống ngoài cung cấp OAuth, guild, channel, member, voice state và API gửi tin. \\
 \hline
-5 & Codeforces & Hệ thống ngoài cung cấp dữ liệu Gym, danh sách bài và bảng xếp hạng Gym. \\
+5 & Codeforces & Hệ thống ngoài cung cấp dữ liệu Gym, bài trong Gym và bảng xếp hạng Gym. \\
 \hline
 \end{tabularx}
 \end{table}
 
 \subsection{Mô hình hoá theo chức năng (DFD -- Data Flow Diagram)}
 
-Các DFD dưới đây mô tả những luồng dữ liệu tiêu biểu nhất. Trong đó, ``Bộ nhớ
-phụ'' đại diện cho cơ sở dữ liệu Microsoft SQL Server/\allowbreak Azure SQL của
-hệ thống, nơi lưu các bảng nghiệp vụ như Teacher, Student, Enrollment, Class,
-Session, Attendance, FeeRecord, Transaction, Discord credential và Gym.
+Các sơ đồ DFD dưới đây dùng cùng một quy ước: D1 là dữ liệu/yêu cầu từ tác
+nhân, D2 là dữ liệu từ thiết bị nhập hoặc hệ thống ngoài; nếu không phát sinh
+dữ liệu riêng ngoài D1 thì ghi ``Không có'', D3 là dữ liệu đọc từ bộ nhớ phụ,
+D4 là dữ liệu ghi vào bộ nhớ phụ, D5 là dữ liệu hiển thị hoặc kết xuất; nếu
+không có dữ liệu xuất riêng thì ghi ``Không có'', D6 là thông báo kết quả trả
+về tác nhân. ``Bộ nhớ phụ'' trong các sơ đồ tương
+ứng với cơ sở dữ liệu Microsoft SQL Server/\allowbreak Azure SQL của hệ thống.
+
+\subsubsection{Quản lý tài khoản}
 
 \paragraph{Chức năng Đăng nhập hệ thống}
-
-\noindent\textbf{Sơ đồ luồng dữ liệu:}
-\begin{center}
-\resizebox{0.96\textwidth}{!}{%
-\begin{tikzpicture}[node distance=1.8cm and 2.6cm]
-    \node[dfdprocess] (login) {Xác thực\\tài khoản};
-    \node[dfdentity, above=of login] (user) {Giáo viên/\\Quản trị viên};
-    \node[dfdentity, left=of login] (input) {Thiết bị nhập};
-    \node[dfdentity, right=of login] (output) {Thiết bị xuất};
-    \node[dfddatastore, below=of login] (storage) {Bộ nhớ phụ};
-
-    \draw[dfdarrow] ([xshift=-0.4cm]user.south) -- node[left] {D1} ([xshift=-0.4cm]login.north);
-    \draw[dfdbluearrow] ([xshift=0.4cm]login.north) -- node[right] {D6} ([xshift=0.4cm]user.south);
-    \draw[dfdbluearrow] (input.east) -- node[above] {D2} (login.west);
-    \draw[dfdarrow] (login.east) -- node[above] {D5} (output.west);
-    \draw[dfdarrow] ([xshift=-0.4cm]storage.north) -- node[left] {D3} ([xshift=-0.4cm]login.south);
-    \draw[dfdarrow] ([xshift=0.4cm]login.south) -- node[right] {D4} ([xshift=0.4cm]storage.north);
-\end{tikzpicture}%
-}
-\end{center}
-
-\noindent\textbf{Mô tả luồng dữ liệu:}
+\dfddiagram{Đăng nhập\\hệ thống}{Giáo viên/\\Quản trị viên}{Thiết bị nhập}{Teacher/Admin}
+\textbf{Mô tả luồng dữ liệu:}
 \begin{itemize}[leftmargin=*]
-\item \textbf{D1:} Tên đăng nhập và mật khẩu.
-\item \textbf{D2:} Dữ liệu nhập từ giao diện đăng nhập.
-\item \textbf{D3:} Thông tin tài khoản, mật khẩu đã băm, vai trò và trạng thái tài khoản.
-\item \textbf{D4:} Nhật ký đăng nhập hoặc thời điểm truy cập gần nhất nếu hệ thống ghi nhận.
-\item \textbf{D5:} Token đăng nhập, vai trò và thông tin điều hướng giao diện.
-\item \textbf{D6:} Thông báo đăng nhập thành công hoặc lỗi xác thực.
+\item \textbf{D1:} Tên đăng nhập và mật khẩu theo BM 1.1.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} Tài khoản, mật khẩu đã băm, vai trò và trạng thái hoạt động.
+\item \textbf{D4:} Không có.
+\item \textbf{D5:} JWT, vai trò và dữ liệu điều hướng.
+\item \textbf{D6:} Thông báo đăng nhập thành công hoặc lỗi theo QĐ 1.1.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận tên đăng nhập và mật khẩu.
+\item \textbf{B2:} Tìm tài khoản tương ứng trong bộ nhớ phụ.
+\item \textbf{B3:} Kiểm tra mật khẩu, trạng thái hoạt động và vai trò.
+\item \textbf{B4:} Nếu không hợp lệ, trả lỗi và kết thúc.
+\item \textbf{B5:} Nếu hợp lệ, cấp token và điều hướng vào màn hình phù hợp.
 \end{itemize}
 
-\noindent\textbf{Thuật toán:}
+\paragraph{Chức năng Đăng ký tài khoản giáo viên}
+\dfddiagram{Đăng ký\\tài khoản giáo viên}{Quản trị viên/\\Giáo viên}{Thiết bị nhập}{Teacher}
+\textbf{Mô tả luồng dữ liệu:}
 \begin{itemize}[leftmargin=*]
-\item \textbf{B1:} Nhận tên đăng nhập và mật khẩu từ người dùng.
-\item \textbf{B2:} Truy vấn tài khoản tương ứng trong bộ nhớ phụ.
-\item \textbf{B3:} Kiểm tra mật khẩu bằng bcrypt, trạng thái tài khoản và vai trò.
-\item \textbf{B4:} Nếu thông tin không hợp lệ, trả thông báo lỗi và kết thúc.
-\item \textbf{B5:} Nếu hợp lệ, sinh JWT, trả thông tin phiên làm việc và điều hướng vào màn hình phù hợp.
+\item \textbf{D1:} Tên đăng nhập, mật khẩu, Codeforces handle/API key/API secret theo BM 1.2.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} Danh sách tài khoản giáo viên hiện có.
+\item \textbf{D4:} Tài khoản giáo viên mới và credential Codeforces được lưu bảo mật.
+\item \textbf{D5:} Giao diện danh sách tài khoản hoặc màn hình đăng nhập.
+\item \textbf{D6:} Thông báo đăng ký thành công hoặc lỗi theo QĐ 1.2.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận dữ liệu đăng ký từ biểu mẫu.
+\item \textbf{B2:} Kiểm tra tên đăng nhập và mật khẩu không rỗng.
+\item \textbf{B3:} Kiểm tra tên đăng nhập không trùng.
+\item \textbf{B4:} Băm mật khẩu, bảo vệ credential Codeforces nếu có.
+\item \textbf{B5:} Lưu tài khoản và trả kết quả.
 \end{itemize}
 
-\paragraph{Chức năng Quản lý học sinh và ghi danh}
-
-\noindent\textbf{Sơ đồ luồng dữ liệu:}
-\begin{center}
-\resizebox{0.96\textwidth}{!}{%
-\begin{tikzpicture}[node distance=1.8cm and 2.6cm]
-    \node[dfdprocess] (student) {Quản lý học sinh\\và ghi danh};
-    \node[dfdentity, above=of student] (teacher) {Giáo viên};
-    \node[dfdentity, left=of student] (input) {Thiết bị nhập};
-    \node[dfdentity, right=of student] (output) {Thiết bị xuất};
-    \node[dfddatastore, below=of student] (storage) {Bộ nhớ phụ};
-
-    \draw[dfdarrow] ([xshift=-0.4cm]teacher.south) -- node[left] {D1} ([xshift=-0.4cm]student.north);
-    \draw[dfdbluearrow] ([xshift=0.4cm]student.north) -- node[right] {D6} ([xshift=0.4cm]teacher.south);
-    \draw[dfdbluearrow] (input.east) -- node[above] {D2} (student.west);
-    \draw[dfdarrow] (student.east) -- node[above] {D5} (output.west);
-    \draw[dfdarrow] ([xshift=-0.4cm]storage.north) -- node[left] {D3} ([xshift=-0.4cm]student.south);
-    \draw[dfdarrow] ([xshift=0.4cm]student.south) -- node[right] {D4} ([xshift=0.4cm]storage.north);
-\end{tikzpicture}%
-}
-\end{center}
-
-\noindent\textbf{Mô tả luồng dữ liệu:}
+\paragraph{Chức năng Cập nhật hồ sơ và thông tin Codeforces của giáo viên}
+\dfddiagram{Cập nhật hồ sơ\\giáo viên}{Giáo viên/\\Quản trị viên}{Thiết bị nhập}{Teacher, Credential}
+\textbf{Mô tả luồng dữ liệu:}
 \begin{itemize}[leftmargin=*]
-\item \textbf{D1:} Thông tin học sinh, lớp ghi danh, Codeforces handle, số dư ban đầu hoặc trạng thái lưu trữ.
-\item \textbf{D2:} Dữ liệu nhập từ biểu mẫu thêm/sửa học sinh hoặc xử lý học sinh chờ lưu trữ.
-\item \textbf{D3:} Danh sách học sinh, lớp học, ghi danh hiện có và số dư tài chính liên quan.
-\item \textbf{D4:} Hồ sơ học sinh, bản ghi Enrollment hoặc trạng thái học sinh được cập nhật.
-\item \textbf{D5:} Danh sách học sinh, trạng thái ghi danh và kết quả lọc/tìm kiếm.
-\item \textbf{D6:} Thông báo thao tác thành công, lỗi ràng buộc hoặc cảnh báo còn công nợ.
+\item \textbf{D1:} Các trường cập nhật theo BM 1.3.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} Hồ sơ giáo viên và credential Codeforces hiện có.
+\item \textbf{D4:} Hồ sơ hoặc credential mới sau khi cập nhật.
+\item \textbf{D5:} Hồ sơ đã được che thông tin nhạy cảm.
+\item \textbf{D6:} Thông báo thành công hoặc lỗi theo QĐ 1.3.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận yêu cầu cập nhật hồ sơ.
+\item \textbf{B2:} Kiểm tra có ít nhất một trường thay đổi.
+\item \textbf{B3:} Nếu cập nhật mật khẩu thì mật khẩu không được rỗng.
+\item \textbf{B4:} Lưu dữ liệu mới, che API key/secret khi trả về giao diện.
 \end{itemize}
 
-\noindent\textbf{Thuật toán:}
+\paragraph{Chức năng Liên kết tài khoản Discord của giáo viên}
+\dfddiagram{Liên kết Discord\\giáo viên}{Giáo viên}{Discord OAuth}{Teacher Discord identity}
+\textbf{Mô tả luồng dữ liệu:}
 \begin{itemize}[leftmargin=*]
-\item \textbf{B1:} Giáo viên chọn thao tác thêm, cập nhật, ghi danh, rút khỏi lớp hoặc lưu trữ học sinh.
-\item \textbf{B2:} Hệ thống kiểm tra giáo viên có quyền trên lớp và học sinh liên quan.
-\item \textbf{B3:} Kiểm tra dữ liệu bắt buộc như họ tên, Codeforces handle và lớp học khi tạo ghi danh.
-\item \textbf{B4:} Nếu học sinh còn số dư hoặc công nợ khi lưu trữ, hệ thống chuyển sang trạng thái chờ xử lý hoặc cảnh báo theo quy định.
-\item \textbf{B5:} Ghi nhận thay đổi vào Student và Enrollment, sau đó trả danh sách mới cho giao diện.
+\item \textbf{D1:} Yêu cầu xác minh Discord theo BM 1.4.
+\item \textbf{D2:} OAuth callback và thông tin user từ Discord.
+\item \textbf{D3:} Hồ sơ giáo viên hiện tại và cấu hình OAuth.
+\item \textbf{D4:} Discord user id, username của giáo viên.
+\item \textbf{D5:} Trạng thái xác minh Discord.
+\item \textbf{D6:} Kết quả liên kết hoặc lỗi callback theo QĐ 1.4.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Giáo viên yêu cầu liên kết Discord.
+\item \textbf{B2:} Hệ thống sinh URL OAuth.
+\item \textbf{B3:} Discord trả callback.
+\item \textbf{B4:} Hệ thống xác thực callback và lưu Discord identity.
 \end{itemize}
 
-\paragraph{Chức năng Điểm danh buổi học và phát sinh học phí}
+\subsubsection{Quản lý học sinh và ghi danh}
 
-\noindent\textbf{Sơ đồ luồng dữ liệu:}
-\begin{center}
-\resizebox{0.96\textwidth}{!}{%
-\begin{tikzpicture}[node distance=1.8cm and 2.6cm]
-    \node[dfdprocess] (attendance) {Điểm danh\\buổi học};
-    \node[dfdentity, above=of attendance] (teacher) {Giáo viên};
-    \node[dfdentity, left=of attendance] (discord) {Discord};
-    \node[dfdentity, right=of attendance] (output) {Thiết bị xuất};
-    \node[dfddatastore, below=of attendance] (storage) {Bộ nhớ phụ};
-
-    \draw[dfdarrow] ([xshift=-0.4cm]teacher.south) -- node[left] {D1} ([xshift=-0.4cm]attendance.north);
-    \draw[dfdbluearrow] ([xshift=0.4cm]attendance.north) -- node[right] {D6} ([xshift=0.4cm]teacher.south);
-    \draw[dfdbluearrow] (discord.east) -- node[above] {D2} (attendance.west);
-    \draw[dfdarrow] (attendance.east) -- node[above] {D5} (output.west);
-    \draw[dfdarrow] ([xshift=-0.4cm]storage.north) -- node[left] {D3} ([xshift=-0.4cm]attendance.south);
-    \draw[dfdarrow] ([xshift=0.4cm]attendance.south) -- node[right] {D4} ([xshift=0.4cm]storage.north);
-\end{tikzpicture}%
-}
-\end{center}
-
-\noindent\textbf{Mô tả luồng dữ liệu:}
+\paragraph{Chức năng Thêm học sinh và ghi danh vào lớp}
+\dfddiagram{Thêm học sinh\\và ghi danh}{Giáo viên}{Thiết bị nhập}{Student, Enrollment, Class}
+\textbf{Mô tả luồng dữ liệu:}
 \begin{itemize}[leftmargin=*]
-\item \textbf{D1:} Buổi học cần điểm danh và trạng thái từng học sinh do giáo viên cập nhật.
-\item \textbf{D2:} Dữ liệu voice state từ Discord nếu lớp có voice channel điểm danh.
-\item \textbf{D3:} Buổi học, danh sách ghi danh, bản ghi điểm danh và khoản học phí đã phát sinh.
-\item \textbf{D4:} Attendance mới/cập nhật và FeeRecord tương ứng với buổi học.
-\item \textbf{D5:} Bảng điểm danh, trạng thái buổi học và khoản phí phát sinh.
-\item \textbf{D6:} Thông báo lưu điểm danh, lỗi buổi học bị hủy hoặc lỗi quyền truy cập.
+\item \textbf{D1:} Họ tên, lớp học, Codeforces handle, số điện thoại, ghi chú theo BM 1.5.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} Lớp học thuộc giáo viên, danh sách học sinh và ghi danh hiện có.
+\item \textbf{D4:} Hồ sơ Student và Enrollment mới.
+\item \textbf{D5:} Danh sách học sinh sau khi thêm.
+\item \textbf{D6:} Thông báo kết quả theo QĐ 1.5.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận dữ liệu học sinh và lớp ghi danh.
+\item \textbf{B2:} Kiểm tra lớp thuộc giáo viên hiện tại.
+\item \textbf{B3:} Kiểm tra họ tên, lớp học, Codeforces handle không rỗng.
+\item \textbf{B4:} Kiểm tra học sinh không có ghi danh hoạt động bị trùng trong phạm vi giáo viên.
+\item \textbf{B5:} Tạo Student và Enrollment.
 \end{itemize}
 
-\noindent\textbf{Thuật toán:}
+\paragraph{Chức năng Cập nhật hồ sơ học sinh}
+\dfddiagram{Cập nhật\\hồ sơ học sinh}{Giáo viên}{Thiết bị nhập}{Student}
+\textbf{Mô tả luồng dữ liệu:}
 \begin{itemize}[leftmargin=*]
-\item \textbf{B1:} Giáo viên mở buổi học và nhập hoặc xác nhận trạng thái điểm danh.
-\item \textbf{B2:} Hệ thống đọc danh sách học sinh đang ghi danh trong lớp và trạng thái buổi học.
-\item \textbf{B3:} Nếu có cấu hình Discord voice channel, hệ thống có thể dùng dữ liệu voice state để gợi ý điểm danh.
-\item \textbf{B4:} Khi học sinh được ghi nhận có mặt, hệ thống tạo hoặc kích hoạt FeeRecord cho buổi học.
-\item \textbf{B5:} Nếu buổi học đã hủy hoặc không thuộc giáo viên, hệ thống từ chối cập nhật.
+\item \textbf{D1:} Thông tin cập nhật theo BM 1.6.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} Hồ sơ học sinh thuộc giáo viên hiện tại.
+\item \textbf{D4:} Hồ sơ học sinh đã cập nhật.
+\item \textbf{D5:} Hồ sơ hoặc danh sách học sinh mới.
+\item \textbf{D6:} Thông báo kết quả theo QĐ 1.6.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận yêu cầu cập nhật.
+\item \textbf{B2:} Kiểm tra học sinh thuộc giáo viên hiện tại.
+\item \textbf{B3:} Kiểm tra có ít nhất một trường thay đổi.
+\item \textbf{B4:} Nếu cập nhật Codeforces handle thì handle không được rỗng.
+\item \textbf{B5:} Lưu hồ sơ.
 \end{itemize}
 
-\paragraph{Chức năng Quản lý tài chính và báo cáo}
-
-\noindent\textbf{Sơ đồ luồng dữ liệu:}
-\begin{center}
-\resizebox{0.96\textwidth}{!}{%
-\begin{tikzpicture}[node distance=1.8cm and 2.6cm]
-    \node[dfdprocess] (finance) {Quản lý giao dịch\\và báo cáo};
-    \node[dfdentity, above=of finance] (teacher) {Giáo viên};
-    \node[dfdentity, left=of finance] (input) {Thiết bị nhập};
-    \node[dfdentity, right=of finance] (output) {Thiết bị xuất};
-    \node[dfddatastore, below=of finance] (storage) {Bộ nhớ phụ};
-
-    \draw[dfdarrow] ([xshift=-0.4cm]teacher.south) -- node[left] {D1} ([xshift=-0.4cm]finance.north);
-    \draw[dfdbluearrow] ([xshift=0.4cm]finance.north) -- node[right] {D6} ([xshift=0.4cm]teacher.south);
-    \draw[dfdbluearrow] (input.east) -- node[above] {D2} (finance.west);
-    \draw[dfdarrow] (finance.east) -- node[above] {D5} (output.west);
-    \draw[dfdarrow] ([xshift=-0.4cm]storage.north) -- node[left] {D3} ([xshift=-0.4cm]finance.south);
-    \draw[dfdarrow] ([xshift=0.4cm]finance.south) -- node[right] {D4} ([xshift=0.4cm]storage.north);
-\end{tikzpicture}%
-}
-\end{center}
-
-\noindent\textbf{Mô tả luồng dữ liệu:}
+\paragraph{Chức năng Chuyển lớp, rút học sinh, khôi phục học sinh}
+\dfddiagram{Chuyển lớp, rút,\\khôi phục học sinh}{Giáo viên}{Thiết bị nhập}{Student, Enrollment, Balance}
+\textbf{Mô tả luồng dữ liệu:}
 \begin{itemize}[leftmargin=*]
-\item \textbf{D1:} Thông tin giao dịch thu tiền/hoàn tiền hoặc tiêu chí báo cáo.
-\item \textbf{D2:} Dữ liệu nhập từ biểu mẫu giao dịch, bộ lọc lớp, học sinh và khoảng thời gian.
-\item \textbf{D3:} FeeRecord, Transaction, số dư học sinh và dữ liệu lớp/buổi học liên quan.
-\item \textbf{D4:} Giao dịch mới, trạng thái FeeRecord hoặc dữ liệu đối soát được cập nhật.
-\item \textbf{D5:} Bảng công nợ, lịch sử giao dịch và báo cáo tài chính.
-\item \textbf{D6:} Kết quả lưu giao dịch, lỗi số tiền hoặc báo cáo được kết xuất.
+\item \textbf{D1:} Học sinh, lớp chuyển đến và thời điểm thao tác theo BM 1.7.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} Enrollment hiện tại, lớp đích và số dư học sinh.
+\item \textbf{D4:} Enrollment cũ được kết thúc, Enrollment mới hoặc trạng thái rút/khôi phục.
+\item \textbf{D5:} Trạng thái ghi danh mới.
+\item \textbf{D6:} Thông báo thành công hoặc lỗi theo QĐ 1.7.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận thao tác chuyển/rút/khôi phục.
+\item \textbf{B2:} Kiểm tra học sinh và lớp thuộc giáo viên.
+\item \textbf{B3:} Nếu chuyển lớp, kết thúc ghi danh cũ và tạo ghi danh mới.
+\item \textbf{B4:} Nếu rút học sinh, xác định trạng thái tiếp theo theo số dư.
+\item \textbf{B5:} Lưu thay đổi và trả trạng thái mới.
 \end{itemize}
 
-\noindent\textbf{Thuật toán:}
+\paragraph{Chức năng Lưu trữ học sinh đang chờ xử lý công nợ}
+\dfddiagram{Lưu trữ học sinh\\chờ xử lý}{Giáo viên}{Thiết bị nhập}{Student, Transaction, FeeRecord}
+\textbf{Mô tả luồng dữ liệu:}
 \begin{itemize}[leftmargin=*]
-\item \textbf{B1:} Giáo viên nhập khoản thu, khoản hoàn hoặc chọn tiêu chí xem báo cáo.
-\item \textbf{B2:} Hệ thống kiểm tra học sinh/lớp thuộc phạm vi giáo viên và số tiền không âm.
-\item \textbf{B3:} Hệ thống ghi Transaction, cập nhật trạng thái các FeeRecord nếu có đối soát.
-\item \textbf{B4:} Khi lập báo cáo, hệ thống tổng hợp phải thu, đã thu, hoàn tiền và số dư theo kỳ.
-\item \textbf{B5:} Trả bảng công nợ hoặc báo cáo tài chính cho giao diện.
+\item \textbf{D1:} Học sinh, thời điểm lưu trữ, lý do chờ lưu trữ theo BM 1.8.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} Trạng thái học sinh và số dư hiện tại.
+\item \textbf{D4:} Trạng thái học sinh đã lưu trữ hoặc tiếp tục chờ xử lý.
+\item \textbf{D5:} Danh sách học sinh theo trạng thái.
+\item \textbf{D6:} Kết quả theo QĐ 1.8.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận yêu cầu lưu trữ.
+\item \textbf{B2:} Kiểm tra học sinh đang ở trạng thái chờ lưu trữ.
+\item \textbf{B3:} Đọc số dư cần thu hoặc cần hoàn.
+\item \textbf{B4:} Nếu chưa xử lý xong số dư, báo lý do.
+\item \textbf{B5:} Nếu đủ điều kiện, chuyển trạng thái đã lưu trữ.
 \end{itemize}
 
-\paragraph{Chức năng Tích hợp Discord và Codeforces Gym}
-
-\noindent\textbf{Sơ đồ luồng dữ liệu:}
-\begin{center}
-\resizebox{0.96\textwidth}{!}{%
-\begin{tikzpicture}[node distance=1.8cm and 2.4cm]
-    \node[dfdprocess] (integration) {Tích hợp Discord\\và Codeforces Gym};
-    \node[dfdentity, above=of integration] (teacher) {Giáo viên/\\Quản trị viên};
-    \node[dfdentity, left=of integration] (discord) {Discord};
-    \node[dfdentity, right=of integration] (codeforces) {Codeforces};
-    \node[dfddatastore, below=of integration] (storage) {Bộ nhớ phụ};
-
-    \draw[dfdarrow] ([xshift=-0.4cm]teacher.south) -- node[left] {D1} ([xshift=-0.4cm]integration.north);
-    \draw[dfdbluearrow] ([xshift=0.4cm]integration.north) -- node[right] {D6} ([xshift=0.4cm]teacher.south);
-    \draw[dfdbluearrow] (discord.east) -- node[above] {D2} (integration.west);
-    \draw[dfdbluearrow] (codeforces.west) -- node[above] {D5} (integration.east);
-    \draw[dfdarrow] ([xshift=-0.4cm]storage.north) -- node[left] {D3} ([xshift=-0.4cm]integration.south);
-    \draw[dfdarrow] ([xshift=0.4cm]integration.south) -- node[right] {D4} ([xshift=0.4cm]storage.north);
-\end{tikzpicture}%
-}
-\end{center}
-
-\noindent\textbf{Mô tả luồng dữ liệu:}
+\paragraph{Chức năng Tra cứu và xem hồ sơ học tập của học sinh}
+\dfddiagram{Tra cứu và xem\\hồ sơ học tập}{Giáo viên}{Thiết bị nhập}{Student, Enrollment, GymStanding}
+\textbf{Mô tả luồng dữ liệu:}
 \begin{itemize}[leftmargin=*]
-\item \textbf{D1:} Bot credential, yêu cầu liên kết Discord, chọn guild/channel, gửi thông báo hoặc gắn Gym cho lớp.
-\item \textbf{D2:} OAuth callback, danh sách guild/channel, trạng thái gửi tin hoặc voice state từ Discord.
-\item \textbf{D3:} Credential, guild/channel cache, class binding, Gym, GymProblem và GymStanding đã lưu.
-\item \textbf{D4:} Credential đã mã hóa/ẩn, cấu hình lớp, nhật ký gửi tin hoặc dữ liệu Gym đồng bộ.
-\item \textbf{D5:} Danh sách Gym, bài trong Gym và bảng xếp hạng từ Codeforces.
-\item \textbf{D6:} Kết quả xác minh, cấu hình, gửi thông báo hoặc hiển thị bảng xếp hạng Gym.
+\item \textbf{D1:} Từ khóa, lớp, trạng thái học sinh hoặc Codeforces handle.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} Hồ sơ học sinh, ghi danh, điểm danh, tài chính, GymStanding.
+\item \textbf{D4:} Không có.
+\item \textbf{D5:} Hồ sơ học tập tổng hợp.
+\item \textbf{D6:} Kết quả tra cứu hoặc thông báo không có dữ liệu.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận bộ lọc.
+\item \textbf{B2:} Truy vấn dữ liệu trong phạm vi giáo viên.
+\item \textbf{B3:} Tổng hợp hồ sơ, ghi danh, điểm danh, công nợ và kết quả Gym.
+\item \textbf{B4:} Trả danh sách hoặc hồ sơ chi tiết.
 \end{itemize}
 
-\noindent\textbf{Thuật toán:}
+\subsubsection{Quản lý lớp học, lịch học và buổi học}
+
+\paragraph{Chức năng Thêm/sửa/lưu trữ lớp học}
+\dfddiagram{Thêm/sửa/lưu trữ\\lớp học}{Giáo viên}{Thiết bị nhập}{Class, ClassSchedule}
+\textbf{Mô tả luồng dữ liệu:}
 \begin{itemize}[leftmargin=*]
-\item \textbf{B1:} Quản trị viên cấu hình bot Discord hoặc giáo viên liên kết Discord/Codeforces cho lớp.
-\item \textbf{B2:} Hệ thống kiểm tra quyền, callback OAuth, credential và lớp học thuộc giáo viên.
-\item \textbf{B3:} Với Discord, hệ thống cache guild/channel, lưu binding và gửi thông báo/DM khi có yêu cầu.
-\item \textbf{B4:} Với Codeforces, hệ thống dùng credential để đồng bộ Gym, GymProblem và GymStanding.
-\item \textbf{B5:} Nếu API ngoài lỗi, hệ thống trả thông báo rõ ràng và ưu tiên dùng dữ liệu cache khi phù hợp.
+\item \textbf{D1:} Tên lớp, học phí mỗi buổi, lịch học, trạng thái lớp theo BM 1.10.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} Danh sách lớp và lịch học hiện có.
+\item \textbf{D4:} Class và ClassSchedule mới/cập nhật hoặc trạng thái archived.
+\item \textbf{D5:} Danh sách lớp học.
+\item \textbf{D6:} Kết quả theo QĐ 1.10.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận thông tin lớp.
+\item \textbf{B2:} Kiểm tra tên lớp không rỗng, học phí không âm.
+\item \textbf{B3:} Kiểm tra lớp mới có ít nhất một lịch học.
+\item \textbf{B4:} Lưu lớp và lịch học; nếu lưu trữ thì chuyển trạng thái thay vì xóa.
+\end{itemize}
+
+\paragraph{Chức năng Thiết lập lịch học định kỳ của lớp}
+\dfddiagram{Thiết lập\\lịch học định kỳ}{Giáo viên}{Thiết bị nhập}{ClassSchedule}
+\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Thứ trong tuần, giờ bắt đầu, giờ kết thúc theo BM 1.11.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} Lớp học và lịch học hiện có.
+\item \textbf{D4:} Lịch học định kỳ mới thay thế cấu hình đang áp dụng.
+\item \textbf{D5:} Lịch học của lớp.
+\item \textbf{D6:} Kết quả theo QĐ 1.11.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận danh sách lịch.
+\item \textbf{B2:} Kiểm tra thứ trong tuần hợp lệ.
+\item \textbf{B3:} Kiểm tra giờ kết thúc sau giờ bắt đầu.
+\item \textbf{B4:} Thay thế lịch đang áp dụng của lớp.
+\end{itemize}
+
+\paragraph{Chức năng Tạo buổi học thủ công và xem danh sách buổi học}
+\dfddiagram{Tạo và xem\\buổi học}{Giáo viên}{Thiết bị nhập}{Session, Class}
+\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Lớp học, ngày học, giờ bắt đầu, giờ kết thúc theo BM 1.12.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} Lớp, lịch học, buổi học hiện có.
+\item \textbf{D4:} Session mới cần lưu trữ; nếu chỉ xem danh sách thì không có dữ liệu ghi.
+\item \textbf{D5:} Danh sách buổi học.
+\item \textbf{D6:} Kết quả theo QĐ 1.12.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận yêu cầu tạo hoặc tra cứu buổi học.
+\item \textbf{B2:} Kiểm tra lớp thuộc giáo viên.
+\item \textbf{B3:} Kiểm tra đủ nhóm dữ liệu thời gian.
+\item \textbf{B4:} Kiểm tra giờ kết thúc sau giờ bắt đầu.
+\item \textbf{B5:} Tạo Session hoặc trả danh sách Session.
+\end{itemize}
+
+\paragraph{Chức năng Hủy buổi học}
+\dfddiagram{Hủy\\buổi học}{Giáo viên}{Thiết bị nhập}{Session, Attendance, FeeRecord}
+\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Buổi học cần hủy.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} Buổi học, điểm danh và khoản phí liên quan.
+\item \textbf{D4:} Session chuyển sang trạng thái hủy và dữ liệu liên quan được xử lý.
+\item \textbf{D5:} Trạng thái buổi học sau khi hủy.
+\item \textbf{D6:} Kết quả theo QĐ 1.13.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Giáo viên chọn buổi học cần hủy.
+\item \textbf{B2:} Kiểm tra buổi học thuộc giáo viên hiện tại.
+\item \textbf{B3:} Chuyển trạng thái buổi học sang hủy, không xóa cứng.
+\item \textbf{B4:} Xử lý Attendance và FeeRecord theo trạng thái buổi học.
+\end{itemize}
+
+\subsubsection{Quản lý điểm danh}
+
+\paragraph{Chức năng Xem và cập nhật trạng thái điểm danh học sinh}
+\dfddiagram{Cập nhật\\điểm danh}{Giáo viên/\\Discord}{Thiết bị nhập/\\Voice state}{Attendance, Session, FeeRecord}
+\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Buổi học, học sinh, trạng thái điểm danh, ghi chú theo BM 1.14.
+\item \textbf{D2:} Voice state từ Discord; nếu giáo viên cập nhật thủ công thì không có.
+\item \textbf{D3:} Session, Enrollment, Attendance, FeeRecord hiện có.
+\item \textbf{D4:} Attendance cập nhật và FeeRecord phát sinh/hủy/kích hoạt lại.
+\item \textbf{D5:} Bảng điểm danh và khoản phí liên quan.
+\item \textbf{D6:} Kết quả theo QĐ 1.14.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận trạng thái điểm danh.
+\item \textbf{B2:} Kiểm tra học sinh và buổi học thuộc giáo viên.
+\item \textbf{B3:} Kiểm tra trạng thái nằm trong ba giá trị hợp lệ.
+\item \textbf{B4:} Lưu Attendance.
+\item \textbf{B5:} Cập nhật FeeRecord tương ứng nếu điểm danh ảnh hưởng học phí.
+\end{itemize}
+
+\subsubsection{Quản lý tài chính và công nợ}
+
+\paragraph{Chức năng Ghi nhận giao dịch thu tiền hoặc hoàn tiền}
+\dfddiagram{Ghi nhận\\giao dịch}{Giáo viên}{Thiết bị nhập}{Transaction, Student}
+\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Học sinh, số tiền, loại giao dịch, ghi chú, thời điểm theo BM 1.15.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} Học sinh, giao dịch cũ nếu cập nhật và số dư hiện tại.
+\item \textbf{D4:} Transaction mới/cập nhật.
+\item \textbf{D5:} Lịch sử giao dịch và số dư mới.
+\item \textbf{D6:} Kết quả theo QĐ 1.15.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận dữ liệu giao dịch.
+\item \textbf{B2:} Kiểm tra học sinh thuộc giáo viên.
+\item \textbf{B3:} Kiểm tra loại giao dịch là thu tiền hoặc hoàn tiền.
+\item \textbf{B4:} Lưu thu tiền là số dương, hoàn tiền là số âm.
+\item \textbf{B5:} Cập nhật số dư hiển thị.
+\end{itemize}
+
+\paragraph{Chức năng Cập nhật trạng thái khoản phí phát sinh từ buổi học}
+\dfddiagram{Cập nhật\\khoản phí}{Giáo viên}{Thiết bị nhập}{FeeRecord}
+\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Khoản phí và trạng thái khoản phí theo BM 1.16.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} FeeRecord thuộc học sinh/buổi học của giáo viên.
+\item \textbf{D4:} FeeRecord đang hiệu lực hoặc đã hủy.
+\item \textbf{D5:} Danh sách khoản phí và số dư.
+\item \textbf{D6:} Kết quả theo QĐ 1.16.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận khoản phí cần cập nhật.
+\item \textbf{B2:} Kiểm tra quyền truy cập khoản phí.
+\item \textbf{B3:} Kiểm tra trạng thái chỉ là đang hiệu lực hoặc đã hủy.
+\item \textbf{B4:} Lưu trạng thái mới, không xóa lịch sử.
+\end{itemize}
+
+\paragraph{Chức năng Xem số dư học sinh và tổng quan tài chính}
+\dfddiagram{Xem số dư và\\tổng quan tài chính}{Giáo viên}{Thiết bị nhập}{Transaction, FeeRecord}
+\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Bộ lọc học sinh, lớp, khoảng thời gian.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} Transaction, FeeRecord, Student, Class.
+\item \textbf{D4:} Không có.
+\item \textbf{D5:} Số dư học sinh, tổng phải thu, tổng đã thu, tổng hoàn.
+\item \textbf{D6:} Kết quả đối soát.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận bộ lọc.
+\item \textbf{B2:} Truy vấn khoản phí và giao dịch trong phạm vi giáo viên.
+\item \textbf{B3:} Tổng hợp số dư theo học sinh/lớp.
+\item \textbf{B4:} Trả bảng tổng quan.
+\end{itemize}
+
+\paragraph{Chức năng Lập báo cáo thu nhập theo kỳ}
+\dfddiagram{Lập báo cáo\\thu nhập}{Giáo viên}{Thiết bị nhập}{Transaction, FeeRecord, Class}
+\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Từ ngày, đến ngày, danh sách lớp, tùy chọn bao gồm khoản chưa thu theo BM 1.18.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} Dữ liệu giao dịch, khoản phí, lớp và học sinh.
+\item \textbf{D4:} Không có.
+\item \textbf{D5:} Báo cáo thu nhập theo kỳ.
+\item \textbf{D6:} Kết quả theo QĐ 1.18.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận bộ lọc báo cáo.
+\item \textbf{B2:} Kiểm tra từ ngày không sau đến ngày.
+\item \textbf{B3:} Kiểm tra lớp thuộc giáo viên.
+\item \textbf{B4:} Tổng hợp giao dịch, khoản phí, số dư.
+\item \textbf{B5:} Trả báo cáo hoặc file kết xuất.
+\end{itemize}
+
+\subsubsection{Quản lý Discord}
+
+\paragraph{Chức năng Cấu hình bot Discord toàn hệ thống}
+\dfddiagram{Cấu hình\\bot Discord}{Quản trị viên}{Thiết bị nhập}{SysadminDiscordBotCredential}
+\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Bot token, client id, client secret, permissions, scopes theo BM 1.19.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} Cấu hình bot hiện có.
+\item \textbf{D4:} Credential bot được lưu bảo mật.
+\item \textbf{D5:} Thông tin cấu hình đã che dữ liệu nhạy cảm.
+\item \textbf{D6:} Kết quả theo QĐ 1.19.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Quản trị viên nhập cấu hình.
+\item \textbf{B2:} Kiểm tra vai trò quản trị viên.
+\item \textbf{B3:} Kiểm tra token, client id, client secret không rỗng.
+\item \textbf{B4:} Lưu bảo mật và không trả giá trị đầy đủ ra giao diện.
+\end{itemize}
+
+\paragraph{Chức năng Chọn Discord guild và channel cho lớp}
+\dfddiagram{Chọn guild/channel\\cho lớp}{Giáo viên}{Discord API}{ClassDiscordBinding}
+\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Lớp học, guild, channel thông báo, voice channel theo BM 1.20.
+\item \textbf{D2:} Danh sách guild/channel từ Discord.
+\item \textbf{D3:} Lớp, Discord guild/channel cache, binding hiện có.
+\item \textbf{D4:} ClassDiscordBinding mới/cập nhật.
+\item \textbf{D5:} Cấu hình Discord của lớp.
+\item \textbf{D6:} Kết quả theo QĐ 1.20.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Giáo viên chọn lớp và guild/channel.
+\item \textbf{B2:} Kiểm tra lớp thuộc giáo viên.
+\item \textbf{B3:} Kiểm tra guild/channel nằm trong dữ liệu Discord hệ thống nhìn thấy.
+\item \textbf{B4:} Kiểm tra channel thuộc đúng guild.
+\item \textbf{B5:} Lưu binding cho lớp.
+\end{itemize}
+
+\paragraph{Chức năng Gửi thông báo vào channel của lớp}
+\dfddiagram{Gửi thông báo\\channel lớp}{Giáo viên}{Discord API}{ClassDiscordBinding, Log}
+\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Nội dung thông báo và danh sách guild nhận tin theo BM 1.21.
+\item \textbf{D2:} Trạng thái gửi từ Discord.
+\item \textbf{D3:} Binding lớp, bot credential và channel thông báo.
+\item \textbf{D4:} Nhật ký gửi tin và trạng thái lỗi nếu có.
+\item \textbf{D5:} Trạng thái gửi theo từng guild/channel.
+\item \textbf{D6:} Kết quả theo QĐ 1.21.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận nội dung và danh sách guild.
+\item \textbf{B2:} Kiểm tra nội dung không rỗng và có ít nhất một guild.
+\item \textbf{B3:} Loại bỏ guild trùng.
+\item \textbf{B4:} Gửi tin qua Discord API.
+\item \textbf{B5:} Ghi nhận kết quả gửi.
+\end{itemize}
+
+\paragraph{Chức năng Gửi tin nhắn riêng cho học sinh qua Discord}
+\dfddiagram{Gửi tin nhắn\\riêng Discord}{Giáo viên}{Discord API}{StudentDiscordCredential, Log}
+\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Nội dung, học sinh nhận tin hoặc lớp nhận tin theo BM 1.22.
+\item \textbf{D2:} Trạng thái gửi DM từ Discord.
+\item \textbf{D3:} Danh sách học sinh, StudentDiscordCredential và lớp học.
+\item \textbf{D4:} Nhật ký gửi tin riêng.
+\item \textbf{D5:} Kết quả gửi theo từng học sinh.
+\item \textbf{D6:} Kết quả theo QĐ 1.22.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận nội dung và danh sách người nhận.
+\item \textbf{B2:} Kiểm tra có ít nhất một học sinh hoặc một lớp.
+\item \textbf{B3:} Lọc học sinh thuộc giáo viên hiện tại và có Discord credential.
+\item \textbf{B4:} Gửi DM qua Discord API.
+\item \textbf{B5:} Trả trạng thái gửi chi tiết.
+\end{itemize}
+
+\subsubsection{Quản lý Codeforces Gym}
+
+\paragraph{Chức năng Gắn hoặc gỡ Gym Codeforces khỏi lớp học}
+\dfddiagram{Gắn/gỡ Gym\\Codeforces}{Giáo viên}{Codeforces API}{Gym, GymProblem, ClassGym}
+\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Lớp học, Gym ID, chu kỳ đồng bộ theo BM 1.23.
+\item \textbf{D2:} Dữ liệu Gym từ Codeforces; nếu chỉ gắn/gỡ Gym đã đồng bộ thì không có.
+\item \textbf{D3:} Lớp, credential Codeforces, Gym hiện có.
+\item \textbf{D4:} Liên kết Gym với lớp hoặc trạng thái gỡ Gym.
+\item \textbf{D5:} Danh sách Gym của lớp.
+\item \textbf{D6:} Kết quả theo QĐ 1.23.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Giáo viên chọn lớp và Gym.
+\item \textbf{B2:} Kiểm tra lớp thuộc giáo viên.
+\item \textbf{B3:} Kiểm tra Gym ID là số và chu kỳ đồng bộ là số nguyên dương nếu có.
+\item \textbf{B4:} Gắn/gỡ Gym, giữ dữ liệu lịch sử đã đồng bộ nếu cần báo cáo.
+\end{itemize}
+
+\paragraph{Chức năng Xem bảng xếp hạng Gym và hồ sơ học tập}
+\dfddiagram{Xem bảng xếp hạng\\Gym}{Giáo viên}{Thiết bị nhập}{GymStanding, GymProblem, Student}
+\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Lớp học, Gym, học sinh hoặc bài cần xem.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} GymProblem, GymStanding, Student, Enrollment.
+\item \textbf{D4:} Không có.
+\item \textbf{D5:} Bảng xếp hạng Gym và hồ sơ học tập.
+\item \textbf{D6:} Kết quả hiển thị hoặc thông báo chưa có dữ liệu.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận lớp/Gym cần xem.
+\item \textbf{B2:} Kiểm tra lớp thuộc giáo viên.
+\item \textbf{B3:} Đọc GymStanding đã đồng bộ.
+\item \textbf{B4:} Ghép standing với học sinh đang ghi danh.
+\item \textbf{B5:} Hiển thị bảng kết quả.
+\end{itemize}
+
+\subsubsection{Uỷ quyền Discord của học sinh}
+
+\paragraph{Chức năng Học sinh uỷ quyền Discord OAuth}
+\dfddiagram{Uỷ quyền Discord\\của học sinh}{Học sinh}{Discord OAuth}{StudentDiscordCredential}
+\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Liên kết uỷ quyền gắn với học sinh theo BM 1.24.
+\item \textbf{D2:} OAuth consent, callback, Discord user id và token.
+\item \textbf{D3:} Hồ sơ học sinh và credential hiện có.
+\item \textbf{D4:} StudentDiscordCredential được lưu bảo mật.
+\item \textbf{D5:} Trang thông báo uỷ quyền thành công/thất bại.
+\item \textbf{D6:} Kết quả theo QĐ 1.24.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Học sinh mở liên kết OAuth.
+\item \textbf{B2:} Discord xác nhận quyền và trả callback.
+\item \textbf{B3:} Hệ thống kiểm tra URL gắn với học sinh hợp lệ.
+\item \textbf{B4:} Lưu Discord identity và token bảo mật.
+\item \textbf{B5:} Trả trang kết quả.
+\end{itemize}
+
+\subsubsection{Quản trị hệ thống và tổng quan}
+
+\paragraph{Chức năng Quản lý tài khoản giáo viên}
+\dfddiagram{Quản lý tài khoản\\giáo viên}{Quản trị viên}{Thiết bị nhập}{Teacher}
+\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Giáo viên, tên đăng nhập, mật khẩu, trạng thái, Codeforces credential theo BM 1.25.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} Danh sách giáo viên và trạng thái hiện có.
+\item \textbf{D4:} Tài khoản giáo viên được cập nhật hoặc vô hiệu hoá.
+\item \textbf{D5:} Danh sách tài khoản giáo viên.
+\item \textbf{D6:} Kết quả theo QĐ 1.25.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Quản trị viên chọn tài khoản giáo viên.
+\item \textbf{B2:} Kiểm tra quyền admin.
+\item \textbf{B3:} Kiểm tra có ít nhất một trường thay đổi.
+\item \textbf{B4:} Cập nhật hoặc vô hiệu hóa, không xóa cứng tài khoản.
+\end{itemize}
+
+\paragraph{Chức năng Xem tổng quan giảng dạy}
+\dfddiagram{Xem tổng quan\\giảng dạy}{Giáo viên}{Thiết bị nhập}{Class, Session, Student, Finance}
+\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Yêu cầu mở dashboard hoặc bộ lọc thời gian.
+\item \textbf{D2:} Không có.
+\item \textbf{D3:} Lớp, học sinh, buổi học, điểm danh, tài chính, GymStanding.
+\item \textbf{D4:} Không có.
+\item \textbf{D5:} Số liệu tổng quan giảng dạy.
+\item \textbf{D6:} Dashboard hoặc thông báo không có dữ liệu.
+\end{itemize}
+\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Giáo viên mở dashboard.
+\item \textbf{B2:} Hệ thống đọc dữ liệu thuộc giáo viên hiện tại.
+\item \textbf{B3:} Tổng hợp số lớp, học sinh, buổi học, doanh thu, công nợ và kết quả Gym.
+\item \textbf{B4:} Trả dữ liệu tổng quan.
 \end{itemize}
 
 \subsection{Sơ đồ sử dụng chức năng (Use Case Diagram)}
 
-\subsubsection{Danh sách Use Case chính}
+\subsubsection{Danh sách các Actor}
 
 \begin{table}[!htbp]
 \centering
 \tablesetup
-\begin{tabularx}{\textwidth}{|C{0.8cm}|L{2.8cm}|Y|}
+\begin{tabularx}{\textwidth}{|C{0.8cm}|L{2.6cm}|Y|}
 \hline
-\textbf{STT} & \textbf{Tác nhân} & \textbf{Use Case chính} \\
+\textbf{STT} & \textbf{Actor} & \textbf{Trách nhiệm} \\
 \hline
-1 & Giáo viên & Đăng nhập; xem tổng quan giảng dạy; cập nhật hồ sơ cá nhân; liên kết Discord; quản lý học sinh; quản lý ghi danh; xử lý học sinh chờ lưu trữ; quản lý lớp học, lịch học và buổi học; điểm danh; theo dõi kết quả học tập; quản lý giao dịch tài chính; xem báo cáo tài chính; thiết lập Discord cho lớp; gửi thông báo; gắn Gym Codeforces; xem bảng xếp hạng Gym. \\
+1 & Giáo viên & Sử dụng hầu hết nghiệp vụ quản lý lớp học: học sinh, ghi danh, lớp, lịch, buổi học, điểm danh, tài chính, báo cáo, Discord và Codeforces Gym. \\
 \hline
-2 & Quản trị viên & Đăng nhập; quản lý tài khoản giáo viên; cấu hình bot Discord toàn hệ thống. \\
+2 & Quản trị viên & Quản lý tài khoản giáo viên và cấu hình bot Discord toàn hệ thống. \\
 \hline
-3 & Học sinh & Uỷ quyền Discord OAuth để hệ thống lưu danh tính Discord và hỗ trợ quản lý membership trong guild lớp học. \\
+3 & Học sinh & Uỷ quyền Discord OAuth để hệ thống có thể lưu danh tính Discord và phục vụ membership lớp học. \\
 \hline
-4 & Discord & Hỗ trợ xác minh OAuth, cung cấp guild/\allowbreak channel/\allowbreak member/\allowbreak voice state và tiếp nhận yêu cầu gửi thông báo hoặc DM. \\
+4 & Discord & Cung cấp OAuth, guild/channel/member API, voice state và gửi thông báo/DM. \\
 \hline
-5 & Codeforces & Cung cấp dữ liệu Gym, bài trong Gym và bảng xếp hạng để hệ thống đồng bộ và hiển thị cho giáo viên. \\
+5 & Codeforces & Cung cấp Gym, GymProblem và GymStanding cho quá trình theo dõi học tập. \\
 \hline
 \end{tabularx}
 \end{table}
 
 \subsubsection{Sơ đồ Use Case tổng quan}
-
-Sơ đồ Use Case tổng quan nên thể hiện một hệ thống duy nhất với năm tác nhân:
-Giáo viên, Quản trị viên, Học sinh, Discord và Codeforces. Nếu nhóm đã xuất file
-ảnh từ công cụ UML, có thể đặt ảnh vào một trong các đường dẫn bên dưới để
-Overleaf tự nạp.
 
 \begin{figure}[!htbp]
 \centering
@@ -1761,33 +2119,245 @@ Overleaf tự nạp.
 }{%
     \fbox{\parbox[c][5cm][c]{0.9\textwidth}{\centering
     Chưa tìm thấy ảnh sơ đồ Use Case tổng quan.\\[4pt]
-    Có thể đặt file tại \code{images/use-case-overview.png}.}}
+    Đặt file tại \code{images/use-case-overview.png} để Overleaf tự nạp.}}
 }}%
 \caption{Sơ đồ Use Case tổng quan của hệ thống giúp giáo viên quản lý lớp học lập trình thi đấu}
 \end{figure}
 
-\subsubsection{Đặc tả Use Case tiêu biểu}
+\subsubsection{Đặc tả các Use Case}
 
-\begin{table}[!htbp]
-\centering
-\tablesetup
-\begin{tabularx}{\textwidth}{|L{3cm}|Y|Y|Y|}
-\hline
-\textbf{Use Case} & \textbf{Tóm tắt} & \textbf{Dòng sự kiện chính} & \textbf{Dòng sự kiện phụ} \\
-\hline
-Quản lý học sinh & Giáo viên tạo, cập nhật, tra cứu và xử lý trạng thái học sinh. & Giáo viên nhập thông tin học sinh; hệ thống kiểm tra quyền sở hữu, dữ liệu bắt buộc và Codeforces handle; hệ thống lưu \code{Student}/\code{Enrollment} và cập nhật danh sách. & Nếu thiếu dữ liệu, trùng hoặc học sinh còn công nợ khi lưu trữ, hệ thống báo lỗi hoặc chuyển sang trạng thái chờ xử lý. \\
-\hline
-Điểm danh buổi học & Giáo viên ghi nhận trạng thái tham gia buổi học và hệ thống phát sinh học phí. & Giáo viên chọn buổi học; hệ thống tải danh sách ghi danh; giáo viên cập nhật trạng thái; hệ thống lưu \code{Attendance} và \code{FeeRecord}. & Nếu buổi học bị hủy, không thuộc giáo viên hoặc học sinh không còn ghi danh, hệ thống từ chối cập nhật. \\
-\hline
-Quản lý giao dịch tài chính & Giáo viên ghi nhận khoản thu/hoàn tiền và đối soát công nợ. & Giáo viên nhập giao dịch; hệ thống kiểm tra học sinh, số tiền và loại giao dịch; hệ thống lưu \code{Transaction}, cập nhật \code{FeeRecord} và số dư. & Nếu số tiền không hợp lệ hoặc giao dịch vượt phạm vi dữ liệu của giáo viên, hệ thống báo lỗi. \\
-\hline
-Thiết lập Discord cho lớp học & Giáo viên chọn guild, channel thông báo và voice channel cho lớp. & Giáo viên liên kết Discord; hệ thống lấy guild/\allowbreak channel; giáo viên chọn cấu hình cho lớp; hệ thống lưu \code{ClassDiscordBinding}. & Nếu bot chưa được cấu hình, guild/\allowbreak channel không hợp lệ hoặc không thuộc dữ liệu Discord đã cache, hệ thống báo lỗi. \\
-\hline
-Gắn Gym Codeforces cho lớp học & Giáo viên gắn Gym đã đồng bộ vào lớp và xem standing. & Giáo viên chọn lớp và Gym; hệ thống kiểm tra quyền lớp; hệ thống lưu liên kết Gym; giáo viên xem \code{GymProblem} và \code{GymStanding}. & Nếu Gym chưa đồng bộ, credential Codeforces lỗi hoặc lớp không hợp lệ, hệ thống thông báo nguyên nhân. \\
-\hline
-Uỷ quyền Discord của học sinh & Học sinh xác nhận OAuth để hệ thống lưu danh tính Discord. & Học sinh mở liên kết uỷ quyền; Discord trả callback; hệ thống kiểm tra token và lưu \code{StudentDiscordCredential}. & Nếu callback không hợp lệ, học sinh không tồn tại hoặc Discord từ chối quyền, hệ thống không lưu credential. \\
-\hline
-\end{tabularx}
-\end{table}
+\paragraph{Quản lý tài khoản}
+
+\subparagraph{Đăng nhập hệ thống}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Cho phép giáo viên hoặc quản trị viên truy cập hệ thống theo đúng vai trò.
+\item \textbf{Dòng sự kiện chính:} Người dùng nhập tên đăng nhập và mật khẩu; hệ thống kiểm tra tài khoản, mật khẩu và trạng thái; hệ thống cấp token và điều hướng vào màn hình phù hợp.
+\item \textbf{Dòng sự kiện phụ:} Nếu thiếu thông tin, sai mật khẩu hoặc tài khoản bị vô hiệu hóa, hệ thống từ chối đăng nhập và hiển thị lỗi.
+\item \textbf{Tiền điều kiện:} Tài khoản đã tồn tại và hệ thống đang hoạt động.
+\end{itemize}
+
+\subparagraph{Đăng ký tài khoản giáo viên}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Tạo tài khoản giáo viên mới để sử dụng hệ thống.
+\item \textbf{Dòng sự kiện chính:} Người dùng nhập thông tin; hệ thống kiểm tra tên đăng nhập; hệ thống băm mật khẩu, lưu credential Codeforces nếu có và tạo tài khoản.
+\item \textbf{Dòng sự kiện phụ:} Nếu tên đăng nhập trùng hoặc thiếu dữ liệu bắt buộc, hệ thống báo lỗi.
+\item \textbf{Tiền điều kiện:} Chức năng đăng ký hoặc quyền quản trị tạo tài khoản đang được cho phép.
+\end{itemize}
+
+\subparagraph{Cập nhật hồ sơ giáo viên}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Cho phép giáo viên hoặc quản trị viên cập nhật tên đăng nhập, mật khẩu và thông tin Codeforces.
+\item \textbf{Dòng sự kiện chính:} Người dùng nhập trường cần đổi; hệ thống kiểm tra ràng buộc; hệ thống lưu hồ sơ và che dữ liệu nhạy cảm.
+\item \textbf{Dòng sự kiện phụ:} Nếu không có trường thay đổi hoặc mật khẩu rỗng, hệ thống báo lỗi.
+\item \textbf{Tiền điều kiện:} Người dùng đã đăng nhập hoặc quản trị viên đang thao tác trên tài khoản giáo viên.
+\end{itemize}
+
+\subparagraph{Liên kết Discord của giáo viên}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Cho phép giáo viên xác minh Discord để dùng các chức năng guild/channel.
+\item \textbf{Dòng sự kiện chính:} Giáo viên yêu cầu liên kết; hệ thống sinh URL OAuth; Discord trả callback; hệ thống lưu Discord user id và username.
+\item \textbf{Dòng sự kiện phụ:} Nếu callback không hợp lệ hoặc Discord từ chối quyền, hệ thống không lưu dữ liệu.
+\item \textbf{Tiền điều kiện:} Giáo viên đã đăng nhập và cấu hình OAuth Discord hợp lệ.
+\end{itemize}
+
+\paragraph{Quản lý học sinh và ghi danh}
+
+\subparagraph{Thêm học sinh và ghi danh vào lớp}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Tạo hồ sơ học sinh và ghi danh học sinh vào một lớp của giáo viên.
+\item \textbf{Dòng sự kiện chính:} Giáo viên nhập thông tin; hệ thống kiểm tra lớp thuộc giáo viên, dữ liệu bắt buộc và ghi danh trùng; hệ thống tạo Student và Enrollment.
+\item \textbf{Dòng sự kiện phụ:} Nếu lớp không thuộc giáo viên hoặc thiếu Codeforces handle, hệ thống báo lỗi.
+\item \textbf{Tiền điều kiện:} Giáo viên đã đăng nhập và lớp học đã tồn tại.
+\end{itemize}
+
+\subparagraph{Cập nhật hồ sơ học sinh}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Cập nhật thông tin cá nhân và Codeforces handle của học sinh.
+\item \textbf{Dòng sự kiện chính:} Giáo viên chọn học sinh; nhập thông tin cần đổi; hệ thống kiểm tra quyền sở hữu; hệ thống lưu hồ sơ.
+\item \textbf{Dòng sự kiện phụ:} Nếu học sinh không thuộc giáo viên hoặc không có trường thay đổi, hệ thống báo lỗi.
+\item \textbf{Tiền điều kiện:} Học sinh đã tồn tại trong hệ thống.
+\end{itemize}
+
+\subparagraph{Chuyển lớp, rút học sinh, khôi phục học sinh}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Điều chỉnh trạng thái ghi danh và vòng đời học sinh.
+\item \textbf{Dòng sự kiện chính:} Giáo viên chọn học sinh và thao tác; hệ thống kiểm tra lớp/học sinh thuộc giáo viên; hệ thống cập nhật Enrollment và trạng thái học sinh.
+\item \textbf{Dòng sự kiện phụ:} Nếu học sinh còn số dư khi rút, hệ thống chuyển sang trạng thái phù hợp để xử lý công nợ.
+\item \textbf{Tiền điều kiện:} Học sinh có ghi danh hoặc trạng thái có thể khôi phục.
+\end{itemize}
+
+\subparagraph{Lưu trữ học sinh đang chờ xử lý công nợ}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Lưu trữ học sinh sau khi đã xử lý xong tình trạng công nợ.
+\item \textbf{Dòng sự kiện chính:} Giáo viên chọn học sinh chờ lưu trữ; hệ thống kiểm tra số dư; hệ thống chuyển sang trạng thái đã lưu trữ.
+\item \textbf{Dòng sự kiện phụ:} Nếu còn số dư cần thu hoặc hoàn, hệ thống hiển thị lý do chưa thể hoàn tất.
+\item \textbf{Tiền điều kiện:} Học sinh đang ở trạng thái chờ lưu trữ.
+\end{itemize}
+
+\subparagraph{Tra cứu và xem hồ sơ học tập}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Tra cứu học sinh và xem dữ liệu học tập, tài chính, Codeforces Gym.
+\item \textbf{Dòng sự kiện chính:} Giáo viên nhập bộ lọc; hệ thống tìm học sinh thuộc giáo viên; hệ thống tổng hợp hồ sơ, ghi danh, điểm danh, công nợ và standing Gym.
+\item \textbf{Dòng sự kiện phụ:} Nếu không có dữ liệu phù hợp, hệ thống hiển thị thông báo rỗng.
+\item \textbf{Tiền điều kiện:} Đã có dữ liệu học sinh.
+\end{itemize}
+
+\paragraph{Quản lý lớp học, lịch học và buổi học}
+
+\subparagraph{Thêm/sửa/lưu trữ lớp học}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Quản lý lớp học và trạng thái lớp.
+\item \textbf{Dòng sự kiện chính:} Giáo viên nhập tên lớp, học phí và lịch học; hệ thống kiểm tra dữ liệu; hệ thống lưu lớp hoặc chuyển trạng thái archived.
+\item \textbf{Dòng sự kiện phụ:} Nếu học phí âm hoặc thiếu lịch khi tạo lớp, hệ thống báo lỗi.
+\item \textbf{Tiền điều kiện:} Giáo viên đã đăng nhập.
+\end{itemize}
+
+\subparagraph{Thiết lập lịch học định kỳ}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Cấu hình các khung giờ học định kỳ cho lớp.
+\item \textbf{Dòng sự kiện chính:} Giáo viên nhập danh sách lịch; hệ thống kiểm tra thứ và giờ; hệ thống thay thế lịch đang áp dụng.
+\item \textbf{Dòng sự kiện phụ:} Nếu giờ kết thúc không sau giờ bắt đầu, hệ thống báo lỗi.
+\item \textbf{Tiền điều kiện:} Lớp học thuộc giáo viên hiện tại.
+\end{itemize}
+
+\subparagraph{Tạo buổi học thủ công và xem danh sách buổi học}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Tạo buổi học phát sinh hoặc xem các buổi học đã có.
+\item \textbf{Dòng sự kiện chính:} Giáo viên chọn lớp, nhập thời gian; hệ thống kiểm tra thời gian; hệ thống tạo Session hoặc trả danh sách Session.
+\item \textbf{Dòng sự kiện phụ:} Nếu thiếu nhóm dữ liệu thời gian hợp lệ, hệ thống báo lỗi.
+\item \textbf{Tiền điều kiện:} Lớp học tồn tại và đang thuộc giáo viên.
+\end{itemize}
+
+\subparagraph{Hủy buổi học}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Chuyển buổi học sang trạng thái hủy mà không xóa lịch sử.
+\item \textbf{Dòng sự kiện chính:} Giáo viên chọn buổi học; hệ thống kiểm tra quyền; hệ thống cập nhật trạng thái hủy và xử lý dữ liệu liên quan.
+\item \textbf{Dòng sự kiện phụ:} Nếu buổi học không thuộc giáo viên, hệ thống từ chối.
+\item \textbf{Tiền điều kiện:} Buổi học đã tồn tại.
+\end{itemize}
+
+\paragraph{Quản lý điểm danh}
+
+\subparagraph{Xem và cập nhật trạng thái điểm danh học sinh}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Ghi nhận có mặt, vắng có phép hoặc vắng không phép cho từng học sinh.
+\item \textbf{Dòng sự kiện chính:} Giáo viên mở buổi học; hệ thống tải danh sách học sinh; giáo viên cập nhật trạng thái; hệ thống lưu Attendance và cập nhật FeeRecord.
+\item \textbf{Dòng sự kiện phụ:} Nếu buổi học đã hủy hoặc trạng thái không hợp lệ, hệ thống từ chối lưu.
+\item \textbf{Tiền điều kiện:} Buổi học và học sinh thuộc giáo viên hiện tại.
+\end{itemize}
+
+\paragraph{Quản lý tài chính và báo cáo}
+
+\subparagraph{Ghi nhận giao dịch thu tiền hoặc hoàn tiền}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Lưu giao dịch thu học phí hoặc hoàn tiền cho học sinh.
+\item \textbf{Dòng sự kiện chính:} Giáo viên nhập giao dịch; hệ thống kiểm tra học sinh và loại giao dịch; hệ thống lưu Transaction và cập nhật số dư.
+\item \textbf{Dòng sự kiện phụ:} Nếu học sinh không thuộc giáo viên hoặc loại giao dịch không hợp lệ, hệ thống báo lỗi.
+\item \textbf{Tiền điều kiện:} Học sinh đã tồn tại.
+\end{itemize}
+
+\subparagraph{Cập nhật trạng thái khoản phí}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Đánh dấu khoản phí đang hiệu lực hoặc đã hủy.
+\item \textbf{Dòng sự kiện chính:} Giáo viên chọn khoản phí; hệ thống kiểm tra quyền; hệ thống cập nhật trạng thái FeeRecord.
+\item \textbf{Dòng sự kiện phụ:} Nếu trạng thái không hợp lệ, hệ thống báo lỗi.
+\item \textbf{Tiền điều kiện:} Khoản phí đã phát sinh từ điểm danh hoặc buổi học.
+\end{itemize}
+
+\subparagraph{Xem số dư và tổng quan tài chính}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Cho phép giáo viên đối soát công nợ theo học sinh hoặc lớp.
+\item \textbf{Dòng sự kiện chính:} Giáo viên chọn bộ lọc; hệ thống tổng hợp FeeRecord và Transaction; hệ thống hiển thị số dư.
+\item \textbf{Dòng sự kiện phụ:} Nếu không có dữ liệu, hệ thống hiển thị bảng rỗng.
+\item \textbf{Tiền điều kiện:} Có dữ liệu học sinh, khoản phí hoặc giao dịch.
+\end{itemize}
+
+\subparagraph{Lập báo cáo thu nhập theo kỳ}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Tổng hợp thu nhập, khoản phải thu và số dư theo khoảng thời gian.
+\item \textbf{Dòng sự kiện chính:} Giáo viên nhập bộ lọc; hệ thống kiểm tra thời gian và lớp; hệ thống tổng hợp báo cáo.
+\item \textbf{Dòng sự kiện phụ:} Nếu từ ngày sau đến ngày, hệ thống yêu cầu nhập lại.
+\item \textbf{Tiền điều kiện:} Giáo viên đã đăng nhập.
+\end{itemize}
+
+\paragraph{Quản lý Discord}
+
+\subparagraph{Cấu hình bot Discord toàn hệ thống}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Quản trị viên lưu credential bot và OAuth cho hệ thống.
+\item \textbf{Dòng sự kiện chính:} Quản trị viên nhập credential; hệ thống kiểm tra quyền admin; hệ thống lưu bảo mật.
+\item \textbf{Dòng sự kiện phụ:} Nếu thiếu token hoặc client secret, hệ thống báo lỗi.
+\item \textbf{Tiền điều kiện:} Người dùng có vai trò quản trị viên.
+\end{itemize}
+
+\subparagraph{Chọn Discord guild và channel cho lớp}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Gắn guild, channel thông báo và voice channel điểm danh vào lớp.
+\item \textbf{Dòng sự kiện chính:} Giáo viên chọn lớp, guild và channel; hệ thống kiểm tra dữ liệu Discord; hệ thống lưu ClassDiscordBinding.
+\item \textbf{Dòng sự kiện phụ:} Nếu channel không thuộc guild đã chọn, hệ thống báo lỗi.
+\item \textbf{Tiền điều kiện:} Giáo viên đã liên kết Discord và bot đã được cấu hình.
+\end{itemize}
+
+\subparagraph{Gửi thông báo vào channel của lớp}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Gửi thông báo chung tới channel Discord đã cấu hình.
+\item \textbf{Dòng sự kiện chính:} Giáo viên nhập nội dung; hệ thống kiểm tra guild/channel; hệ thống gửi qua Discord API và ghi trạng thái.
+\item \textbf{Dòng sự kiện phụ:} Nếu Discord lỗi hoặc chưa có channel, hệ thống trả trạng thái lỗi.
+\item \textbf{Tiền điều kiện:} Lớp đã có cấu hình Discord hợp lệ.
+\end{itemize}
+
+\subparagraph{Gửi tin nhắn riêng cho học sinh qua Discord}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Gửi DM tới học sinh đã uỷ quyền Discord.
+\item \textbf{Dòng sự kiện chính:} Giáo viên nhập nội dung và chọn người nhận; hệ thống lọc học sinh có credential; hệ thống gửi DM và trả trạng thái từng học sinh.
+\item \textbf{Dòng sự kiện phụ:} Nếu học sinh chưa có Discord credential, hệ thống bỏ qua hoặc báo lý do.
+\item \textbf{Tiền điều kiện:} Học sinh đã uỷ quyền Discord.
+\end{itemize}
+
+\paragraph{Quản lý Codeforces Gym}
+
+\subparagraph{Gắn hoặc gỡ Gym Codeforces khỏi lớp học}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Liên kết Gym với lớp để theo dõi bài và standing.
+\item \textbf{Dòng sự kiện chính:} Giáo viên chọn lớp và Gym; hệ thống kiểm tra quyền; hệ thống lưu liên kết hoặc gỡ liên kết.
+\item \textbf{Dòng sự kiện phụ:} Nếu Gym ID không phải số hoặc credential lỗi, hệ thống báo lỗi.
+\item \textbf{Tiền điều kiện:} Lớp học tồn tại và giáo viên có credential Codeforces phù hợp khi cần đồng bộ.
+\end{itemize}
+
+\subparagraph{Xem bảng xếp hạng Gym và hồ sơ học tập}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Hiển thị standing theo học sinh đang học trong lớp.
+\item \textbf{Dòng sự kiện chính:} Giáo viên chọn lớp/Gym; hệ thống đọc GymStanding; hệ thống ghép với danh sách học sinh và hiển thị bảng kết quả.
+\item \textbf{Dòng sự kiện phụ:} Nếu Gym chưa đồng bộ, hệ thống thông báo chưa có dữ liệu.
+\item \textbf{Tiền điều kiện:} Lớp đã gắn Gym.
+\end{itemize}
+
+\paragraph{Uỷ quyền Discord của học sinh}
+
+\subparagraph{Học sinh uỷ quyền Discord OAuth}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Học sinh cấp quyền để hệ thống lưu Discord identity và token.
+\item \textbf{Dòng sự kiện chính:} Học sinh mở URL; Discord xác nhận quyền; hệ thống nhận callback, kiểm tra học sinh và lưu credential.
+\item \textbf{Dòng sự kiện phụ:} Nếu callback sai hoặc học sinh không tồn tại, hệ thống không lưu credential.
+\item \textbf{Tiền điều kiện:} Học sinh có liên kết uỷ quyền hợp lệ.
+\end{itemize}
+
+\paragraph{Quản trị hệ thống}
+
+\subparagraph{Quản lý tài khoản giáo viên}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Quản trị viên cập nhật hoặc vô hiệu hóa tài khoản giáo viên.
+\item \textbf{Dòng sự kiện chính:} Quản trị viên chọn tài khoản; nhập trường cần thay đổi; hệ thống kiểm tra quyền; hệ thống cập nhật tài khoản.
+\item \textbf{Dòng sự kiện phụ:} Nếu không có trường thay đổi, hệ thống báo lỗi.
+\item \textbf{Tiền điều kiện:} Người dùng đang đăng nhập với vai trò quản trị viên.
+\end{itemize}
+
+\subparagraph{Xem tổng quan giảng dạy}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tóm tắt:} Giáo viên xem nhanh số liệu lớp, học sinh, buổi học, tài chính và kết quả học tập.
+\item \textbf{Dòng sự kiện chính:} Giáo viên mở dashboard; hệ thống tổng hợp dữ liệu thuộc giáo viên; hệ thống hiển thị chỉ số tổng quan.
+\item \textbf{Dòng sự kiện phụ:} Nếu chưa có dữ liệu, hệ thống hiển thị trạng thái rỗng.
+\item \textbf{Tiền điều kiện:} Giáo viên đã đăng nhập.
+\end{itemize}
 
 \end{document}
