@@ -174,6 +174,11 @@ export function Students() {
         return;
       }
 
+      if (status === "failed") {
+        setRequestError("Discord authorize chưa hoàn tất. Hãy copy link authorize mới cho học sinh rồi thử lại; nếu vẫn lỗi, kiểm tra Student authorization redirect URI trong Discord Developer Portal.");
+        return;
+      }
+
       setRequestError("Không xử lý được kết quả authorize Discord của học sinh.");
     };
 

@@ -1,0 +1,23 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam wrapWidth 120
+skinparam maxMessageSize 80
+
+actor "Người dùng" as User
+
+component "Giao diện web" as Frontend
+component "Backend TMS" as Backend
+database "Azure Database Server\nCSDL TMS" as Database
+cloud "Discord" as Discord
+cloud "Codeforces" as Codeforces
+
+User --> Frontend : "Sử dụng hệ thống"
+Frontend --> Backend : "API"
+Backend --> Database : "Đọc / ghi dữ liệu"
+Backend --> Discord : "Tích hợp lớp học"
+Backend --> Codeforces : "Tích hợp luyện tập"
+
+@enduml

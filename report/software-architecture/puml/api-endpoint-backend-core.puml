@@ -1,0 +1,24 @@
+@startmindmap
+skinparam shadowing false
+skinparam wrapWidth 190
+
+* /api
+** /register
+** /login
+** /me
+*** /discord
+**** /verification/start
+** /admin
+*** /teachers
+**** /:teacherId
+*** /discord-bot
+** /discord
+*** /verification/callback
+*** /student/callback
+*** /oauth/callback
+*** /bot-invite-link
+*** /guilds
+**** /:guildId/channels
+*** /messages/channel-post
+
+@endmindmap

@@ -1,0 +1,37 @@
+@startuml
+left to right direction
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam nodeStyle rectangle
+skinparam artifactStyle rectangle
+skinparam wrapWidth 150
+
+rectangle "Development" as DEV {
+  component "Source code" as Source
+  component "Docker build" as Build
+  artifact "Docker image" as Image
+}
+
+node "VPS" as VPS {
+  component "Nginx\nreverse proxy" as Nginx
+  component "Docker" as Docker {
+    component "TMS container" as App
+  }
+}
+
+database "Azure Database Server" as DB
+
+rectangle "Browser" as Browser {
+  component "saas.owlab.uk" as Domain
+}
+
+Source --> Build
+Build --> Image
+Image --> VPS : "push image"
+
+Browser -left-> VPS : "port 443"
+Nginx --> App : "port 4000"
+VPS -[hidden]down- DB
+App -down-> DB : "DB connection"
+
+@enduml

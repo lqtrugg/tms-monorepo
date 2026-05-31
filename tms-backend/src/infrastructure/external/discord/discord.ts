@@ -5,6 +5,7 @@ import { HttpError } from '../../../shared/errors/HttpError.js';
 type DiscordApiErrorPayload = {
   message?: string;
   error_description?: string;
+  error?: string;
 };
 
 type DiscordGuildPayload = {
@@ -354,10 +355,16 @@ function getDiscordErrorMessage(error: unknown): string | null {
   }
 
   if (error instanceof HTTPError) {
-    return error.message;
+    const message = error.message.trim();
+    return message && message !== 'No Description' ? message : null;
   }
 
-  return error instanceof Error ? error.message : null;
+  if (error instanceof Error) {
+    const message = error.message.trim();
+    return message && message !== 'No Description' ? message : null;
+  }
+
+  return null;
 }
 
 function toDiscordHttpError(error: unknown, fallbackMessage: string, statusCode = 502): HttpError {

@@ -1,0 +1,26 @@
+@startmindmap
+skinparam shadowing false
+skinparam wrapWidth 190
+
+* /api
+** /sessions
+*** /:sessionId
+**** /cancel
+**** /attendance
+***** /:studentId
+** /attendance
+** /finance
+*** /transactions
+**** /:id
+*** /fee-records
+**** /:id/status
+*** /balances
+*** /summary
+*** /reporting
+**** /income
+** /reporting
+*** /dashboard
+*** /students
+**** /:studentId/learning-profile
+
+@endmindmap

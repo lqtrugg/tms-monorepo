@@ -1,0 +1,62 @@
+@startuml
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam componentStyle rectangle
+skinparam wrapWidth 120
+
+actor "Giáo viên" as Teacher
+actor "Quản trị viên" as Admin
+
+package "Giao diện web" as Frontend {
+  component "Màn hình quản lý" as Screens
+  component "API client" as ApiClient
+}
+
+package "Backend TMS" as Backend {
+  component "Route" as Route
+  component "Security" as Security
+  component "Controller" as Controller
+
+  package "Module nghiệp vụ" as Modules {
+    component "Account" as Account
+    component "Student" as Student
+    component "Classroom" as Classroom
+    component "Finance" as Finance
+    component "System" as System
+  }
+}
+
+database "Azure Database Server\nCSDL TMS" as DB
+cloud "Discord" as Discord
+cloud "Codeforces" as Codeforces
+
+Teacher --> Screens
+Admin --> Screens
+
+Screens --> ApiClient
+ApiClient --> Route : HTTP request
+Route --> Security
+Security --> Controller
+Controller --> Modules : gọi use case
+
+System ..> Account : quản trị tài khoản\ncấu hình bot
+Student ..> Account : định danh Discord
+Student ..> Classroom : lớp hiện tại\nDiscord lớp
+Student ..> Finance : số dư, phí
+Finance ..> Student : trạng thái học sinh
+Classroom ..> Student : danh sách học sinh\nđiểm danh
+Classroom ..> Finance : phí buổi học
+Classroom ..> Account : Discord bot\nteacher Discord
+
+Account --> DB
+Student --> DB
+Classroom --> DB
+Finance --> DB
+System --> DB
+
+Student --> Discord
+Classroom --> Discord
+Classroom --> Codeforces
+
+@enduml

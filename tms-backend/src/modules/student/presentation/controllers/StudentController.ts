@@ -374,10 +374,17 @@ export class StudentController implements Controller {
 function renderStudentDiscordClosePage(status: string): string {
   const safeStatus = status.replace(/[^a-z0-9_]/gi, '');
   const isSuccess = safeStatus === 'success';
-  const title = isSuccess ? 'Discord authorization completed' : 'Discord authorization received';
+  const isFailed = safeStatus === 'failed';
+  const title = isSuccess
+    ? 'Discord authorization completed'
+    : isFailed
+      ? 'Discord authorization failed'
+      : 'Discord authorization received';
   const message = isSuccess
     ? 'Your Discord account has been connected. This tab will close automatically.'
-    : 'Your Discord authorization was processed. This tab will close automatically.';
+    : isFailed
+      ? 'The Discord authorization could not be completed. Please ask your teacher for a new link and try again.'
+      : 'Your Discord authorization was processed. This tab will close automatically.';
 
   return `<!doctype html>
 <html lang="en">
@@ -402,6 +409,8 @@ function renderStudentDiscordClosePage(status: string): string {
     try {
       if (window.opener) {
         window.opener.postMessage({ type: 'student-discord-authorization', status: '${safeStatus}' }, '*');
+      } else {
+        window.location.replace('/students?discord_student=${safeStatus}');
       }
     } catch (_) {}
     setTimeout(function () {

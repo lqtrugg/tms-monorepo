@@ -1,0 +1,34 @@
+@startmindmap
+skinparam shadowing false
+skinparam wrapWidth 190
+
+* /api
+** /students
+*** /:studentId
+**** /enrollments
+**** /discord
+***** /authorization-url
+***** /invite-current-class
+***** /message
+**** /transfer
+**** /withdraw
+**** /reinstate
+**** /archive
+*** /discord
+**** /messages
+** /classes
+*** /:classId
+**** /details
+**** /archive
+**** /close
+**** /schedules
+**** /sessions
+***** /manual
+**** /discord-guild
+***** /select
+**** /available-gyms
+**** /gyms
+***** /:gymId
+****** /standing
+
+@endmindmap

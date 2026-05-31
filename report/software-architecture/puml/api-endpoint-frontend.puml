@@ -1,0 +1,22 @@
+@startmindmap
+skinparam shadowing false
+skinparam wrapWidth 180
+
+* /
+** /login
+** /dashboard
+** /students
+*** /:id
+** /classes
+*** /:classId
+**** /gyms/:gymId/standing
+** /sessions
+*** /:sessionId
+** /transactions
+** /reports
+*** redirect /transactions
+** /settings
+** /admin
+*** /teachers
+
+@endmindmap

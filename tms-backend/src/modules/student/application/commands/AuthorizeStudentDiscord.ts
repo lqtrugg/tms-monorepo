@@ -47,24 +47,40 @@ export class AuthorizeStudentDiscord {
     }
 
     if (!input.code || !input.state) {
-      throw new HttpError('student discord authorization callback is missing required parameters', 400);
+      return 'failed';
     }
 
     const credential = await this.credentialStore.findDefault();
     if (!credential?.client_id || !credential.client_secret) {
-      throw new HttpError('discord is not available right now', 503);
+      return 'failed';
     }
 
-    const authState = verifyStudentDiscordAuthorizationState(input.state);
+    let authState: ReturnType<typeof verifyStudentDiscordAuthorizationState>;
+    try {
+      authState = verifyStudentDiscordAuthorizationState(input.state);
+    } catch {
+      return 'unauthorized';
+    }
 
     const redirectUri = discordApiUrl('/discord/student/callback');
-    const tokenSet = await exchangeStudentDiscordCode({
-      code: input.code,
-      clientId: credential.client_id,
-      clientSecret: credential.client_secret,
-      redirectUri,
-    });
-    const discordUser = await fetchStudentDiscordUser(tokenSet.accessToken);
+    let tokenSet: Awaited<ReturnType<typeof exchangeStudentDiscordCode>>;
+    let discordUser: Awaited<ReturnType<typeof fetchStudentDiscordUser>>;
+
+    try {
+      tokenSet = await exchangeStudentDiscordCode({
+        code: input.code,
+        clientId: credential.client_id,
+        clientSecret: credential.client_secret,
+        redirectUri,
+      });
+      discordUser = await fetchStudentDiscordUser(tokenSet.accessToken);
+    } catch (error) {
+      console.error('[student-discord-authorization] failed to complete OAuth callback', {
+        error: error instanceof Error ? error.message : String(error),
+        redirectUri,
+      });
+      return 'failed';
+    }
 
     const updated = await this.repository.updateStudentDiscordAuthorization({
       teacherId: authState.teacher_id,

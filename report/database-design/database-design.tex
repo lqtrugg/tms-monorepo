@@ -1,0 +1,415 @@
+\documentclass[12pt,a4paper]{article}
+
+%!TEX program = pdflatex
+
+% =============================================================================
+% 1. PHÔNG CHỮ & NGÔN NGỮ (Hỗ trợ Tiếng Việt)
+% =============================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usepackage[vietnamese]{babel}
+
+% =============================================================================
+% 2. BỐ CỤC TRANG (LAYOUT)
+% =============================================================================
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+% =============================================================================
+% 3. ĐỒ HỌA & BIỂU ĐỒ
+% =============================================================================
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric}
+
+% =============================================================================
+% 4. BẢNG BIỂU & DANH SÁCH
+% =============================================================================
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{longtable}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{tabularx}
+\usepackage{makecell}
+\usepackage{colortbl}
+
+% =============================================================================
+% 5. TIỆN ÍCH VĂN BẢN & LIÊN KẾT
+% =============================================================================
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{xurl}
+\usepackage{seqsplit}
+\usepackage{hyperref}
+
+\hypersetup{
+    colorlinks=false,
+    hidelinks,
+    pdftitle={Thiết kế cơ sở dữ liệu hệ thống TMS},
+    pdfauthor={Tên của bạn}
+}
+
+% =============================================================================
+% 6. ĐỊNH DẠNG ĐOẠN VĂN & ĐÁNH SỐ MỤC
+% =============================================================================
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setcounter{secnumdepth}{3}
+
+\renewcommand{\thesection}{\Roman{section}}
+\renewcommand{\thesubsection}{\arabic{subsection}}
+\renewcommand{\thesubsubsection}{\thesubsection.\arabic{subsubsection}}
+
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}{\normalsize\itshape\bfseries}{\thesubsubsection.}{0.5em}{}
+
+\titleformat{\paragraph}[block]{\normalsize\bfseries}{}{0pt}{}
+\titlespacing*{\paragraph}{0pt}{6pt}{0pt}
+
+% =============================================================================
+% 7. MỤC LỤC (TOC)
+% =============================================================================
+\renewcommand{\cftsecaftersnum}{.}
+\renewcommand{\cftsubsecaftersnum}{.}
+\renewcommand{\cftsubsubsecaftersnum}{.}
+
+% =============================================================================
+% 8. CUSTOM COMMANDS & COLUMN TYPES
+% =============================================================================
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\subsubsubsection}[1]{\paragraph{#1}}
+\newcommand{\tablesetup}{\small\setlength{\tabcolsep}{3pt}\renewcommand{\arraystretch}{1.2}}
+\newcommand{\code}[1]{{\ttfamily\seqsplit{#1}}}
+\newcommand{\datetimeoffset}{\makecell{DATETIME\\OFFSET}}
+
+\begin{document}
+
+\section{Thiết kế cơ sở dữ liệu}
+
+Phần này mô tả thiết kế cơ sở dữ liệu của hệ thống Tutor Management System
+(TMS). Nội dung tập trung vào các lớp đối tượng được lưu trữ, quan hệ giữa
+chúng và ý nghĩa của từng lớp trong dữ liệu nghiệp vụ.
+
+\subsection{Sơ đồ lớp}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.98\textwidth,height=0.78\textheight,keepaspectratio]{diagrams/so-do-lop-co-so-du-lieu.png}
+    \caption{Sơ đồ lớp dữ liệu của hệ thống TMS}
+\end{figure}
+
+Sơ đồ lớp thể hiện các đối tượng chính trong cơ sở dữ liệu. Các lớp trung tâm
+là \code{Teacher}, \code{Student}, \code{Class}, \code{Session},
+\code{Attendance}, \code{Transaction} và \code{FeeRecord}. Các lớp còn lại lưu
+thông tin tích hợp Discord, Codeforces và cấu hình vận hành.
+
+\subsection{Danh sách các lớp đối tượng}
+
+\begin{longtable}{C{1cm} L{4.3cm} L{9.2cm}}
+\toprule
+\textbf{STT} & \textbf{Tên lớp} & \textbf{Mô tả} \\
+\midrule
+\endhead
+1 & \code{teachers} & Lưu tài khoản giáo viên, trạng thái hoạt động và thông tin Discord đã xác minh. \\
+2 & \code{teacher\_codeforces\_credential} & Lưu thông tin Codeforces API của giáo viên. \\
+3 & \code{discord\_bot\_credentials} & Lưu cấu hình bot Discord dùng chung cho hệ thống. \\
+4 & \code{students} & Lưu hồ sơ học sinh thuộc một giáo viên. \\
+5 & \code{student\_discord\_credential} & Lưu thông tin liên kết Discord của học sinh. \\
+6 & \code{classes} & Lưu lớp học, học phí mỗi buổi và trạng thái lớp. \\
+7 & \code{enrollments} & Lưu lịch sử ghi danh học sinh vào lớp. \\
+8 & \code{class\_schedules} & Lưu lịch học cố định của lớp theo ngày trong tuần. \\
+9 & \code{sessions} & Lưu buổi học cụ thể của một lớp. \\
+10 & \code{attendance} & Lưu kết quả điểm danh học sinh trong buổi học. \\
+11 & \code{transactions} & Lưu giao dịch tài chính của học sinh. \\
+12 & \code{fee\_records} & Lưu khoản phí phát sinh từ buổi học. \\
+13 & \code{class\_discord\_bindings} & Lưu liên kết lớp học với Discord guild và channel. \\
+14 & \code{gyms} & Lưu bài luyện tập Codeforces Gym gắn với giáo viên hoặc lớp. \\
+15 & \code{gym\_problems} & Lưu danh sách bài trong một Gym. \\
+16 & \code{gym\_standings} & Lưu kết quả làm bài của học sinh trong Gym. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Danh sách các quan hệ}
+
+\begin{table}[H]
+\small
+\begin{tabularx}{\textwidth}{C{1cm} L{4.4cm} Y}
+\toprule
+\textbf{STT} & \textbf{Tên quan hệ} & \textbf{Mô tả} \\
+\midrule
+1 & Giáo viên -- Học sinh & Quan hệ 1--n: một giáo viên (\code{teachers}) quản lý nhiều học sinh (\code{students}). \\
+2 & Giáo viên -- Lớp học & Quan hệ 1--n: một giáo viên quản lý nhiều lớp học (\code{classes}). \\
+3 & Giáo viên -- Codeforces credential & Quan hệ 1--0..1: một giáo viên có tối đa một cấu hình Codeforces. \\
+4 & Học sinh -- Discord credential & Quan hệ 1--0..1: một học sinh có tối đa một liên kết Discord. \\
+5 & Học sinh -- Ghi danh & Quan hệ 1--n: một học sinh có nhiều bản ghi ghi danh (\code{enrollments}) theo thời gian. \\
+6 & Lớp học -- Ghi danh & Quan hệ 1--n: một lớp có nhiều học sinh được ghi danh qua bảng \code{enrollments}. \\
+7 & Lớp học -- Lịch học & Quan hệ 1--n: một lớp có nhiều lịch học cố định trong tuần. \\
+8 & Lớp học -- Buổi học & Quan hệ 1--n: một lớp sinh ra nhiều buổi học (\code{sessions}). \\
+9 & Buổi học -- Điểm danh & Quan hệ 1--n: một buổi học có nhiều bản ghi điểm danh. \\
+10 & Học sinh -- Điểm danh & Quan hệ 1--n: một học sinh có nhiều bản ghi điểm danh theo các buổi học. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\small
+\begin{tabularx}{\textwidth}{C{1cm} L{4.4cm} Y}
+\toprule
+\textbf{STT} & \textbf{Tên quan hệ} & \textbf{Mô tả} \\
+\midrule
+11 & Học sinh -- Giao dịch & Quan hệ 1--n: một học sinh có nhiều giao dịch tài chính. \\
+12 & Học sinh -- Khoản phí & Quan hệ 1--n: một học sinh có nhiều khoản phí phát sinh. \\
+13 & Buổi học -- Khoản phí & Quan hệ 1--n: một buổi học có thể sinh nhiều khoản phí cho học sinh tham gia. \\
+14 & Ghi danh -- Khoản phí & Quan hệ 1--n: khoản phí gắn với bản ghi ghi danh tại thời điểm phát sinh. \\
+15 & Lớp học -- Discord binding & Quan hệ 1--0..1: một lớp có tối đa một cấu hình Discord guild. \\
+16 & Lớp học -- Gym & Quan hệ 1--n: một lớp có thể được gắn nhiều Codeforces Gym. \\
+17 & Gym -- Bài tập & Quan hệ 1--n: một Gym có nhiều bài tập (\code{gym\_problems}). \\
+18 & Gym -- Kết quả & Quan hệ 1--n: một Gym có nhiều dòng kết quả (\code{gym\_standings}). \\
+19 & Học sinh -- Kết quả Gym & Quan hệ 1--n: một học sinh có nhiều kết quả trong Gym. \\
+20 & Bài tập -- Kết quả Gym & Quan hệ 1--n: một bài tập có nhiều kết quả theo học sinh. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Mô tả từng lớp đối tượng}
+
+\subsubsection{Lớp teachers}
+\begin{table}[H]\small\begin{tabularx}{\textwidth}{C{0.8cm} L{3cm} L{2.6cm} L{3cm} Y}
+\toprule
+\textbf{STT} & \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+\midrule
+1 & \code{id} & INT & PK, Auto Inc & Mã định danh giáo viên. \\
+2 & \code{username} & VARCHAR(100) & NOT NULL, UNIQUE & Tên đăng nhập. \\
+3 & \code{password\_hash} & TEXT & NOT NULL & Mật khẩu đã băm. \\
+4 & \code{is\_active} & BIT & DEFAULT true & Trạng thái tài khoản. \\
+5 & \code{discord\_user\_id} & VARCHAR(64) & NULL & Định danh Discord của giáo viên. \\
+6 & \code{created\_at} & \datetimeoffset & DEFAULT now & Thời điểm tạo tài khoản. \\
+\bottomrule
+\end{tabularx}\end{table}
+
+\subsubsection{Lớp teacher\_codeforces\_credential}
+\begin{table}[H]\small\begin{tabularx}{\textwidth}{C{0.8cm} L{3cm} L{2.6cm} L{3cm} Y}
+\toprule
+\textbf{STT} & \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+\midrule
+1 & \code{id} & INT & PK, Auto Inc & Mã bản ghi credential. \\
+2 & \code{teacher\_id} & INT & FK, UNIQUE & Giáo viên sở hữu credential. \\
+3 & \code{codeforces\_handle} & VARCHAR(100) & NULL & Handle Codeforces của giáo viên. \\
+4 & \code{codeforces\_api\_key} & TEXT & NULL, encrypted & API key Codeforces. \\
+5 & \code{codeforces\_api\_secret} & TEXT & NULL, encrypted & API secret Codeforces. \\
+6 & \code{updated\_at} & \datetimeoffset & DEFAULT now & Thời điểm cập nhật credential. \\
+\bottomrule
+\end{tabularx}\end{table}
+
+\subsubsection{Lớp discord\_bot\_credentials}
+\begin{table}[H]\small\begin{tabularx}{\textwidth}{C{0.8cm} L{3cm} L{2.6cm} L{3cm} Y}
+\toprule
+\textbf{STT} & \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+\midrule
+1 & \code{id} & INT & PK, Auto Inc & Mã cấu hình bot. \\
+2 & \code{singleton\_key} & VARCHAR(32) & UNIQUE & Khóa bảo đảm chỉ có một cấu hình mặc định. \\
+3 & \code{bot\_token} & TEXT & NOT NULL, encrypted & Token bot Discord. \\
+4 & \code{client\_id} & VARCHAR(64) & NOT NULL & Client ID của Discord application. \\
+5 & \code{client\_secret} & TEXT & encrypted & Client secret của Discord application. \\
+6 & \code{bot\_health\_status} & VARCHAR(16) & DEFAULT unknown & Trạng thái kiểm tra bot. \\
+\bottomrule
+\end{tabularx}\end{table}
+
+\subsubsection{Lớp students}
+\begin{table}[H]\small\begin{tabularx}{\textwidth}{C{0.8cm} L{3cm} L{2.6cm} L{3cm} Y}
+\toprule
+\textbf{STT} & \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+\midrule
+1 & \code{id} & INT & PK, Auto Inc & Mã học sinh. \\
+2 & \code{teacher\_id} & INT & FK, NOT NULL & Giáo viên quản lý học sinh. \\
+3 & \code{full\_name} & VARCHAR(255) & NOT NULL & Họ tên học sinh. \\
+4 & \code{codeforces\_handle} & VARCHAR(100) & UNIQUE theo giáo viên, NULL & Handle Codeforces của học sinh. \\
+5 & \code{phone} & VARCHAR(20) & NULL & Số điện thoại. \\
+6 & \code{status} & ENUM & DEFAULT active & Trạng thái học sinh. \\
+7 & \code{archived\_at} & \datetimeoffset & NULL & Thời điểm lưu trữ học sinh. \\
+\bottomrule
+\end{tabularx}\end{table}
+
+\subsubsection{Lớp student\_discord\_credential}
+\begin{table}[H]\small\begin{tabularx}{\textwidth}{C{0.8cm} L{3cm} L{2.6cm} L{3cm} Y}
+\toprule
+\textbf{STT} & \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+\midrule
+1 & \code{id} & INT & PK, Auto Inc & Mã liên kết Discord. \\
+2 & \code{student\_id} & INT & FK, UNIQUE & Học sinh được liên kết. \\
+3 & \code{discord\_username} & NVARCHAR(100) & NULL & Tên hiển thị Discord. \\
+4 & \code{discord\_user\_id} & VARCHAR(50) & NULL, INDEX & ID người dùng Discord. \\
+5 & \code{guild\_id} & VARCHAR(50) & NULL, INDEX & Discord guild đang liên kết. \\
+6 & \code{discord\_authorized\_at} & \datetimeoffset & NULL & Thời điểm học sinh cấp quyền Discord. \\
+\bottomrule
+\end{tabularx}\end{table}
+
+\subsubsection{Lớp classes}
+\begin{table}[H]\small\begin{tabularx}{\textwidth}{C{0.8cm} L{3cm} L{2.6cm} L{3cm} Y}
+\toprule
+\textbf{STT} & \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+\midrule
+1 & \code{id} & INT & PK, Auto Inc & Mã lớp học. \\
+2 & \code{teacher\_id} & INT & FK, NOT NULL & Giáo viên sở hữu lớp. \\
+3 & \code{name} & VARCHAR(255) & NOT NULL & Tên lớp học. \\
+4 & \code{fee\_per\_session} & NUMERIC(12,0) & CHECK >= 0 & Học phí mỗi buổi. \\
+5 & \code{status} & ENUM & DEFAULT active & Trạng thái lớp. \\
+6 & \code{archived\_at} & \datetimeoffset & NULL & Thời điểm lưu trữ lớp. \\
+\bottomrule
+\end{tabularx}\end{table}
+
+\subsubsection{Lớp enrollments}
+\begin{table}[H]\small\begin{tabularx}{\textwidth}{C{0.8cm} L{3cm} L{2.6cm} L{3cm} Y}
+\toprule
+\textbf{STT} & \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+\midrule
+1 & \code{id} & INT & PK, Auto Inc & Mã ghi danh. \\
+2 & \code{teacher\_id} & INT & FK, NOT NULL & Giáo viên sở hữu dữ liệu. \\
+3 & \code{student\_id} & INT & FK, NOT NULL & Học sinh được ghi danh. \\
+4 & \code{class\_id} & INT & FK, NOT NULL & Lớp được ghi danh. \\
+5 & \code{enrolled\_at} & \datetimeoffset & DEFAULT now & Thời điểm vào lớp. \\
+6 & \code{unenrolled\_at} & \datetimeoffset & NULL, CHECK & Thời điểm rút khỏi lớp. \\
+\bottomrule
+\end{tabularx}\end{table}
+
+\subsubsection{Lớp class\_schedules}
+\begin{table}[H]\small\begin{tabularx}{\textwidth}{C{0.8cm} L{3cm} L{2.6cm} L{3cm} Y}
+\toprule
+\textbf{STT} & \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+\midrule
+1 & \code{id} & INT & PK, Auto Inc & Mã lịch học. \\
+2 & \code{teacher\_id} & INT & FK, NOT NULL & Giáo viên sở hữu dữ liệu. \\
+3 & \code{class\_id} & INT & FK, NOT NULL & Lớp áp dụng lịch học. \\
+4 & \code{day\_of\_week} & SMALLINT & CHECK 0--6 & Ngày học trong tuần. \\
+5 & \code{start\_time} & TIME & NOT NULL & Giờ bắt đầu. \\
+6 & \code{end\_time} & TIME & CHECK > start & Giờ kết thúc. \\
+\bottomrule
+\end{tabularx}\end{table}
+
+\subsubsection{Lớp sessions}
+\begin{table}[H]\small\begin{tabularx}{\textwidth}{C{0.8cm} L{3cm} L{2.6cm} L{3cm} Y}
+\toprule
+\textbf{STT} & \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+\midrule
+1 & \code{id} & INT & PK, Auto Inc & Mã buổi học. \\
+2 & \code{teacher\_id} & INT & FK, NOT NULL & Giáo viên sở hữu dữ liệu. \\
+3 & \code{class\_id} & INT & FK, NOT NULL & Lớp của buổi học. \\
+4 & \code{scheduled\_at} & \datetimeoffset & NOT NULL & Thời điểm bắt đầu buổi học. \\
+5 & \code{end\_time} & TIME & NULL, CHECK & Giờ kết thúc nếu có. \\
+6 & \code{status} & ENUM & DEFAULT scheduled & Trạng thái buổi học. \\
+7 & \code{cancelled\_at} & \datetimeoffset & NULL & Thời điểm hủy buổi học. \\
+\bottomrule
+\end{tabularx}\end{table}
+
+\subsubsection{Lớp attendance}
+\begin{table}[H]\small\begin{tabularx}{\textwidth}{C{0.8cm} L{3cm} L{2.6cm} L{3cm} Y}
+\toprule
+\textbf{STT} & \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+\midrule
+1 & \code{id} & INT & PK, Auto Inc & Mã điểm danh. \\
+2 & \code{teacher\_id} & INT & FK, NOT NULL & Giáo viên sở hữu dữ liệu. \\
+3 & \code{session\_id} & INT & FK, UNIQUE theo student & Buổi học được điểm danh. \\
+4 & \code{student\_id} & INT & FK, UNIQUE theo session & Học sinh được điểm danh. \\
+5 & \code{status} & ENUM & NOT NULL & Kết quả điểm danh. \\
+6 & \code{source} & ENUM & DEFAULT system & Nguồn tạo điểm danh. \\
+7 & \code{overridden\_at} & \datetimeoffset & NULL, CHECK & Thời điểm giáo viên ghi đè. \\
+\bottomrule
+\end{tabularx}\end{table}
+
+\subsubsection{Lớp transactions}
+\begin{table}[H]\small\begin{tabularx}{\textwidth}{C{0.8cm} L{3cm} L{2.6cm} L{3cm} Y}
+\toprule
+\textbf{STT} & \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+\midrule
+1 & \code{id} & INT & PK, Auto Inc & Mã giao dịch. \\
+2 & \code{teacher\_id} & INT & FK, NOT NULL & Giáo viên sở hữu dữ liệu. \\
+3 & \code{student\_id} & INT & FK, NOT NULL & Học sinh phát sinh giao dịch. \\
+4 & \code{amount} & NUMERIC(12,0) & CHECK != 0 & Số tiền giao dịch. \\
+5 & \code{type} & ENUM & CHECK dấu amount & Loại giao dịch: payment hoặc refund. \\
+6 & \code{recorded\_at} & \datetimeoffset & DEFAULT now & Thời điểm ghi nhận giao dịch. \\
+7 & \code{notes} & NVARCHAR(MAX) & NULL & Ghi chú giao dịch. \\
+\bottomrule
+\end{tabularx}\end{table}
+
+\subsubsection{Lớp fee\_records}
+\begin{table}[H]\small\begin{tabularx}{\textwidth}{C{0.8cm} L{3cm} L{2.6cm} L{3cm} Y}
+\toprule
+\textbf{STT} & \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+\midrule
+1 & \code{id} & INT & PK, Auto Inc & Mã khoản phí. \\
+2 & \code{teacher\_id} & INT & FK, NOT NULL & Giáo viên sở hữu dữ liệu. \\
+3 & \code{student\_id} & INT & FK, UNIQUE theo session & Học sinh chịu phí. \\
+4 & \code{session\_id} & INT & FK, UNIQUE theo student & Buổi học phát sinh phí. \\
+5 & \code{enrollment\_id} & INT & FK, NOT NULL & Bản ghi ghi danh liên quan. \\
+6 & \code{amount} & NUMERIC(12,0) & CHECK > 0 & Số tiền phải thu. \\
+7 & \code{status} & ENUM & DEFAULT active & Trạng thái khoản phí. \\
+\bottomrule
+\end{tabularx}\end{table}
+
+\subsubsection{Lớp class\_discord\_bindings}
+\begin{table}[H]\small\begin{tabularx}{\textwidth}{C{0.8cm} L{3cm} L{2.6cm} L{3cm} Y}
+\toprule
+\textbf{STT} & \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+\midrule
+1 & \code{id} & INT & PK, Auto Inc & Mã cấu hình Discord của lớp. \\
+2 & \code{teacher\_id} & INT & FK, NOT NULL & Giáo viên sở hữu cấu hình. \\
+3 & \code{class\_id} & INT & FK, UNIQUE & Lớp được liên kết Discord. \\
+4 & \code{discord\_guild\_id} & VARCHAR(50) & UNIQUE theo teacher & Discord guild của lớp. \\
+5 & \code{name} & NVARCHAR(255) & NULL & Tên guild. \\
+6 & \code{attendance\_voice\_channel\_id} & VARCHAR(50) & NULL & Voice channel dùng để điểm danh. \\
+7 & \code{notification\_channel\_id} & VARCHAR(50) & NULL & Channel gửi thông báo. \\
+\bottomrule
+\end{tabularx}\end{table}
+
+\subsubsection{Lớp gyms}
+\begin{table}[H]\small\begin{tabularx}{\textwidth}{C{0.8cm} L{3cm} L{2.6cm} L{3cm} Y}
+\toprule
+\textbf{STT} & \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+\midrule
+1 & \code{id} & INT & PK, Auto Inc & Mã Gym nội bộ. \\
+2 & \code{teacher\_id} & INT & FK, NOT NULL & Giáo viên sở hữu Gym. \\
+3 & \code{class\_id} & INT & FK, NULL & Lớp được gắn Gym nếu có. \\
+4 & \code{title} & VARCHAR(255) & NOT NULL & Tiêu đề Gym. \\
+5 & \code{gym\_link} & TEXT & NOT NULL & Đường dẫn Gym trên Codeforces. \\
+6 & \code{gym\_id} & VARCHAR(50) & UNIQUE theo phạm vi & Mã Gym trên Codeforces. \\
+7 & \code{pull\_interval\_minutes} & INT & CHECK > 0 & Chu kỳ đồng bộ kết quả. \\
+\bottomrule
+\end{tabularx}\end{table}
+
+\subsubsection{Lớp gym\_problems}
+\begin{table}[H]\small\begin{tabularx}{\textwidth}{C{0.8cm} L{3cm} L{2.6cm} L{3cm} Y}
+\toprule
+\textbf{STT} & \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+\midrule
+1 & \code{id} & INT & PK, Auto Inc & Mã bài tập. \\
+2 & \code{teacher\_id} & INT & FK, NOT NULL & Giáo viên sở hữu dữ liệu. \\
+3 & \code{topic\_id} & INT & FK, NOT NULL & Gym chứa bài tập. \\
+4 & \code{problem\_index} & VARCHAR(10) & UNIQUE theo Gym & Chỉ số bài trong Gym. \\
+5 & \code{problem\_name} & NVARCHAR(255) & NULL & Tên bài tập. \\
+\bottomrule
+\end{tabularx}\end{table}
+
+\subsubsection{Lớp gym\_standings}
+\begin{table}[H]\small\begin{tabularx}{\textwidth}{C{0.8cm} L{3cm} L{2.6cm} L{3cm} Y}
+\toprule
+\textbf{STT} & \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+\midrule
+1 & \code{id} & INT & PK, Auto Inc & Mã kết quả Gym. \\
+2 & \code{teacher\_id} & INT & FK, NOT NULL & Giáo viên sở hữu dữ liệu. \\
+3 & \code{topic\_id} & INT & FK, UNIQUE theo student/problem & Gym chứa kết quả. \\
+4 & \code{student\_id} & INT & FK, UNIQUE theo topic/problem & Học sinh có kết quả. \\
+5 & \code{problem\_id} & INT & FK, UNIQUE theo topic/student & Bài tập tương ứng. \\
+6 & \code{solved} & BIT & DEFAULT false & Học sinh đã giải bài hay chưa. \\
+7 & \code{penalty\_minutes} & INT & NULL & Thời gian phạt nếu có. \\
+8 & \code{pulled\_at} & \datetimeoffset & DEFAULT now & Thời điểm kéo kết quả. \\
+\bottomrule
+\end{tabularx}\end{table}
+
+\end{document}

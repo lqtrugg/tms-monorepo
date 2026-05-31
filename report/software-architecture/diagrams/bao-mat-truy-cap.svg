@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="760" viewBox="0 0 1800 760">
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#111"/>
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.12"/>
+    </filter>
+    <linearGradient id="blue" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#eef5ff"/>
+      <stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f1fbef"/>
+      <stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+    <linearGradient id="orange" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#fff7e8"/>
+      <stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1800" height="760" fill="#fff"/>
+  <g font-family="Arial, Helvetica, sans-serif" fill="#111">
+    <rect x="30" y="95" width="190" height="390" rx="8" fill="url(#blue)" stroke="#86a9db" stroke-width="2"/>
+    <text x="125" y="128" font-size="19" font-weight="700" text-anchor="middle">1. Frontend</text>
+    <rect x="62" y="185" width="126" height="90" rx="6" fill="#fff" stroke="#24529b" stroke-width="3"/>
+    <circle cx="125" cy="230" r="30" fill="none" stroke="#24529b" stroke-width="4"/>
+    <path d="M95 230 H155 M125 200 C142 218 142 242 125 260 M125 200 C108 218 108 242 125 260" fill="none" stroke="#24529b" stroke-width="3"/>
+    <text x="125" y="340" font-size="18" text-anchor="middle">Gửi request</text>
+    <text x="125" y="370" font-size="18" text-anchor="middle">kèm JWT</text>
+
+    <rect x="300" y="95" width="170" height="390" rx="8" fill="url(#blue)" stroke="#86a9db" stroke-width="2"/>
+    <text x="385" y="128" font-size="19" font-weight="700" text-anchor="middle">2. Route</text>
+    <rect x="342" y="190" width="82" height="95" rx="8" fill="#fff" stroke="#555" stroke-width="3"/>
+    <circle cx="418" cy="260" r="25" fill="#fff" stroke="#555" stroke-width="3"/>
+    <text x="418" y="268" font-size="18" font-weight="700" text-anchor="middle">API</text>
+    <text x="385" y="350" font-size="18" text-anchor="middle">Backend</text>
+    <text x="385" y="380" font-size="18" text-anchor="middle">endpoint</text>
+
+    <rect x="540" y="45" width="850" height="555" rx="10" fill="none" stroke="#86a9db" stroke-width="2" stroke-dasharray="8 6"/>
+    <text x="965" y="74" font-size="20" font-weight="700" fill="#2f5597" text-anchor="middle">Middleware bảo mật Backend</text>
+
+    <rect x="560" y="95" width="180" height="390" rx="8" fill="url(#green)" stroke="#8bbd83" stroke-width="2"/>
+    <text x="650" y="128" font-size="18" font-weight="700" text-anchor="middle">3. Xác thực JWT</text>
+    <path d="M650 180 L710 205 V265 C710 300 682 326 650 340 C618 326 590 300 590 265 V205 Z" fill="#f8fff7" stroke="#4f8c4f" stroke-width="3"/>
+    <rect x="633" y="235" width="34" height="38" rx="4" fill="#4f8c4f"/>
+    <path d="M640 235 V222 C640 208 660 208 660 222 V235" fill="none" stroke="#4f8c4f" stroke-width="5"/>
+    <text x="650" y="390" font-size="16" text-anchor="middle">Kiểm tra token</text>
+
+    <rect x="760" y="95" width="190" height="390" rx="8" fill="url(#green)" stroke="#8bbd83" stroke-width="2"/>
+    <text x="855" y="125" font-size="18" font-weight="700" text-anchor="middle">4. Request Context</text>
+    <text x="855" y="151" font-size="18" font-weight="700" text-anchor="middle">Principal</text>
+    <circle cx="855" cy="220" r="24" fill="#54a354"/>
+    <path d="M815 300 C822 250 888 250 895 300 Z" fill="#54a354"/>
+    <rect x="885" y="245" width="35" height="55" rx="3" fill="#fff" stroke="#4f8c4f" stroke-width="3"/>
+    <text x="855" y="356" font-size="16" text-anchor="middle">teacher_id</text>
+    <text x="855" y="383" font-size="16" text-anchor="middle">role</text>
+    <text x="855" y="410" font-size="16" text-anchor="middle">account_status</text>
+
+    <rect x="970" y="95" width="190" height="390" rx="8" fill="url(#green)" stroke="#8bbd83" stroke-width="2"/>
+    <text x="1065" y="126" font-size="18" font-weight="700" text-anchor="middle">5. RBAC</text>
+    <text x="1065" y="152" font-size="18" font-weight="700" text-anchor="middle">Kiểm tra vai trò</text>
+    <circle cx="1038" cy="225" r="18" fill="#fff" stroke="#4f8c4f" stroke-width="3"/>
+    <circle cx="1090" cy="225" r="18" fill="#fff" stroke="#4f8c4f" stroke-width="3"/>
+    <path d="M1000 305 C1008 258 1068 258 1076 305 Z" fill="#fff" stroke="#4f8c4f" stroke-width="3"/>
+    <path d="M1054 305 C1062 258 1122 258 1130 305 Z" fill="#fff" stroke="#4f8c4f" stroke-width="3"/>
+    <text x="1065" y="375" font-size="16" text-anchor="middle">teacher / admin</text>
+
+    <rect x="1180" y="95" width="190" height="390" rx="8" fill="url(#green)" stroke="#8bbd83" stroke-width="2"/>
+    <text x="1275" y="126" font-size="18" font-weight="700" text-anchor="middle">6. Ownership</text>
+    <text x="1275" y="152" font-size="18" font-weight="700" text-anchor="middle">Kiểm tra sở hữu</text>
+    <circle cx="1265" cy="218" r="20" fill="#fff" stroke="#4f8c4f" stroke-width="3"/>
+    <path d="M1225 300 C1233 250 1297 250 1305 300 Z" fill="#fff" stroke="#4f8c4f" stroke-width="3"/>
+    <circle cx="1325" cy="262" r="14" fill="none" stroke="#4f8c4f" stroke-width="4"/>
+    <line x1="1293" y1="285" x2="1320" y2="267" stroke="#4f8c4f" stroke-width="5"/>
+    <text x="1275" y="365" font-size="16" text-anchor="middle">student / class</text>
+    <text x="1275" y="392" font-size="16" text-anchor="middle">session / finance</text>
+
+    <rect x="1420" y="95" width="160" height="390" rx="8" fill="url(#orange)" stroke="#d9a53c" stroke-width="2"/>
+    <text x="1500" y="128" font-size="19" font-weight="700" text-anchor="middle">7. Controller</text>
+    <circle cx="1500" cy="260" r="24" fill="none" stroke="#c48025" stroke-width="6"/>
+    <path d="M1500 200 V224 M1500 296 V320 M1440 260 H1464 M1536 260 H1560 M1458 218 L1475 235 M1525 285 L1542 302 M1458 302 L1475 285 M1525 235 L1542 218" stroke="#c48025" stroke-width="6"/>
+    <text x="1500" y="360" font-size="16" text-anchor="middle">Validate input</text>
+    <text x="1500" y="388" font-size="16" text-anchor="middle">Gọi use case</text>
+
+    <rect x="1610" y="95" width="160" height="390" rx="8" fill="url(#orange)" stroke="#d9a53c" stroke-width="2"/>
+    <text x="1690" y="128" font-size="19" font-weight="700" text-anchor="middle">8. Use case</text>
+    <rect x="1650" y="235" width="80" height="60" rx="6" fill="none" stroke="#a45f20" stroke-width="4"/>
+    <path d="M1668 235 V216 H1712 V235" fill="none" stroke="#a45f20" stroke-width="4"/>
+    <text x="1690" y="360" font-size="16" text-anchor="middle">Xử lý nghiệp vụ</text>
+    <text x="1690" y="388" font-size="16" text-anchor="middle">Thao tác dữ liệu</text>
+
+    <line x1="220" y1="290" x2="300" y2="290" stroke="#111" stroke-width="2.4" marker-end="url(#arrow)"/>
+    <line x1="470" y1="290" x2="560" y2="290" stroke="#111" stroke-width="2.4" marker-end="url(#arrow)"/>
+    <line x1="740" y1="290" x2="760" y2="290" stroke="#111" stroke-width="2.4" marker-end="url(#arrow)"/>
+    <line x1="950" y1="290" x2="970" y2="290" stroke="#111" stroke-width="2.4" marker-end="url(#arrow)"/>
+    <line x1="1160" y1="290" x2="1180" y2="290" stroke="#111" stroke-width="2.4" marker-end="url(#arrow)"/>
+    <line x1="1370" y1="290" x2="1420" y2="290" stroke="#111" stroke-width="2.4" marker-end="url(#arrow)"/>
+    <line x1="1580" y1="290" x2="1610" y2="290" stroke="#111" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+    <rect x="595" y="520" width="160" height="70" rx="7" fill="#fff5f5" stroke="#ef8b82" stroke-width="2"/>
+    <text x="675" y="545" font-size="15" font-weight="700" fill="#c0392b" text-anchor="middle">401 Unauthorized</text>
+    <text x="675" y="570" font-size="14" fill="#c0392b" text-anchor="middle">JWT không hợp lệ</text>
+    <line x1="650" y1="485" x2="650" y2="520" stroke="#c0392b" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <rect x="990" y="520" width="160" height="70" rx="7" fill="#fff5f5" stroke="#ef8b82" stroke-width="2"/>
+    <text x="1070" y="545" font-size="15" font-weight="700" fill="#c0392b" text-anchor="middle">403 Forbidden</text>
+    <text x="1070" y="570" font-size="14" fill="#c0392b" text-anchor="middle">Sai vai trò</text>
+    <line x1="1065" y1="485" x2="1065" y2="520" stroke="#c0392b" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <rect x="1205" y="520" width="160" height="70" rx="7" fill="#fff5f5" stroke="#ef8b82" stroke-width="2"/>
+    <text x="1285" y="545" font-size="15" font-weight="700" fill="#c0392b" text-anchor="middle">403 Forbidden</text>
+    <text x="1285" y="570" font-size="14" fill="#c0392b" text-anchor="middle">Sai ownership</text>
+    <line x1="1275" y1="485" x2="1275" y2="520" stroke="#c0392b" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <rect x="1625" y="540" width="130" height="65" rx="7" fill="#f2fff2" stroke="#8bbd83" stroke-width="2"/>
+    <text x="1690" y="567" font-size="16" font-weight="700" fill="#2d7d36" text-anchor="middle">200 OK</text>
+    <text x="1690" y="592" font-size="14" fill="#2d7d36" text-anchor="middle">Thành công</text>
+    <line x1="1690" y1="485" x2="1690" y2="540" stroke="#111" stroke-width="2" marker-end="url(#arrow)"/>
+  </g>
+</svg>

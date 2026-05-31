@@ -84,12 +84,61 @@ async function dropUserTables(): Promise<void> {
   }
 }
 
+async function ensureSessionTimeRangeConstraint(): Promise<void> {
+  const resetDataSource = new DataSource({
+    ...dataSourceOptions,
+    entities: [],
+    synchronize: false,
+    dropSchema: false,
+    logging: false,
+  } as DataSourceOptions);
+
+  await resetDataSource.initialize();
+
+  try {
+    const sessionsTable = await resetDataSource.query(`
+      SELECT OBJECT_ID(N'[dbo].[sessions]', N'U') AS object_id
+    `) as Array<{ object_id: number | null }>;
+
+    if (!sessionsTable[0]?.object_id) {
+      return;
+    }
+
+    const constraints = await resetDataSource.query(`
+      SELECT definition
+      FROM sys.check_constraints
+      WHERE parent_object_id = OBJECT_ID(N'[dbo].[sessions]')
+        AND name = N'chk_sessions_time_range'
+    `) as Array<{ definition: string }>;
+
+    const currentDefinition = constraints[0]?.definition ?? '';
+    if (currentDefinition.includes('SWITCHOFFSET')) {
+      return;
+    }
+
+    if (constraints.length > 0) {
+      await resetDataSource.query(`
+        ALTER TABLE [dbo].[sessions] DROP CONSTRAINT [chk_sessions_time_range]
+      `);
+    }
+
+    await resetDataSource.query(`
+      ALTER TABLE [dbo].[sessions]
+      ADD CONSTRAINT [chk_sessions_time_range]
+      CHECK (end_time IS NULL OR end_time > CAST(SWITCHOFFSET(scheduled_at, '+07:00') AS time))
+    `);
+  } finally {
+    await resetDataSource.destroy();
+  }
+}
+
 export async function initializeDatabase(): Promise<DataSource> {
   if (!AppDataSource.isInitialized) {
     if (config.database.dropSchema) {
       await dropUserTables();
     }
 
+    await ensureSessionTimeRangeConstraint();
     await AppDataSource.initialize();
   }
 
