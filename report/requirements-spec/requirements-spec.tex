@@ -1,0 +1,1793 @@
+\documentclass[12pt,a4paper]{article}
+
+%!TEX program = pdflatex
+
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usepackage[vietnamese]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{longtable}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{tabularx}
+\usepackage{makecell}
+\usepackage{ragged2e}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{xurl}
+\usepackage{seqsplit}
+\usepackage{hyperref}
+
+\hypersetup{
+    colorlinks=false,
+    hidelinks,
+    pdftitle={Đặc tả và phân tích yêu cầu chức năng phần mềm - Hệ thống giúp giáo viên quản lý lớp học lập trình thi đấu},
+    pdfauthor={Nhóm phát triển hệ thống}
+}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setlength{\emergencystretch}{3em}
+\setcounter{secnumdepth}{3}
+\raggedbottom
+\sloppy
+
+\renewcommand{\thesection}{\Roman{section}}
+\renewcommand{\thesubsection}{\arabic{subsection}}
+\renewcommand{\thesubsubsection}{\thesubsection.\arabic{subsubsection}}
+
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}{\normalsize\itshape\bfseries}{\thesubsubsection.}{0.5em}{}
+\titleformat{\paragraph}[block]{\normalsize\bfseries}{}{0pt}{}
+\titlespacing*{\paragraph}{0pt}{6pt}{0pt}
+
+\renewcommand{\cftsecaftersnum}{.}
+\renewcommand{\cftsubsecaftersnum}{.}
+\renewcommand{\cftsubsubsecaftersnum}{.}
+
+\definecolor{uitblue}{HTML}{005BAA}
+\definecolor{uitlightblue}{HTML}{EAF4FF}
+
+\tikzset{
+    dfdprocess/.style={ellipse, draw=uitblue, line width=0.8pt, minimum width=3.6cm, minimum height=1.35cm, align=center, fill=uitlightblue},
+    dfdentity/.style={rectangle, draw=black!70, rounded corners=2pt, minimum width=2.8cm, minimum height=0.9cm, align=center, fill=white},
+    dfddatastore/.style={rectangle, draw=black!70, minimum width=3.5cm, minimum height=0.75cm, align=center, fill=white},
+    dfdarrow/.style={-Stealth, semithick},
+    dfdbluearrow/.style={-Stealth, semithick, draw=uitblue}
+}
+
+\newcolumntype{C}[1]{>{\Centering\hspace{0pt}\arraybackslash}p{#1}}
+\newcolumntype{L}[1]{>{\RaggedRight\hspace{0pt}\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\RaggedRight\hspace{0pt}\arraybackslash}X}
+\newcommand{\tablesetup}{\scriptsize\setlength{\tabcolsep}{2pt}\renewcommand{\arraystretch}{1.2}}
+\newcommand{\code}[1]{{\ttfamily\seqsplit{#1}}}
+\newcommand{\uitlogo}{%
+\IfFileExists{logo_uit.jpg}{%
+    \includegraphics[width=0.28\textwidth]{logo_uit.jpg}%
+}{%
+\IfFileExists{./logo_uit.jpg}{%
+    \includegraphics[width=0.28\textwidth]{./logo_uit.jpg}%
+}{%
+\IfFileExists{../logo_uit.jpg}{%
+    \includegraphics[width=0.28\textwidth]{../logo_uit.jpg}%
+}{%
+\IfFileExists{../../logo_uit.jpg}{%
+    \includegraphics[width=0.28\textwidth]{../../logo_uit.jpg}%
+}{%
+    \fcolorbox{uitblue}{white}{\parbox[c][2.7cm][c]{0.28\textwidth}{\centering\textcolor{uitblue}{Logo UIT}}}%
+}}}}%
+}
+
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \begin{tikzpicture}[remember picture,overlay]
+        \fill[uitlightblue] (current page.south west) rectangle (current page.north east);
+        \draw[uitblue,line width=2pt]
+            ([xshift=0.65cm,yshift=0.65cm]current page.south west)
+            rectangle
+            ([xshift=-0.65cm,yshift=-0.65cm]current page.north east);
+    \end{tikzpicture}
+
+    \vspace*{0.8cm}
+    \begin{minipage}[c][0.86\textheight][c]{0.82\textwidth}
+        \centering
+        \uitlogo\\[0.8cm]
+
+        {\Large \textbf{\textcolor{uitblue}{ĐẠI HỌC CÔNG NGHỆ THÔNG TIN}}}\\[0.15cm]
+        {\large \textbf{ĐẠI HỌC QUỐC GIA TP.HCM}}\\[0.9cm]
+
+        {\large \textbf{SE104 - NHẬP MÔN CÔNG NGHỆ PHẦN MỀM}}\\[0.5cm]
+
+        \rule{0.72\textwidth}{0.7pt}\\[0.6cm]
+        {\Large \textbf{HỆ THỐNG GIÚP GIÁO VIÊN}}\\[0.2cm]
+        {\Large \textbf{QUẢN LÝ LỚP HỌC LẬP TRÌNH THI ĐẤU}}\\[0.6cm]
+        \rule{0.72\textwidth}{0.7pt}\\[1.2cm]
+
+        {\large \textbf{Giáo viên hướng dẫn: ThS. Đỗ Văn Tiến}}\\[1.2cm]
+
+        {\large \textbf{Nhóm sinh viên thực hiện}}\\[0.45cm]
+        \begin{tabular}{ll}
+            Nguyễn Thành Sơn & 24521532\\
+            Lê Quang Trung & 24521883\\
+            Đinh Mạnh Hùng & 24520014\\
+            Trần Vạn Tấn & 23521407\\
+        \end{tabular}
+
+        \vfill
+        {\large \textbf{Lớp SE104.Q26}}\\
+    \end{minipage}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Tổng quan đề tài}
+
+\subsection{Giới thiệu nhóm thực hiện}
+
+Nhóm thực hiện đề tài gồm bốn thành viên. Các thành viên cùng tham gia khảo sát
+hiện trạng, phân tích yêu cầu, thiết kế nghiệp vụ, xây dựng hệ thống và hoàn
+thiện tài liệu báo cáo.
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{0.8cm}|L{4cm}|L{2.6cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Họ và tên} & \textbf{MSSV} & \textbf{Vai trò chính trong đề tài} \\
+\hline
+1 & Nguyễn Thành Sơn & 24521532 & Phân tích nghiệp vụ, đặc tả yêu cầu và phối hợp xây dựng các chức năng quản lý lớp học. \\
+\hline
+2 & Lê Quang Trung & 24521883 & Thiết kế và phát triển các chức năng quản lý học sinh, ghi danh, điểm danh và báo cáo. \\
+\hline
+3 & Đinh Mạnh Hùng & 24520014 & Thiết kế dữ liệu, xử lý tài chính, công nợ và tích hợp Codeforces Gym. \\
+\hline
+4 & Trần Vạn Tấn & 23521407 & Xây dựng giao diện, tích hợp Discord, kiểm thử và hoàn thiện tài liệu. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Giới thiệu đề tài}
+
+Trong quá trình quản lý lớp dạy thêm thuật toán, giáo viên thường phải theo dõi
+nhiều nhóm dữ liệu cùng lúc: hồ sơ học sinh, lớp học, lịch học, buổi học, điểm
+danh, học phí, công nợ, thông báo Discord và kết quả luyện tập trên Codeforces.
+Nếu các dữ liệu này được lưu rời rạc bằng bảng tính, tin nhắn hoặc ghi chú cá
+nhân, giáo viên rất khó có một cái nhìn thống nhất về tình hình học tập và tài
+chính của từng học sinh.
+
+Những bất cập chính của cách quản lý bán thủ công gồm:
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Dữ liệu học sinh và ghi danh phân tán:} Hồ sơ học sinh, lớp đang học, lịch sử chuyển lớp hoặc rút khỏi lớp thường nằm ở nhiều file khác nhau, khó truy vết theo thời gian.
+\item \textbf{Quản lý buổi học và điểm danh phức tạp:} Lớp học có lịch định kỳ nhưng thực tế có thể phát sinh buổi học thủ công, hủy buổi học hoặc thay đổi trạng thái điểm danh. Nếu xử lý bằng tay, giáo viên dễ bỏ sót dữ liệu.
+\item \textbf{Đối soát tài chính dễ sai lệch:} Học phí phát sinh theo buổi học và trạng thái điểm danh, trong khi tiền thu hoặc hoàn tiền lại được ghi nhận theo từng giao dịch. Nếu không có hệ thống liên kết giữa khoản phí và giao dịch, việc tính số dư học sinh dễ nhầm lẫn.
+\item \textbf{Thiếu tích hợp Discord:} Việc mời học sinh vào server lớp, chọn channel thông báo, gửi thông báo chung hoặc tin nhắn riêng thường phải thao tác thủ công, khó kiểm soát kết quả gửi.
+\item \textbf{Thiếu liên kết với Codeforces Gym:} Codeforces có dữ liệu Gym và bảng xếp hạng, nhưng giáo viên cần một nơi gắn Gym với lớp học, đồng bộ bài tập và xem kết quả theo danh sách học sinh đang học.
+\end{itemize}
+
+Vì vậy, đề tài ``Hệ thống giúp giáo viên quản lý lớp học lập trình thi đấu'' được xây dựng nhằm tập
+trung hóa dữ liệu vận hành lớp học, hỗ trợ giáo viên theo dõi tiến độ học tập,
+điểm danh, công nợ và các tích hợp Discord/Codeforces trong một hệ thống web
+thống nhất.
+
+\subsection{Mục tiêu phần mềm}
+
+Phần mềm được xây dựng với các mục tiêu chính sau:
+
+\subsubsection{Quản lý dữ liệu học sinh và ghi danh tập trung}
+
+\begin{itemize}[leftmargin=*]
+\item Lưu trữ hồ sơ học sinh, số điện thoại, ghi chú, Codeforces handle và Discord identity nếu học sinh đã uỷ quyền.
+\item Quản lý vòng đời học sinh theo trạng thái đang học, chờ lưu trữ và đã lưu trữ.
+\item Theo dõi lịch sử ghi danh, chuyển lớp, rút học sinh và khôi phục học sinh vào lớp mới.
+\end{itemize}
+
+\subsubsection{Quản lý lớp học, lịch học, buổi học và điểm danh}
+
+\begin{itemize}[leftmargin=*]
+\item Cho phép giáo viên tạo lớp học, thiết lập học phí mỗi buổi và lịch học định kỳ theo thứ/giờ.
+\item Quản lý các buổi học thực tế, bao gồm buổi học được sinh theo lịch hoặc buổi học tạo thủ công.
+\item Hỗ trợ cập nhật điểm danh theo từng học sinh trong buổi học với các trạng thái có mặt, vắng có phép và vắng không phép.
+\end{itemize}
+
+\subsubsection{Tự động hóa tài chính và công nợ}
+
+\begin{itemize}[leftmargin=*]
+\item Ghi nhận khoản phí phát sinh từ buổi học bằng \code{FeeRecord}.
+\item Ghi nhận giao dịch thu tiền hoặc hoàn tiền bằng \code{Transaction}.
+\item Tính số dư học sinh, tổng quan tài chính và báo cáo thu nhập theo kỳ để hỗ trợ đối soát.
+\end{itemize}
+
+\subsubsection{Tích hợp Discord}
+
+\begin{itemize}[leftmargin=*]
+\item Cho phép quản trị viên cấu hình bot Discord và OAuth credential dùng chung.
+\item Cho phép giáo viên liên kết tài khoản Discord, chọn Discord guild và channel cho lớp học.
+\item Hỗ trợ học sinh uỷ quyền Discord OAuth để hệ thống lưu \code{StudentDiscordCredential} và quản lý membership của học sinh trong guild lớp.
+\item Hỗ trợ gửi thông báo vào channel lớp hoặc gửi tin nhắn riêng cho học sinh.
+\end{itemize}
+
+\subsubsection{Tích hợp Codeforces Gym}
+
+\begin{itemize}[leftmargin=*]
+\item Cho phép giáo viên cấu hình Codeforces credential để đồng bộ dữ liệu Gym.
+\item Cho phép gắn Codeforces Gym vào lớp học, đồng bộ danh sách bài trong Gym và bảng xếp hạng.
+\item Hiển thị kết quả theo ma trận học sinh - bài tập để giáo viên theo dõi tiến độ luyện tập.
+\end{itemize}
+
+\subsection{Phạm vi phần mềm}
+
+Hệ thống tập trung vào các phân hệ chức năng sau:
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Quản lý tài khoản:} Đăng ký, đăng nhập, cập nhật hồ sơ giáo viên, quản lý tài khoản giáo viên và cấu hình credential cần thiết.
+\item \textbf{Quản lý học sinh và ghi danh:} Tạo hồ sơ học sinh, cập nhật thông tin, chuyển lớp, rút học sinh, khôi phục và lưu trữ học sinh.
+\item \textbf{Quản lý lớp học, lịch học và buổi học:} Tạo lớp, thiết lập lịch định kỳ, tạo buổi học thủ công, xem danh sách buổi học và hủy buổi học khi cần.
+\item \textbf{Quản lý điểm danh:} Xem và cập nhật trạng thái điểm danh theo từng buổi học.
+\item \textbf{Quản lý tài chính:} Ghi nhận giao dịch, quản lý khoản phí phát sinh, xem số dư học sinh, tổng quan tài chính và báo cáo thu nhập.
+\item \textbf{Quản lý Discord:} Cấu hình bot, xác minh Discord của giáo viên, uỷ quyền Discord của học sinh, liên kết guild/channel cho lớp và gửi thông báo.
+\item \textbf{Quản lý Codeforces Gym:} Gắn/gỡ Gym khỏi lớp, đồng bộ bài tập và xem bảng xếp hạng Gym.
+\item \textbf{Dashboard và báo cáo học tập:} Cung cấp số liệu tổng quan và hồ sơ học tập của từng học sinh.
+\end{itemize}
+
+\section{Xác định và thu thập yêu cầu}
+
+\subsection{Kế hoạch và phương pháp khảo sát}
+
+\subsubsection{Đối tượng và địa điểm khảo sát}
+
+- Địa điểm khảo sát: Khảo sát được thực hiện thông qua trao đổi trực tiếp và
+trao đổi online với giáo viên đang dạy thêm thuật toán, hiện đang vận hành lớp
+học bằng các công cụ rời rạc như Google Sheets, Excel, Discord, Codeforces và
+các ứng dụng ghi chú.
+
+- Các đối tượng liên quan cần khảo sát:
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Giáo viên dạy thêm thuật toán:} Người sử dụng chính của hệ thống, trực tiếp quản lý học sinh, lớp học, lịch học, buổi học, điểm danh, tài chính, Discord và Codeforces Gym.
+\item \textbf{Quản trị viên hệ thống:} Người cấu hình tài khoản giáo viên và bot Discord dùng chung.
+\item \textbf{Học sinh:} Đối tượng liên quan đến uỷ quyền Discord OAuth, tham gia guild lớp và được theo dõi kết quả luyện tập trên Codeforces Gym.
+\end{itemize}
+
+\subsubsection{Các phương pháp khảo sát}
+
+- \textbf{Phỏng vấn:} Thu thập thông tin chuyên sâu về quy trình vận hành lớp
+học, cách ghi nhận điểm danh, cách tính học phí, cách gửi thông báo và các khó
+khăn khi theo dõi kết quả Codeforces.
+
+- \textbf{Quan sát thực tế:} Theo dõi cách giáo viên đang tạo lớp, lập lịch,
+điểm danh, ghi nhận học phí, gửi thông báo Discord và xem kết quả luyện tập của
+học sinh trên Codeforces.
+
+- \textbf{Nghiên cứu tài liệu:} Phân tích các file bảng tính, danh sách học
+sinh, lịch học, bảng công nợ, kênh Discord lớp học và dữ liệu Codeforces Gym mà
+giáo viên đang sử dụng.
+
+- \textbf{Tổng hợp nghiệp vụ hiện có:} Chuẩn hóa các thao tác rời rạc thành
+các nhóm chức năng ổn định để làm cơ sở đặc tả yêu cầu phần mềm.
+
+\subsection{Khảo sát hiện trạng}
+
+\subsubsection{Hiện trạng tổ chức}
+
+Mô hình tổ chức của hoạt động dạy thêm thuật toán tương đối gọn. Giáo viên là
+người vận hành chính, chịu trách nhiệm quản lý học sinh, lớp học, lịch học, buổi
+học, điểm danh, học phí, công nợ và theo dõi kết quả luyện tập. Quản trị viên
+chỉ tham gia ở các công việc cấu hình hệ thống như quản lý tài khoản giáo viên
+và cấu hình bot Discord.
+
+Học sinh không sử dụng toàn bộ hệ thống như giáo viên, nhưng có tương tác trực
+tiếp trong luồng uỷ quyền Discord OAuth để hệ thống lưu danh tính Discord và
+phục vụ việc tham gia guild lớp học. Discord và Codeforces là hai hệ thống ngoài
+đóng vai trò cung cấp dữ liệu hoặc kênh tương tác.
+
+\subsubsection{Hiện trạng nghiệp vụ}
+
+\paragraph{1. Quản lý học sinh và ghi danh}
+Thông tin học sinh thường được lưu bằng bảng tính hoặc ghi chú rời rạc. Việc
+theo dõi học sinh đang học lớp nào, đã chuyển lớp khi nào, đã rút khỏi lớp hay
+đang chờ xử lý công nợ chưa có một quy trình tập trung.
+
+\paragraph{2. Quản lý lớp học, lịch học và buổi học}
+Lịch học định kỳ thường được ghi trong bảng tính hoặc tin nhắn ghim. Khi phát
+sinh buổi học thủ công, hủy buổi học hoặc thay đổi lịch, giáo viên phải cập
+nhật nhiều nơi nên dễ thiếu lịch sử chính xác.
+
+\paragraph{3. Quản lý điểm danh}
+Điểm danh thường được ghi bằng tay hoặc dựa vào việc học sinh có mặt trong lớp
+online. Dữ liệu điểm danh chưa được liên kết chặt với khoản phí phát sinh, gây
+khó khăn khi cần kiểm tra vì sao học sinh phát sinh học phí ở một buổi cụ thể.
+
+\paragraph{4. Quản lý tài chính và công nợ}
+Giáo viên phải tự đối chiếu giữa số buổi học, học phí mỗi buổi, khoản phí phải
+thu, các giao dịch đã thu và các khoản hoàn tiền nếu có. Quy trình này dễ sai
+khi học sinh chuyển lớp, rút khỏi lớp hoặc có nhiều giao dịch nhỏ.
+
+\paragraph{5. Quản lý Discord}
+Thông báo lịch học, nhắc học phí hoặc trao đổi với học sinh thường được thực
+hiện qua Discord bằng thao tác thủ công. Giáo viên cần một cách chọn guild,
+channel thông báo và gửi tin nhắn từ hệ thống để giảm sai sót.
+
+\paragraph{6. Theo dõi Codeforces Gym}
+Codeforces cung cấp Gym, bài tập và standing, nhưng giáo viên vẫn phải tự mở
+Codeforces để đối chiếu. Chưa có nơi gắn Gym với lớp học và xem bảng kết quả
+theo đúng danh sách học sinh đang ghi danh.
+
+\paragraph{7. Báo cáo và thống kê}
+Báo cáo thu nhập, số dư học sinh, tổng quan lớp học và hồ sơ học tập thường
+được tổng hợp thủ công từ nhiều nguồn, mất thời gian và khó kiểm tra lại.
+
+\subsubsection{Hiện trạng tin học}
+
+\paragraph{1. Phần cứng đang sử dụng}
+Giáo viên chủ yếu sử dụng laptop cá nhân hoặc máy tính để bàn có kết nối
+Internet. Học sinh sử dụng máy tính cá nhân để học, dùng Discord và Codeforces.
+
+\paragraph{2. Phần mềm và công cụ đang sử dụng}
+\begin{itemize}[leftmargin=*]
+\item Google Sheets hoặc Microsoft Excel để lưu danh sách học sinh, lịch học và công nợ.
+\item Discord để quản lý server lớp học, trao đổi và gửi thông báo.
+\item Codeforces để tổ chức hoặc theo dõi Gym, bài tập và standing.
+\item Các công cụ ghi chú hoặc lịch cá nhân để lưu thông tin vận hành phát sinh.
+\end{itemize}
+
+\paragraph{3. Trình độ công nghệ thông tin của người sử dụng}
+Giáo viên có khả năng sử dụng tốt các công cụ web phổ biến, bảng tính và
+Discord. Tuy nhiên, việc phối hợp nhiều công cụ làm tăng khối lượng thao tác và
+tạo nhu cầu về một hệ thống quản lý tập trung hơn.
+
+\subsection{Đánh giá hiện trạng và những tính năng mong muốn}
+
+\subsubsection{Ưu điểm}
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Chi phí ban đầu thấp:} Các công cụ như Google Sheets, Discord và Codeforces dễ tiếp cận.
+\item \textbf{Dễ bắt đầu sử dụng:} Giáo viên đã quen với các công cụ hiện tại.
+\item \textbf{Linh hoạt:} Có thể thay đổi nhanh nội dung ghi chú, lịch học hoặc thông báo.
+\end{itemize}
+
+\subsubsection{Nhược điểm và khó khăn cần giải quyết}
+
+\paragraph{a) Dữ liệu phân tán}
+Hồ sơ học sinh, lớp học, điểm danh, tài chính, Discord và Codeforces Gym chưa
+được liên kết thành một hồ sơ thống nhất.
+
+\paragraph{b) Đối soát tài chính phức tạp}
+Khoản phí phát sinh theo buổi học và giao dịch thu/hoàn tiền chưa được quản lý
+tập trung, khiến việc tính số dư học sinh dễ sai lệch.
+
+\paragraph{c) Thiếu lịch sử ghi danh và điểm danh rõ ràng}
+Giáo viên khó truy vết học sinh đã học lớp nào, nghỉ từ khi nào, đã được điểm
+danh ra sao và khoản phí nào phát sinh từ buổi học nào.
+
+\paragraph{d) Thông báo Discord còn thủ công}
+Việc gửi tin nhắn vào channel hoặc DM cho học sinh phụ thuộc vào thao tác thủ
+công, dễ gửi sai hoặc bỏ sót người nhận.
+
+\paragraph{e) Theo dõi Codeforces Gym chưa tập trung}
+Kết quả Gym chưa được hiển thị theo lớp và theo danh sách học sinh đang học, làm
+giảm hiệu quả theo dõi tiến độ luyện tập.
+
+\subsubsection{Giải pháp và tính năng mong muốn}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|L{3cm}|Y|}
+\hline
+\textbf{Chủ thể} & \textbf{Mong muốn} \\
+\hline
+Giáo viên & Có một hệ thống duy nhất để quản lý học sinh, ghi danh, lớp học, lịch học, buổi học, điểm danh, công nợ và báo cáo. \\
+\hline
+Giáo viên & Tự động liên kết điểm danh, buổi học và khoản phí để tính số dư học sinh chính xác hơn. \\
+\hline
+Giáo viên & Gắn Codeforces Gym vào lớp học và xem standing theo danh sách học sinh đang học. \\
+\hline
+Giáo viên & Cấu hình Discord guild/channel cho lớp và gửi thông báo hoặc tin nhắn riêng từ hệ thống. \\
+\hline
+Quản trị viên & Quản lý tài khoản giáo viên và cấu hình bot Discord dùng chung một cách bảo mật. \\
+\hline
+Học sinh & Uỷ quyền Discord một lần để được hệ thống hỗ trợ tham gia guild lớp và nhận thông báo phù hợp. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Xác định và thu thập yêu cầu}
+
+Từ kết quả khảo sát hiện trạng và các nhu cầu thực tế, nhóm xác định hệ thống
+cần tập trung vào các nhóm yêu cầu chính sau:
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Quản lý tài khoản:} Hỗ trợ đăng ký, đăng nhập, cập nhật hồ sơ giáo viên và quản trị tài khoản giáo viên.
+\item \textbf{Quản lý học sinh và ghi danh:} Lưu trữ hồ sơ học sinh, chuyển lớp, rút học sinh, khôi phục và lưu trữ học sinh.
+\item \textbf{Quản lý lớp học, lịch học và buổi học:} Tạo lớp, thiết lập lịch định kỳ, tạo/hủy buổi học và xem lịch sử buổi học.
+\item \textbf{Quản lý điểm danh:} Cập nhật trạng thái điểm danh theo từng học sinh trong buổi học.
+\item \textbf{Quản lý tài chính và công nợ:} Quản lý \code{FeeRecord}, \code{Transaction}, số dư học sinh và báo cáo thu nhập.
+\item \textbf{Quản lý Discord:} Cấu hình bot, liên kết Discord của giáo viên, uỷ quyền Discord của học sinh, chọn guild/channel và gửi thông báo.
+\item \textbf{Quản lý Codeforces Gym:} Gắn Gym cho lớp, đồng bộ bài tập và xem bảng xếp hạng Gym.
+\item \textbf{Dashboard và báo cáo:} Tổng hợp số liệu lớp học, học sinh, tài chính và hồ sơ học tập.
+\end{itemize}
+
+Kế hoạch thu thập yêu cầu được thực hiện thông qua phỏng vấn giáo viên, quan sát
+quy trình quản lý hiện tại, nghiên cứu các tài liệu đang được sử dụng và chuẩn
+hóa chúng thành các nhóm yêu cầu chức năng, phi chức năng, yêu cầu hệ thống và
+yêu cầu công nghệ cho phần mềm mới.
+
+\section{Đặc tả và phân tích yêu cầu chức năng phần mềm}
+
+\subsection{Yêu cầu chức năng}
+
+\subsubsection{\textit{Yêu cầu chức năng nghiệp vụ}}
+
+Hệ thống giúp giáo viên quản lý lớp học lập trình thi đấu trong phiên bản hiện tại là ứng dụng web
+quản lý hoạt động dạy thêm thuật toán. Phần mềm hỗ trợ giáo viên quản lý tài
+khoản, học sinh, lớp học, lịch học, buổi học, điểm danh, ghi danh, tài chính,
+báo cáo, Discord và Codeforces Gym. Ngoài giáo viên, hệ thống có thêm vai trò
+quản trị viên để quản lý tài khoản giáo viên và cấu hình bot Discord dùng chung.
+
+Bảng yêu cầu nghiệp vụ:
+
+{\scriptsize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.12}
+\begin{longtable}{|C{0.7cm}|L{2.5cm}|L{6.4cm}|C{1.05cm}|C{1.05cm}|L{1.8cm}|}
+\hline
+\textbf{STT} & \textbf{Nghiệp vụ} & \textbf{Thao tác cụ thể} & \textbf{Biểu mẫu} & \textbf{Quy định} & \textbf{Ghi chú} \\
+\hline
+\endfirsthead
+\hline
+\textbf{STT} & \textbf{Nghiệp vụ} & \textbf{Thao tác cụ thể} & \textbf{Biểu mẫu} & \textbf{Quy định} & \textbf{Ghi chú} \\
+\hline
+\endhead
+1 & \multirow{4}{2.5cm}{\RaggedRight Quản lý tài khoản} & Đăng nhập hệ thống & BM 1.1 & QĐ 1.1 & Truy cập \\
+\cline{1-1}\cline{3-6}
+2 & & Đăng ký tài khoản giáo viên & BM 1.2 & QĐ 1.2 & Khởi tạo \\
+\cline{1-1}\cline{3-6}
+3 & & Cập nhật hồ sơ và thông tin Codeforces của giáo viên & BM 1.3 & QĐ 1.3 & Cá nhân \\
+\cline{1-1}\cline{3-6}
+4 & & Liên kết tài khoản Discord của giáo viên & BM 1.4 & QĐ 1.4 & OAuth \\
+\hline
+5 & \multirow{5}{2.5cm}{\RaggedRight Quản lý học sinh và ghi danh} & Thêm học sinh và ghi danh vào lớp & BM 1.5 & QĐ 1.5 & Quản lý \\
+\cline{1-1}\cline{3-6}
+6 & & Cập nhật hồ sơ học sinh & BM 1.6 & QĐ 1.6 & Quản lý \\
+\cline{1-1}\cline{3-6}
+7 & & Chuyển lớp, rút học sinh, khôi phục học sinh & BM 1.7 & QĐ 1.7 & Ghi danh \\
+\cline{1-1}\cline{3-6}
+8 & & Lưu trữ học sinh đang chờ xử lý công nợ & BM 1.8 & QĐ 1.8 & Lưu trữ \\
+\cline{1-1}\cline{3-6}
+9 & & Tra cứu và xem hồ sơ học tập của học sinh &  &  & Tra cứu \\
+\hline
+10 & \multirow{4}{2.5cm}{\RaggedRight Quản lý lớp học, lịch học và buổi học} & Thêm/sửa/lưu trữ lớp học & BM 1.10 & QĐ 1.10 & Lớp học \\
+\cline{1-1}\cline{3-6}
+11 & & Thiết lập lịch học định kỳ của lớp & BM 1.11 & QĐ 1.11 & Lịch học \\
+\cline{1-1}\cline{3-6}
+12 & & Tạo buổi học thủ công và xem danh sách buổi học & BM 1.12 & QĐ 1.12 & Buổi học \\
+\cline{1-1}\cline{3-6}
+13 & & Hủy buổi học &  & QĐ 1.13 & Vận hành \\
+\hline
+14 & Quản lý điểm danh & Xem và cập nhật trạng thái điểm danh học sinh theo buổi học & BM 1.14 & QĐ 1.14 & Điểm danh \\
+\hline
+15 & \multirow{4}{2.5cm}{\RaggedRight Quản lý tài chính và công nợ} & Ghi nhận giao dịch thu tiền hoặc hoàn tiền & BM 1.15 & QĐ 1.15 & Giao dịch \\
+\cline{1-1}\cline{3-6}
+16 & & Cập nhật trạng thái khoản phí phát sinh từ buổi học & BM 1.16 & QĐ 1.16 & Khoản phí \\
+\cline{1-1}\cline{3-6}
+17 & & Xem số dư học sinh và tổng quan tài chính &  &  & Đối soát \\
+\cline{1-1}\cline{3-6}
+18 & & Lập báo cáo thu nhập theo kỳ & BM 1.18 & QĐ 1.18 & Báo cáo \\
+\hline
+19 & \multirow{4}{2.5cm}{\RaggedRight Quản lý Discord} & Cấu hình bot Discord toàn hệ thống & BM 1.19 & QĐ 1.19 & Quản trị \\
+\cline{1-1}\cline{3-6}
+20 & & Chọn Discord guild và channel cho lớp & BM 1.20 & QĐ 1.20 & Liên kết \\
+\cline{1-1}\cline{3-6}
+21 & & Gửi thông báo vào channel của lớp & BM 1.21 & QĐ 1.21 & Gửi tin \\
+\cline{1-1}\cline{3-6}
+22 & & Gửi tin nhắn riêng cho học sinh qua Discord & BM 1.22 & QĐ 1.22 & DM \\
+\hline
+23 & \multirow{2}{2.5cm}{\RaggedRight Quản lý Codeforces Gym} & Gắn hoặc gỡ Gym Codeforces khỏi lớp học & BM 1.23 & QĐ 1.23 & Tích hợp \\
+\cline{1-1}\cline{3-6}
+24 & & Xem bảng xếp hạng Gym và hồ sơ học tập &  &  & Theo dõi \\
+\hline
+25 & Uỷ quyền Discord của học sinh & Học sinh uỷ quyền Discord OAuth để hệ thống lưu \code{StudentDiscordCredential} và quản lý membership Discord của lớp & BM 1.24 & QĐ 1.24 & OAuth \\
+\hline
+26 & \multirow{2}{2.5cm}{\RaggedRight Quản trị hệ thống} & Quản lý tài khoản giáo viên & BM 1.25 & QĐ 1.25 & Admin \\
+\cline{1-1}\cline{3-6}
+27 & & Xem tổng quan giảng dạy &  &  & Tổng quan \\
+\hline
+\end{longtable}
+}
+
+\paragraph{Biểu mẫu 1 và quy định 1}
+
+\textbf{* BM 1.1: Đăng nhập hệ thống}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{0.78\textwidth}{|Y|Y|}
+\hline
+\textbf{Tên đăng nhập} & \textbf{Mật khẩu} \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.1: Tên đăng nhập và mật khẩu không được để trống; tài khoản phải tồn tại, mật khẩu phải khớp, tài khoản phải đang hoạt động. Sau khi đăng nhập thành công, hệ thống cấp token và phân quyền theo vai trò giáo viên hoặc quản trị viên.
+
+\paragraph{Biểu mẫu 2 và quy định 2}
+
+\textbf{* BM 1.2: Đăng ký tài khoản giáo viên}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Tên đăng nhập & Nhập văn bản & Bắt buộc, dùng để đăng nhập hệ thống \\
+\hline
+2 & Mật khẩu & Nhập bảo mật & Bắt buộc \\
+\hline
+3 & Codeforces handle & Nhập văn bản & Không bắt buộc, dùng cho đồng bộ Gym \\
+\hline
+4 & Codeforces API key & Nhập bảo mật & Không bắt buộc \\
+\hline
+5 & Codeforces API secret & Nhập bảo mật & Không bắt buộc \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.2: Tên đăng nhập và mật khẩu là bắt buộc; tên đăng nhập không được trùng; các thông tin Codeforces có thể bỏ trống nhưng nếu nhập thì phải được lưu bảo mật và chỉ sử dụng cho việc đồng bộ dữ liệu Gym.
+
+\paragraph{Biểu mẫu 3 và quy định 3}
+
+\textbf{* BM 1.3: Cập nhật hồ sơ giáo viên}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Tên đăng nhập & Nhập văn bản & Có thể cập nhật \\
+\hline
+2 & Mật khẩu mới & Nhập bảo mật & Không bắt buộc \\
+\hline
+3 & Codeforces handle & Nhập văn bản & Có thể xóa hoặc cập nhật \\
+\hline
+4 & Codeforces API key & Nhập bảo mật & Không hiển thị đầy đủ sau khi lưu \\
+\hline
+5 & Codeforces API secret & Nhập bảo mật & Không hiển thị đầy đủ sau khi lưu \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.3: Khi cập nhật hồ sơ phải có ít nhất một trường thay đổi; mật khẩu không được rỗng nếu được gửi lên; thông tin nhạy cảm Codeforces phải được bảo vệ khi lưu trữ và không được hiển thị đầy đủ ở giao diện danh sách.
+
+\paragraph{Biểu mẫu 4 và quy định 4}
+
+\textbf{* BM 1.4: Liên kết Discord của giáo viên}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Yêu cầu xác minh Discord & Nút thao tác & Hệ thống sinh URL OAuth \\
+\hline
+2 & Discord user id & Tự động ghi nhận & Ghi sau khi OAuth thành công \\
+\hline
+3 & Discord username & Tự động hiển thị & Dùng để nhận diện giáo viên \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.4: Giáo viên phải đăng nhập trước khi bắt đầu xác minh; callback OAuth phải hợp lệ; hệ thống chỉ ghi nhận Discord identity khi Discord trả về thông tin xác thực hợp lệ.
+
+\paragraph{Biểu mẫu 5 và quy định 5}
+
+\textbf{* BM 1.5: Thêm học sinh và ghi danh vào lớp}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Họ và tên học sinh & Nhập văn bản & Bắt buộc \\
+\hline
+2 & Lớp học & Chọn từ danh sách & Bắt buộc, lớp thuộc giáo viên hiện tại \\
+\hline
+3 & Codeforces handle & Nhập văn bản & Bắt buộc \\
+\hline
+4 & Số điện thoại & Nhập văn bản & Không bắt buộc \\
+\hline
+5 & Ghi chú & Nhập nội dung dài & Không bắt buộc \\
+\hline
+6 & Ngày ghi danh & Chọn ngày giờ & Mặc định là thời điểm hiện tại \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.5: Họ tên, lớp học và Codeforces handle không được để trống; lớp học phải thuộc giáo viên đang thao tác; mỗi học sinh chỉ có tối đa một ghi danh đang hoạt động trong phạm vi một giáo viên.
+
+\paragraph{Biểu mẫu 6 và quy định 6}
+
+\textbf{* BM 1.6: Cập nhật hồ sơ học sinh}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Họ và tên học sinh & Nhập văn bản & Có thể cập nhật \\
+\hline
+2 & Codeforces handle & Nhập văn bản & Có thể cập nhật \\
+\hline
+3 & Số điện thoại & Nhập văn bản & Có thể để trống \\
+\hline
+4 & Ghi chú & Nhập nội dung dài & Có thể để trống \\
+\hline
+5 & Discord username & Tự động hiển thị & Sinh từ liên kết Discord của học sinh \\
+\hline
+6 & Trạng thái học sinh & Tự động hiển thị & Đang học, chờ lưu trữ hoặc đã lưu trữ \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.6: Khi cập nhật phải có ít nhất một trường thay đổi; học sinh phải thuộc giáo viên hiện tại; nếu cập nhật Codeforces handle thì không được để rỗng.
+
+\paragraph{Biểu mẫu 7 và quy định 7}
+
+\textbf{* BM 1.7: Chuyển lớp, rút học sinh và khôi phục học sinh}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Học sinh & Chọn từ danh sách & Bắt buộc \\
+\hline
+2 & Lớp chuyển đến & Chọn từ danh sách & Dùng khi chuyển lớp hoặc khôi phục \\
+\hline
+3 & Thời điểm chuyển/rút/khôi phục & Chọn ngày giờ & Mặc định là hiện tại \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.7: Học sinh và lớp chuyển đến phải thuộc giáo viên hiện tại; khi chuyển lớp, hệ thống kết thúc ghi danh cũ và tạo ghi danh mới; khi rút học sinh, hệ thống xác định trạng thái tiếp theo dựa trên số dư tài chính còn phải thu hoặc cần hoàn.
+
+\paragraph{Biểu mẫu 8 và quy định 8}
+
+\textbf{* BM 1.8: Lưu trữ học sinh chờ xử lý}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Học sinh & Chọn từ danh sách & Bắt buộc \\
+\hline
+2 & Thời điểm lưu trữ & Chọn ngày giờ & Mặc định là hiện tại \\
+\hline
+3 & Lý do chờ lưu trữ & Tự động hiển thị & Cần thu thêm hoặc cần hoàn tiền \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.8: Chỉ cho phép lưu trữ khi học sinh đang ở trạng thái chờ lưu trữ; nếu còn số dư cần xử lý thì hệ thống phải thể hiện lý do để giáo viên đối soát trước.
+
+\paragraph{Biểu mẫu 10 và quy định 10}
+
+\textbf{* BM 1.10: Thêm/sửa/lưu trữ lớp học}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Tên lớp & Nhập văn bản & Bắt buộc \\
+\hline
+2 & Học phí mỗi buổi & Nhập số & Bắt buộc, không âm \\
+\hline
+3 & Danh sách lịch học & Nhập danh sách & Ít nhất một lịch học \\
+\hline
+4 & Trạng thái lớp & Tự động hoặc chọn thao tác & Đang hoạt động hoặc đã lưu trữ \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.10: Tên lớp không được để trống; học phí mỗi buổi là số nguyên không âm; lớp phải có ít nhất một lịch học khi tạo mới; khi lưu trữ lớp, hệ thống chuyển trạng thái lớp sang đã lưu trữ thay vì xóa dữ liệu.
+
+\paragraph{Biểu mẫu 11 và quy định 11}
+
+\textbf{* BM 1.11: Thiết lập lịch học định kỳ}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Thứ trong tuần & Chọn từ danh sách & Giá trị 0 đến 6 tương ứng các ngày trong tuần \\
+\hline
+2 & Giờ bắt đầu & Chọn giờ & Định dạng HH:mm hoặc HH:mm:ss \\
+\hline
+3 & Giờ kết thúc & Chọn giờ & Phải sau giờ bắt đầu \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.11: Thứ trong tuần nằm trong miền giá trị hợp lệ; giờ kết thúc phải lớn hơn giờ bắt đầu; khi cập nhật lịch của lớp, danh sách lịch mới thay thế cấu hình lịch đang áp dụng.
+
+\paragraph{Biểu mẫu 12 và quy định 12}
+
+\textbf{* BM 1.12: Tạo buổi học thủ công}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Lớp học & Chọn từ danh sách & Bắt buộc \\
+\hline
+2 & Ngày học & Chọn ngày & Dùng khi tạo theo ngày và giờ \\
+\hline
+3 & Giờ bắt đầu & Chọn giờ & Dùng khi tạo theo ngày và giờ \\
+\hline
+4 & Thời điểm bắt đầu & Chọn ngày giờ & Có thể dùng thay cho ngày và giờ bắt đầu \\
+\hline
+5 & Giờ kết thúc & Chọn giờ & Bắt buộc \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.12: Buổi học phải thuộc lớp của giáo viên hiện tại; giáo viên phải nhập một trong hai nhóm dữ liệu: thời điểm bắt đầu và giờ kết thúc, hoặc ngày học, giờ bắt đầu và giờ kết thúc; giờ kết thúc phải sau giờ bắt đầu.
+
+\paragraph{Quy định 13}
+
+\noindent - QĐ 1.13: Chỉ được hủy buổi học thuộc giáo viên hiện tại; buổi học bị hủy phải được giữ lại lịch sử với trạng thái hủy, không xóa cứng khỏi hệ thống; dữ liệu điểm danh và khoản phí liên quan phải được xử lý theo trạng thái buổi học.
+
+\paragraph{Biểu mẫu 14 và quy định 14}
+
+\textbf{* BM 1.14: Cập nhật điểm danh buổi học}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Buổi học & Chọn từ danh sách & Bắt buộc \\
+\hline
+2 & Học sinh & Chọn từ danh sách & Bắt buộc \\
+\hline
+3 & Trạng thái điểm danh & Chọn từ danh sách & Có mặt, vắng có phép hoặc vắng không phép \\
+\hline
+4 & Ghi chú & Nhập văn bản & Không bắt buộc \\
+\hline
+5 & Nguồn điểm danh & Tự động hiển thị & Bot, thủ công hoặc hệ thống \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.14: Trạng thái điểm danh chỉ nhận một trong ba giá trị hợp lệ: có mặt, vắng có phép, vắng không phép; học sinh và buổi học phải thuộc giáo viên hiện tại; nếu điểm danh làm phát sinh hoặc thay đổi khoản phí, hệ thống phải bảo toàn liên kết giữa \code{Attendance} và \code{FeeRecord}.
+
+\paragraph{Biểu mẫu 15 và quy định 15}
+
+\textbf{* BM 1.15: Ghi nhận giao dịch tài chính}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Học sinh & Chọn từ danh sách & Bắt buộc \\
+\hline
+2 & Số tiền & Nhập số & Bắt buộc \\
+\hline
+3 & Loại giao dịch & Chọn từ danh sách & Thu tiền hoặc hoàn tiền \\
+\hline
+4 & Ghi chú & Nhập nội dung & Không bắt buộc \\
+\hline
+5 & Thời điểm ghi nhận & Chọn ngày giờ & Mặc định là hiện tại \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.15: Học sinh phải thuộc giáo viên hiện tại; loại giao dịch chỉ được là thu tiền hoặc hoàn tiền; giao dịch thu tiền lưu số tiền dương, giao dịch hoàn tiền lưu số tiền âm; khi sửa giao dịch đã có, hệ thống phải kiểm tra lại quyền sở hữu học sinh và giao dịch.
+
+\paragraph{Biểu mẫu 16 và quy định 16}
+
+\textbf{* BM 1.16: Cập nhật trạng thái khoản phí}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Khoản phí & Chọn từ danh sách & Bắt buộc \\
+\hline
+2 & Trạng thái khoản phí & Chọn từ danh sách & Đang hiệu lực hoặc đã hủy \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.16: Khoản phí phải thuộc học sinh hoặc buổi học của giáo viên hiện tại; trạng thái khoản phí chỉ được là đang hiệu lực hoặc đã hủy; thao tác hủy khoản phí không làm mất lịch sử phát sinh.
+
+\paragraph{Biểu mẫu 18 và quy định 18}
+
+\textbf{* BM 1.18: Lập báo cáo thu nhập}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Từ ngày & Chọn ngày giờ & Không bắt buộc \\
+\hline
+2 & Đến ngày & Chọn ngày giờ & Không bắt buộc \\
+\hline
+3 & Danh sách lớp & Chọn nhiều lớp & Không bắt buộc \\
+\hline
+4 & Bao gồm khoản chưa thu & Bật/tắt & Không bắt buộc \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.18: Nếu có cả từ ngày và đến ngày thì từ ngày không được sau đến ngày; danh sách lớp được lọc phải thuộc giáo viên hiện tại; báo cáo phải tổng hợp giao dịch, khoản phí và số dư theo đúng kỳ lọc.
+
+\paragraph{Biểu mẫu 19 và quy định 19}
+
+\textbf{* BM 1.19: Cấu hình bot Discord}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Bot token & Nhập bảo mật & Bắt buộc \\
+\hline
+2 & Client ID & Nhập văn bản & Bắt buộc \\
+\hline
+3 & Client secret & Nhập bảo mật & Bắt buộc \\
+\hline
+4 & Permissions & Nhập văn bản & Không bắt buộc \\
+\hline
+5 & Scopes & Nhập văn bản & Không bắt buộc \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.19: Chỉ quản trị viên được cấu hình bot Discord; bot token và client secret là dữ liệu nhạy cảm, phải được bảo vệ và không hiển thị đầy đủ sau khi lưu.
+
+\paragraph{Biểu mẫu 20 và quy định 20}
+
+\textbf{* BM 1.20: Chọn Discord guild và channel cho lớp}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Lớp học & Chọn từ danh sách & Bắt buộc \\
+\hline
+2 & Discord guild & Chọn từ danh sách & Bắt buộc \\
+\hline
+3 & Channel thông báo & Chọn từ danh sách & Không bắt buộc \\
+\hline
+4 & Voice channel điểm danh & Chọn từ danh sách & Không bắt buộc \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.20: Lớp học phải thuộc giáo viên hiện tại; guild và channel phải nằm trong dữ liệu Discord mà hệ thống nhìn thấy; channel thông báo và voice channel điểm danh phải thuộc đúng guild đã chọn.
+
+\paragraph{Biểu mẫu 21 và quy định 21}
+
+\textbf{* BM 1.21: Gửi thông báo channel Discord}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Nội dung thông báo & Nhập văn bản & Bắt buộc \\
+\hline
+2 & Danh sách guild nhận thông báo & Chọn nhiều guild & Ít nhất một guild \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.21: Nội dung không được để trống; danh sách guild phải có ít nhất một phần tử; hệ thống loại bỏ guild trùng trong một lần gửi; khi gửi lỗi, hệ thống cần trả trạng thái để giáo viên biết thao tác không thành công.
+
+\paragraph{Biểu mẫu 22 và quy định 22}
+
+\textbf{* BM 1.22: Gửi tin nhắn riêng cho học sinh}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Nội dung tin nhắn & Nhập văn bản & Bắt buộc \\
+\hline
+2 & Học sinh nhận tin & Chọn một hoặc nhiều học sinh & Dùng khi gửi cho danh sách học sinh \\
+\hline
+3 & Lớp nhận tin & Chọn lớp & Dùng khi gửi cho toàn bộ học sinh trong lớp \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.22: Nội dung không được để trống; phải chọn ít nhất một học sinh hoặc một lớp; học sinh và lớp phải thuộc giáo viên hiện tại; hệ thống chỉ gửi được cho học sinh đã có thông tin Discord phù hợp.
+
+\paragraph{Biểu mẫu 23 và quy định 23}
+
+\textbf{* BM 1.23: Gắn Codeforces Gym cho lớp}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Lớp học & Chọn từ danh sách & Bắt buộc \\
+\hline
+2 & Gym ID & Nhập số hoặc chọn từ danh sách & Bắt buộc, phải là chuỗi số \\
+\hline
+3 & Chu kỳ đồng bộ & Nhập số phút & Không bắt buộc, số nguyên dương \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.23: Gym ID phải là số; lớp học phải thuộc giáo viên hiện tại; chu kỳ đồng bộ nếu nhập thì phải là số nguyên dương; khi gỡ Gym khỏi lớp, hệ thống phải giữ dữ liệu lịch sử đã đồng bộ nếu cần phục vụ báo cáo học tập.
+
+\paragraph{Biểu mẫu 24 và quy định 24}
+
+\textbf{* BM 1.24: Uỷ quyền Discord của học sinh}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Học sinh & Xác định từ liên kết uỷ quyền & Bắt buộc \\
+\hline
+2 & Discord OAuth consent & Học sinh xác nhận trên Discord & Dùng quyền nhận diện và tham gia guild \\
+\hline
+3 & Discord user id & Tự động ghi nhận & Lưu vào \code{StudentDiscordCredential} \\
+\hline
+4 & Access token & Tự động ghi nhận bảo mật & Dùng để quản lý membership theo lớp \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.24: URL uỷ quyền phải gắn với học sinh hợp lệ; callback Discord phải hợp lệ; hệ thống chỉ lưu Discord credential khi OAuth thành công; token của học sinh là dữ liệu nhạy cảm và không được hiển thị đầy đủ.
+
+\paragraph{Biểu mẫu 25 và quy định 25}
+
+\textbf{* BM 1.25: Quản lý tài khoản giáo viên}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{1cm}|L{3.2cm}|L{3cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Trường/Mục} & \textbf{Cách nhập/hiển thị} & \textbf{Ghi chú} \\
+\hline
+1 & Giáo viên & Chọn từ danh sách & Bắt buộc khi cập nhật \\
+\hline
+2 & Tên đăng nhập & Nhập văn bản & Có thể cập nhật \\
+\hline
+3 & Mật khẩu & Nhập bảo mật & Có thể đặt lại \\
+\hline
+4 & Trạng thái hoạt động & Bật/tắt & Kích hoạt hoặc vô hiệu hóa \\
+\hline
+5 & Codeforces credential & Nhập hoặc cập nhật & Không bắt buộc \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - QĐ 1.25: Chỉ quản trị viên được quản lý tài khoản giáo viên; khi cập nhật phải có ít nhất một trường thay đổi; không xóa cứng tài khoản giáo viên mà chỉ chuyển trạng thái hoạt động khi cần ngừng truy cập.
+
+\clearpage
+\subsubsection{Bảng trách nhiệm yêu cầu nghiệp vụ}
+
+\begin{table}[!htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{|C{0.8cm}|L{2.6cm}|L{3.5cm}|Y|L{1.6cm}|}
+\hline
+\textbf{STT} & \textbf{Tên yêu cầu} & \textbf{Người dùng} & \textbf{Phần mềm} & \textbf{Ghi chú} \\
+\hline
+1 & Quản lý tài khoản & Giáo viên hoặc quản trị viên nhập thông tin đăng nhập, đăng ký hoặc cập nhật hồ sơ. & Xác thực, cấp token, kiểm tra vai trò, lưu credential Codeforces và hỗ trợ xác minh Discord của giáo viên. & Truy cập hệ thống. \\
+\hline
+2 & Quản lý học sinh và ghi danh & Giáo viên thêm, sửa, tra cứu, chuyển lớp, rút, khôi phục hoặc lưu trữ học sinh. & Kiểm tra quyền sở hữu dữ liệu, quản lý hồ sơ học sinh, trạng thái ghi danh và trạng thái lưu trữ dựa trên công nợ. & Trung tâm dữ liệu học sinh. \\
+\hline
+3 & Quản lý lớp học, lịch học và buổi học & Giáo viên tạo lớp, cập nhật lịch định kỳ, tạo buổi học thủ công, xem hoặc hủy buổi học. & Lưu lớp, lịch, buổi học, trạng thái lớp và trạng thái buổi học; đảm bảo dữ liệu thuộc đúng giáo viên. & Vận hành lớp học. \\
+\hline
+4 & Quản lý điểm danh & Giáo viên cập nhật trạng thái điểm danh từng học sinh trong buổi học. & Lưu trạng thái điểm danh, nguồn điểm danh, ghi chú và liên kết dữ liệu với khoản phí phát sinh. & Phục vụ tính phí. \\
+\hline
+5 & Quản lý tài chính và công nợ & Giáo viên ghi nhận giao dịch, cập nhật khoản phí, xem số dư và báo cáo. & Quản lý \code{Transaction}, \code{FeeRecord}, số dư học sinh, tổng quan tài chính và báo cáo thu nhập theo kỳ. & Đối soát tài chính. \\
+\hline
+6 & Quản lý Discord & Quản trị viên cấu hình bot; giáo viên liên kết guild, channel, gửi thông báo và DM. & Lưu cấu hình bot, xử lý OAuth, cache guild/channel, gửi tin nhắn và ghi nhận kết quả. & Phụ thuộc Discord. \\
+\hline
+7 & Quản lý Codeforces Gym & Giáo viên gắn Gym cho lớp và xem bảng xếp hạng. & Đồng bộ Gym, \code{GymProblem}, \code{GymStanding} và hiển thị ma trận kết quả theo học sinh trong lớp. & Phụ thuộc Codeforces. \\
+\hline
+8 & Uỷ quyền Discord của học sinh & Học sinh mở liên kết OAuth và xác nhận quyền trên Discord. & Lưu \code{StudentDiscordCredential}, phục vụ mời học sinh vào guild lớp và gửi tin nhắn phù hợp. & Phụ thuộc Discord. \\
+\hline
+9 & Quản trị hệ thống & Quản trị viên quản lý tài khoản giáo viên và cấu hình bot Discord. & Phân quyền admin, kiểm soát trạng thái tài khoản giáo viên và credential dùng chung. & Vận hành nội bộ. \\
+\hline
+10 & Dashboard và báo cáo học tập & Giáo viên xem tổng quan và hồ sơ học tập của học sinh. & Tổng hợp số lớp, số học sinh, tài chính, lịch sử Gym và trạng thái học tập. & Theo dõi nhanh. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Yêu cầu phi chức năng}
+
+\subsubsection{Yêu cầu hiệu quả}
+
+Yêu cầu hiệu quả liên quan đến tốc độ xử lý và khả năng sử dụng tài nguyên của
+hệ thống, đặc biệt là các tác vụ thường xuyên và quan trọng như đăng nhập, tra
+cứu học sinh, cập nhật lớp học, điểm danh, ghi nhận tài chính, gửi thông báo và
+xem báo cáo.
+
+\noindent - Bảng yêu cầu hiệu quả:
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{0.8cm}|L{2.8cm}|Y|L{2.1cm}|L{1.7cm}|}
+\hline
+\textbf{STT} & \textbf{Nghiệp vụ} & \textbf{Tốc độ xử lý} & \textbf{Dung lượng lưu trữ} & \textbf{Ghi chú} \\
+\hline
+1 & Quản lý tài khoản & Đăng nhập và lấy thông tin cá nhân dưới 2 giây; cập nhật hồ sơ dưới 3 giây. & Tăng theo số tài khoản và credential. & Phụ thuộc mã hóa mật khẩu. \\
+\hline
+2 & Quản lý học sinh và ghi danh & Lưu hồ sơ, chuyển lớp hoặc rút học sinh dưới 5 giây; lọc danh sách dưới 8 giây. & Tăng theo số học sinh và lịch sử ghi danh. & Cần truy vấn số dư. \\
+\hline
+3 & Quản lý lớp, lịch và buổi học & Tạo/cập nhật lớp dưới 5 giây; danh sách buổi học dưới 8 giây. & Tăng theo lịch học và buổi học phát sinh. & Dữ liệu tăng theo thời gian. \\
+\hline
+4 & Quản lý điểm danh & Cập nhật một bản ghi điểm danh dưới 3 giây; tải điểm danh của một buổi học dưới 5 giây. & Tăng theo số buổi học và số học sinh. & Có thể liên quan \code{FeeRecord}. \\
+\hline
+5 & Tài chính và công nợ & Lưu giao dịch dưới 5 giây; tính số dư hoặc tổng quan tài chính dưới 10 giây. & Tăng theo \code{Transaction} và \code{FeeRecord}. & Ưu tiên độ chính xác. \\
+\hline
+6 & Discord & Lấy guild/channel dưới 10 giây; gửi thông báo hoặc DM dưới 10 giây mỗi lô nhỏ. & Tăng theo credential và cache guild/channel. & Phụ thuộc Discord API. \\
+\hline
+7 & Codeforces Gym & Xem bảng xếp hạng đã đồng bộ dưới 5 giây; đồng bộ từ Codeforces theo cơ chế nền. & Tăng theo Gym, Problem và Standing. & Phụ thuộc Codeforces. \\
+\hline
+8 & Báo cáo & Lập báo cáo thu nhập theo kỳ dưới 10 giây với dữ liệu thông thường. & Không phát sinh nhiều nếu chỉ xem trực tiếp. & Cần lọc theo lớp và thời gian. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - Bảng trách nhiệm yêu cầu hiệu quả:
+
+\begin{table}[!htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{|C{0.8cm}|L{2.7cm}|L{3.4cm}|Y|L{1.5cm}|}
+\hline
+\textbf{STT} & \textbf{Nghiệp vụ} & \textbf{Người dùng} & \textbf{Phần mềm} & \textbf{Ghi chú} \\
+\hline
+1 & Tài khoản & Nhập thông tin đăng nhập hoặc cập nhật hồ sơ. & Xác thực, băm mật khẩu, cấp token và trả kết quả trong ngưỡng thời gian. & \\
+\hline
+2 & Học sinh và ghi danh & Nhập hồ sơ, tiêu chí lọc hoặc yêu cầu thay đổi trạng thái ghi danh. & Tối ưu truy vấn học sinh, ghi danh và số dư liên quan. & \\
+\hline
+3 & Lớp và buổi học & Tạo lớp, xem lịch, tạo/hủy buổi học. & Lưu lịch học, trạng thái buổi học và truy vấn theo khoảng thời gian hiệu quả. & \\
+\hline
+4 & Điểm danh & Cập nhật trạng thái học sinh trong buổi học. & Ghi điểm danh nhanh, cập nhật dữ liệu tài chính liên quan khi cần. & \\
+\hline
+5 & Tài chính & Nhập giao dịch hoặc xem báo cáo. & Tính toán \code{Transaction}, \code{FeeRecord} và số dư nhất quán. & \\
+\hline
+6 & Tích hợp ngoài & Kích hoạt thao tác Discord hoặc Codeforces. & Dùng dữ liệu cache khi có thể, ghi nhận lỗi khi dịch vụ ngoài phản hồi chậm hoặc thất bại. & \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Yêu cầu tiện dụng}
+
+Yêu cầu tiện dụng tập trung vào khả năng học nhanh, thao tác thuận tiện và hạn
+chế sai sót cho giáo viên khi sử dụng hệ thống trong quá trình vận hành lớp học.
+
+\noindent - Bảng yêu cầu tiện dụng:
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{0.9cm}|L{3.1cm}|C{2.3cm}|Y|L{1.7cm}|}
+\hline
+\textbf{STT} & \textbf{Nghiệp vụ} & \textbf{Mức độ dễ học} & \textbf{Mức độ dễ sử dụng} & \textbf{Ghi chú} \\
+\hline
+1 & Quản lý tài khoản & 3--5 phút & Màn hình đăng nhập, hồ sơ cá nhân và thông báo lỗi rõ ràng. & \\
+\hline
+2 & Quản lý học sinh & 10 phút & Dễ tìm kiếm, lọc theo lớp/trạng thái, xem chi tiết và thao tác chuyển/rút/khôi phục. & \\
+\hline
+3 & Quản lý lớp và buổi học & 15 phút & Form lớp, lịch và buổi học thống nhất, dễ nhận biết trạng thái. & \\
+\hline
+4 & Điểm danh & 5--10 phút & Cập nhật nhanh theo danh sách học sinh trong một buổi học. & \\
+\hline
+5 & Tài chính & 10 phút & Số dư, khoản phí và giao dịch hiển thị rõ, hạn chế nhầm lẫn thu/hoàn tiền. & \\
+\hline
+6 & Discord & 15 phút & Quy trình cấu hình bot, chọn guild/channel và gửi tin cần tuần tự, dễ kiểm tra. & \\
+\hline
+7 & Codeforces Gym & 5--10 phút & Dễ gắn Gym, xem standing và nhận biết trạng thái dữ liệu. & \\
+\hline
+8 & Báo cáo & 10 phút & Dễ chọn kỳ, lớp và tùy chọn bao gồm khoản chưa thu. & \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - Bảng trách nhiệm yêu cầu tiện dụng:
+
+\begin{table}[!htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{|C{0.8cm}|L{2.8cm}|L{3.2cm}|Y|L{1.6cm}|}
+\hline
+\textbf{STT} & \textbf{Nghiệp vụ} & \textbf{Người dùng} & \textbf{Phần mềm} & \textbf{Ghi chú} \\
+\hline
+1 & Tài khoản & Nhập thông tin và đọc thông báo lỗi. & Kiểm tra dữ liệu tức thời, thông báo lỗi ngắn gọn. & \\
+\hline
+2 & Học sinh & Tìm kiếm, xem chi tiết và thao tác trạng thái học sinh. & Bố trí danh sách, bộ lọc, nút thao tác và cảnh báo nhất quán. & \\
+\hline
+3 & Lớp và buổi học & Tạo lớp, lịch, buổi học, điểm danh. & Duy trì quy trình tuần tự từ lớp đến buổi học và điểm danh. & \\
+\hline
+4 & Tài chính & Nhập giao dịch, kiểm tra phí, xem số dư. & Tách rõ giao dịch thu/hoàn, khoản phí và báo cáo. & \\
+\hline
+5 & Tích hợp & Thực hiện OAuth, chọn guild/channel, gắn Gym. & Hiển thị trạng thái kết nối và lỗi từ dịch vụ ngoài dễ hiểu. & \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Yêu cầu tương thích}
+
+Yêu cầu tương thích mô tả khả năng hoạt động của phần mềm trên các môi trường
+trình duyệt, hệ điều hành và dịch vụ ngoài mà hệ thống cần kết nối.
+
+\noindent - Bảng yêu cầu tương thích:
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{0.9cm}|L{3.1cm}|Y|L{1.8cm}|}
+\hline
+\textbf{STT} & \textbf{Nghiệp vụ} & \textbf{Đối tượng liên quan} & \textbf{Ghi chú} \\
+\hline
+1 & Ứng dụng web & Trình duyệt hiện đại như Chrome, Edge, Firefox; giao diện desktop/laptop và màn hình phổ biến. & React + Vite. \\
+\hline
+2 & Backend API & Node.js, Express, TypeORM và Microsoft SQL Server/\allowbreak Azure SQL. & Modular monolith. \\
+\hline
+3 & Discord & Discord OAuth, bot token, guild, text channel, voice channel và DM. & Phụ thuộc API ngoài. \\
+\hline
+4 & Codeforces & Codeforces credential, Gym, bài trong Gym và standing. & Phụ thuộc API ngoài. \\
+\hline
+5 & Báo cáo & Trình duyệt và công cụ đọc dữ liệu kết xuất như CSV/Excel nếu triển khai xuất file. & Phục vụ đối soát. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Yêu cầu tiến hóa}
+
+Yêu cầu tiến hóa mô tả khả năng thay đổi các quy định, tham số nghiệp vụ và cấu
+hình vận hành mà không cần viết lại toàn bộ hệ thống.
+
+\noindent - Bảng yêu cầu tiến hóa:
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{0.9cm}|L{3.4cm}|L{3.2cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Nghiệp vụ} & \textbf{Tham số cần thay đổi} & \textbf{Miền giá trị cần thay đổi} \\
+\hline
+1 & Thay đổi học phí mỗi buổi của lớp & Học phí mỗi buổi & Số nguyên không âm theo từng lớp \\
+\hline
+2 & Thay đổi lịch học định kỳ & Thứ trong tuần, giờ bắt đầu, giờ kết thúc & Lịch hợp lệ theo tuần \\
+\hline
+3 & Thay đổi trạng thái học sinh & Quy trình đang học, chờ lưu trữ, lưu trữ & Trạng thái Enrollment theo công nợ \\
+\hline
+4 & Thay đổi trạng thái điểm danh & Danh mục trạng thái điểm danh & Có mặt, vắng có phép, vắng không phép hoặc mở rộng sau này \\
+\hline
+5 & Thay đổi chính sách tài chính & Loại giao dịch, trạng thái khoản phí, cách tính số dư & Thu tiền, hoàn tiền, phí hiệu lực/hủy \\
+\hline
+6 & Thay đổi cấu hình Discord & Bot credential, guild, channel, permissions, scopes & Theo từng môi trường triển khai \\
+\hline
+7 & Thay đổi chu kỳ đồng bộ Codeforces & Pull interval của Gym & Số nguyên dương theo Gym hoặc lớp \\
+\hline
+8 & Thay đổi kỳ báo cáo & Từ ngày, đến ngày, danh sách lớp, bao gồm khoản chưa thu & Khoảng thời gian và bộ lọc báo cáo \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - Bảng trách nhiệm yêu cầu tiến hóa:
+
+\begin{table}[!htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{|C{0.8cm}|L{2.7cm}|L{3.2cm}|Y|L{1.6cm}|}
+\hline
+\textbf{STT} & \textbf{Nghiệp vụ} & \textbf{Người dùng} & \textbf{Phần mềm} & \textbf{Ghi chú} \\
+\hline
+1 & Học phí và lịch học & Giáo viên cập nhật lớp và lịch. & Ghi nhận giá trị mới, áp dụng cho buổi học và khoản phí phát sinh sau đó. & \\
+\hline
+2 & Điểm danh và tài chính & Giáo viên điều chỉnh trạng thái điểm danh hoặc khoản phí. & Cập nhật số dư, \code{FeeRecord} và báo cáo dựa trên trạng thái mới. & \\
+\hline
+3 & Discord & Quản trị viên hoặc giáo viên cập nhật cấu hình liên quan. & Lưu credential, guild, channel và dùng cho các thao tác gửi tin về sau. & \\
+\hline
+4 & Codeforces & Giáo viên thay đổi Gym hoặc chu kỳ đồng bộ. & Cập nhật liên kết Gym và cơ chế đồng bộ nền. & \\
+\hline
+5 & Báo cáo & Giáo viên chọn kỳ hoặc phạm vi lớp khác. & Tính toán lại số liệu theo tham số lọc mới. & \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Yêu cầu hệ thống}
+
+\subsubsection{Yêu cầu bảo mật}
+
+Yêu cầu bảo mật đảm bảo tính toàn vẹn và bảo mật của dữ liệu học sinh, lớp học,
+điểm danh, tài chính, credential Discord/\allowbreak Codeforces và thiết lập cơ chế phân
+quyền truy cập rõ ràng giữa giáo viên, quản trị viên và học sinh.
+
+\noindent - Bảng yêu cầu bảo mật:
+
+\begin{table}[!htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{|C{0.7cm}|L{2.8cm}|Y|C{1cm}|C{1cm}|C{1cm}|L{1.4cm}|}
+\hline
+\textbf{STT} & \textbf{Nghiệp vụ} & \textbf{Thao tác cụ thể} & \textbf{Giáo viên} & \textbf{Admin} & \textbf{Học sinh} & \textbf{Ghi chú} \\
+\hline
+1 & Quản lý tài khoản & Đăng nhập, xem/cập nhật hồ sơ cá nhân & X & X &  & Theo JWT và vai trò \\
+\hline
+2 & Quản trị tài khoản giáo viên & Xem danh sách, cập nhật, vô hiệu hóa giáo viên &  & X &  & Chỉ admin \\
+\hline
+3 & Quản lý học sinh & Thêm/sửa/xem/chuyển/rút/lưu trữ học sinh & X &  &  & Theo ownership \\
+\hline
+4 & Quản lý lớp học & Thêm/sửa/lưu trữ lớp, lịch, buổi học & X &  &  & Theo ownership \\
+\hline
+5 & Điểm danh & Xem và cập nhật điểm danh & X &  &  & Theo session/student ownership \\
+\hline
+6 & Tài chính & Quản lý giao dịch, khoản phí, số dư, báo cáo & X &  &  & Dữ liệu nhạy cảm \\
+\hline
+7 & Discord giáo viên/lớp & Liên kết Discord, chọn guild/channel, gửi thông báo/DM & X &  &  & Phụ thuộc credential \\
+\hline
+8 & Cấu hình bot Discord & Cập nhật token, client id, client secret &  & X &  & Dữ liệu rất nhạy cảm \\
+\hline
+9 & Uỷ quyền Discord của học sinh & Học sinh xác nhận OAuth để lưu Discord identity/token &  &  & X & Học sinh là tác nhân ngoài \\
+\hline
+10 & Codeforces Gym & Cấu hình credential, gắn Gym, xem standing & X & X &  & Admin có thể cập nhật credential giáo viên \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - Bảng trách nhiệm yêu cầu bảo mật:
+
+\begin{table}[!htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{|C{0.8cm}|L{2.4cm}|L{3.5cm}|Y|L{1.5cm}|}
+\hline
+\textbf{STT} & \textbf{Vai trò} & \textbf{Người dùng} & \textbf{Phần mềm} & \textbf{Ghi chú} \\
+\hline
+1 & Giáo viên & Sử dụng dữ liệu học sinh, lớp, tài chính, Discord và Codeforces đúng phạm vi mình quản lý. & Bắt buộc xác thực JWT, kiểm tra vai trò giáo viên và kiểm tra ownership ở các thao tác theo lớp/học sinh/buổi học/giao dịch. & \\
+\hline
+2 & Quản trị viên & Quản lý tài khoản giáo viên và cấu hình bot Discord. & Bắt buộc vai trò admin, không cho truy cập nghiệp vụ giáo viên nếu không đúng quyền. & \\
+\hline
+3 & Hệ thống ngoài & Discord và Codeforces trả dữ liệu qua API/\allowbreak OAuth. & Kiểm tra callback, bảo vệ token/secret, ghi nhận lỗi tích hợp và không lộ credential ở phản hồi. & \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Yêu cầu an toàn}
+
+Yêu cầu an toàn tập trung vào việc bảo toàn dữ liệu nghiệp vụ quan trọng, tránh
+xóa nhầm hoặc làm mất lịch sử học tập, điểm danh, tài chính và dữ liệu tích hợp
+ngoài hệ thống.
+
+\noindent - Bảng yêu cầu an toàn:
+
+\begin{table}[!htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{|C{0.8cm}|L{3.5cm}|L{3.4cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Nghiệp vụ không được phép thực hiện} & \textbf{Đối tượng liên quan} & \textbf{Ghi chú} \\
+\hline
+1 & Xóa cứng tài khoản giáo viên đang có dữ liệu nghiệp vụ & Giáo viên, học sinh, lớp, tài chính & Chỉ nên vô hiệu hóa tài khoản để giữ lịch sử. \\
+\hline
+2 & Xóa cứng học sinh đã có ghi danh, điểm danh, khoản phí, giao dịch hoặc kết quả Gym & Học sinh & Dùng trạng thái rút/chờ lưu trữ/lưu trữ thay cho xóa. \\
+\hline
+3 & Xóa cứng lớp học đã có học sinh, buổi học, điểm danh, Discord binding hoặc Gym & Lớp học & Dùng trạng thái archived. \\
+\hline
+4 & Xóa buổi học đã có điểm danh hoặc khoản phí phát sinh & \code{Session}, \code{Attendance}, \code{FeeRecord} & Dùng trạng thái cancelled và xử lý khoản phí liên quan. \\
+\hline
+5 & Ghi giao dịch hoặc cập nhật khoản phí cho học sinh không thuộc giáo viên hiện tại & \code{Student}, \code{Transaction}, \code{FeeRecord} & Phải kiểm tra ownership. \\
+\hline
+6 & Gửi thông báo Discord đến guild/channel không thuộc cấu hình lớp của giáo viên & Discord guild/channel & Tránh gửi sai nơi nhận. \\
+\hline
+7 & Hiển thị đầy đủ bot token, client secret, Codeforces API key/secret & Credential & Chỉ lưu bảo mật, hiển thị dạng ẩn hoặc không hiển thị. \\
+\hline
+8 & Gắn Gym hoặc xem standing của lớp không thuộc giáo viên hiện tại & \code{Class}, Gym, \code{GymStanding} & Phải kiểm tra ownership. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - Bảng trách nhiệm yêu cầu an toàn:
+
+\begin{table}[!htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{|C{0.8cm}|L{3cm}|L{3.2cm}|Y|L{1.5cm}|}
+\hline
+\textbf{STT} & \textbf{Nghiệp vụ} & \textbf{Người thực hiện} & \textbf{Biện pháp nghiệp vụ} & \textbf{Ghi chú} \\
+\hline
+1 & Kiểm soát tài khoản & Quản trị viên & Vô hiệu hóa thay vì xóa cứng, bảo vệ credential nhạy cảm. & \\
+\hline
+2 & Kiểm soát học sinh & Giáo viên & Quản lý vòng đời qua trạng thái ghi danh và lưu trữ. & \\
+\hline
+3 & Kiểm soát lớp và buổi học & Giáo viên & Lưu trữ lớp, hủy buổi học bằng trạng thái, giữ dữ liệu lịch sử. & \\
+\hline
+4 & Kiểm soát tài chính & Giáo viên & Không xóa mất dấu vết phí/giao dịch; cập nhật trạng thái thay cho mất lịch sử. & \\
+\hline
+5 & Kiểm soát tích hợp ngoài & Giáo viên, quản trị viên & Kiểm tra quyền sở hữu guild, channel, Gym và xử lý lỗi API ngoài. & \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Yêu cầu công nghệ}
+
+\noindent - Bảng yêu cầu công nghệ:
+
+\begin{table}[!htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{|C{0.9cm}|L{3cm}|Y|L{2.4cm}|}
+\hline
+\textbf{STT} & \textbf{Yêu cầu} & \textbf{Mô tả chi tiết} & \textbf{Ghi chú} \\
+\hline
+1 & Nền tảng & Ứng dụng web chạy trên trình duyệt hiện đại. & Desktop/laptop là chính. \\
+\hline
+2 & Frontend & React với Vite, TypeScript, component UI dùng trong thư mục frontend. & Giao diện tương tác. \\
+\hline
+3 & Backend & Node.js, Express, TypeScript, TypeORM theo kiến trúc modular monolith. & API dưới tiền tố \code{/api}. \\
+\hline
+4 & Cơ sở dữ liệu & Microsoft SQL Server/\allowbreak Azure SQL qua driver \code{mssql}, lưu Teacher, \code{Student}, \code{Class}, \code{Session}, \code{Attendance}, \code{Transaction}, \code{FeeRecord}, Discord và Gym. & Dữ liệu quan hệ. \\
+\hline
+5 & Bảo mật & JWT, bcrypt, RBAC, kiểm tra ownership, mã hóa hoặc che giấu credential nhạy cảm. & Tài khoản và credential. \\
+\hline
+6 & Tích hợp Discord & Discord OAuth, bot credential, guild/channel cache, gửi channel post và DM. & API ngoài. \\
+\hline
+7 & Tích hợp Codeforces & Codeforces credential, đồng bộ Gym, \code{GymProblem}, \code{GymStanding}. & API ngoài. \\
+\hline
+8 & Triển khai & Có Dockerfile và docker-compose để đóng gói ứng dụng; cơ sở dữ liệu được cấu hình qua biến môi trường DB hoặc chuỗi kết nối Azure SQL. & Phù hợp máy chủ nội bộ hoặc cloud. \\
+\hline
+9 & Dễ bảo trì & Phân module Account, System, \code{Student}, Classroom, Finance; backend giao tiếp nội bộ qua contract/persistence thay vì HTTP nội bộ. & Giảm phụ thuộc chéo. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent - Bảng trách nhiệm yêu cầu công nghệ:
+
+\begin{table}[!htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{|C{0.9cm}|L{3cm}|L{3.4cm}|Y|L{1.7cm}|}
+\hline
+\textbf{STT} & \textbf{Nghiệp vụ} & \textbf{Người dùng} & \textbf{Phần mềm} & \textbf{Ghi chú} \\
+\hline
+1 & Vận hành frontend & Giáo viên, quản trị viên & Cung cấp giao diện web ổn định trên trình duyệt hiện đại. & React/\allowbreak Vite. \\
+\hline
+2 & Vận hành backend &  & Cung cấp API ổn định, phân quyền, kiểm tra dữ liệu và xử lý nghiệp vụ. & Express/\allowbreak TypeORM. \\
+\hline
+3 & Vận hành cơ sở dữ liệu &  & Lưu trữ và truy xuất chính xác dữ liệu học sinh, lớp, buổi học, điểm danh, tài chính và tích hợp. & Azure SQL/MSSQL. \\
+\hline
+4 & Vận hành tích hợp & Giáo viên, quản trị viên & Kết nối Discord và Codeforces, cache dữ liệu cần thiết và ghi nhận lỗi. & API ngoài. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Phân tích yêu cầu}
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tính khả thi kỹ thuật:} Khá khả thi. Dự án hiện tại đã có cấu trúc backend theo modular monolith với các module Account, System, \code{Student}, Classroom và Finance; frontend dùng React/\allowbreak Vite; cơ sở dữ liệu dùng Microsoft SQL Server/\allowbreak Azure SQL thông qua TypeORM và driver \code{mssql}. Các nghiệp vụ nội bộ như quản lý học sinh, ghi danh, lớp học, buổi học, điểm danh và tài chính là các chức năng web quản trị phổ biến. Rủi ro kỹ thuật chính nằm ở tích hợp Discord và Codeforces vì phụ thuộc API ngoài, credential, OAuth, giới hạn tốc độ và khả năng lỗi mạng.
+
+\item \textbf{Tính khả thi nghiệp vụ:} Hoàn toàn khả thi. Quy trình nghiệp vụ đã rõ hơn so với bản trước: giáo viên quản lý học sinh theo Enrollment, tổ chức lớp bằng \code{ClassSchedule} và \code{Session}, ghi nhận \code{Attendance}, phát sinh \code{FeeRecord}, đối soát bằng \code{Transaction} và xem báo cáo. Codeforces không còn chỉ là thông tin rời rạc mà được mô hình hóa thành Gym, \code{GymProblem} và \code{GymStanding}; Discord không chỉ gửi tin mà còn có bot credential, guild binding, channel thông báo và voice channel điểm danh.
+
+\item \textbf{Tính khả thi về con người:} Khá khả thi nhưng cần hướng dẫn ban đầu cho các luồng nhiều bước. Giáo viên có thể làm quen nhanh với các chức năng cốt lõi nếu giao diện đi theo quy trình lớp học thực tế: tạo lớp, thêm học sinh, tạo buổi học, điểm danh, xem phí và thu tiền. Các phần khó hơn là cấu hình Discord, liên kết OAuth và Codeforces credential, nên cần thông báo lỗi rõ ràng và tách quyền quản trị viên khỏi quyền giáo viên.
+
+\item \textbf{Rủi ro dữ liệu:} Dữ liệu tài chính, điểm danh và trạng thái ghi danh có quan hệ chặt chẽ. Vì vậy hệ thống nên ưu tiên cập nhật bằng trạng thái thay vì xóa cứng, kiểm tra ownership ở mọi thao tác có khóa ngoại và giữ lịch sử đủ để truy vết học phí, hoàn tiền, buổi học đã hủy hoặc học sinh đã lưu trữ.
+
+\item \textbf{Rủi ro mở rộng:} Khi số lượng buổi học, điểm danh, \code{FeeRecord} và \code{GymStanding} tăng, các màn hình báo cáo cần được phân trang, lọc theo thời gian/lớp và tối ưu truy vấn. Những tác vụ đồng bộ Codeforces hoặc Discord nên được xử lý nền hoặc dùng cache để giao diện không phụ thuộc hoàn toàn vào thời gian phản hồi của API ngoài.
+\end{itemize}
+
+\section{Mô hình hoá yêu cầu chức năng}
+
+\subsection{Tổng quan về mô hình hoá yêu cầu}
+
+Phần mô hình hoá yêu cầu chức năng dùng để diễn đạt trực quan cách các tác nhân
+tương tác với hệ thống và cách dữ liệu đi qua các nghiệp vụ chính. Dựa trên dự
+án hiện tại, hệ thống tập trung vào quản lý lớp học lập trình thi đấu cho giáo
+viên, có thêm quản trị viên để vận hành tài khoản và bot Discord, học sinh tham
+gia luồng uỷ quyền Discord, đồng thời có hai hệ thống ngoài là Discord và
+Codeforces.
+
+Mục III là tiền đề trực tiếp cho phần mô hình hoá này. Các biểu mẫu, quy định,
+bảng trách nhiệm và phân tích yêu cầu ở mục III được dùng để xác định tác nhân,
+dữ liệu vào, dữ liệu ra, kho dữ liệu và điều kiện xử lý trong từng sơ đồ. Vì
+vậy, mỗi DFD và Use Case ở mục IV đều bám theo các nhóm nghiệp vụ đã đặc tả:
+tài khoản, học sinh và ghi danh, lớp học và buổi học, điểm danh, tài chính,
+Discord, Codeforces Gym và báo cáo.
+
+Những nghiệp vụ có cùng bản chất xử lý như thêm/sửa/xóa dữ liệu được mô tả theo
+cùng một mẫu luồng dữ liệu để báo cáo gọn và tránh lặp lại, nhưng vẫn giữ đúng
+các ràng buộc đã nêu ở mục III.
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{0.8cm}|L{2.8cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Tác nhân} & \textbf{Vai trò trong mô hình} \\
+\hline
+1 & Giáo viên & Người dùng chính, thực hiện quản lý học sinh, lớp học, lịch học, buổi học, điểm danh, tài chính, Discord và Codeforces Gym. \\
+\hline
+2 & Quản trị viên & Quản lý tài khoản giáo viên và cấu hình bot Discord dùng chung cho hệ thống. \\
+\hline
+3 & Học sinh & Thực hiện uỷ quyền Discord OAuth để hệ thống có thể lưu danh tính Discord và hỗ trợ tham gia guild lớp học. \\
+\hline
+4 & Discord & Hệ thống ngoài cung cấp OAuth, guild, channel, member API, voice state và gửi tin nhắn. \\
+\hline
+5 & Codeforces & Hệ thống ngoài cung cấp dữ liệu Gym, danh sách bài và bảng xếp hạng Gym. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Mô hình hoá theo chức năng (DFD -- Data Flow Diagram)}
+
+Các DFD dưới đây mô tả những luồng dữ liệu tiêu biểu nhất. Trong đó, ``Bộ nhớ
+phụ'' đại diện cho cơ sở dữ liệu Microsoft SQL Server/\allowbreak Azure SQL của
+hệ thống, nơi lưu các bảng nghiệp vụ như Teacher, Student, Enrollment, Class,
+Session, Attendance, FeeRecord, Transaction, Discord credential và Gym.
+
+\paragraph{Chức năng Đăng nhập hệ thống}
+
+\noindent\textbf{Sơ đồ luồng dữ liệu:}
+\begin{center}
+\resizebox{0.96\textwidth}{!}{%
+\begin{tikzpicture}[node distance=1.8cm and 2.6cm]
+    \node[dfdprocess] (login) {Xác thực\\tài khoản};
+    \node[dfdentity, above=of login] (user) {Giáo viên/\\Quản trị viên};
+    \node[dfdentity, left=of login] (input) {Thiết bị nhập};
+    \node[dfdentity, right=of login] (output) {Thiết bị xuất};
+    \node[dfddatastore, below=of login] (storage) {Bộ nhớ phụ};
+
+    \draw[dfdarrow] ([xshift=-0.4cm]user.south) -- node[left] {D1} ([xshift=-0.4cm]login.north);
+    \draw[dfdbluearrow] ([xshift=0.4cm]login.north) -- node[right] {D6} ([xshift=0.4cm]user.south);
+    \draw[dfdbluearrow] (input.east) -- node[above] {D2} (login.west);
+    \draw[dfdarrow] (login.east) -- node[above] {D5} (output.west);
+    \draw[dfdarrow] ([xshift=-0.4cm]storage.north) -- node[left] {D3} ([xshift=-0.4cm]login.south);
+    \draw[dfdarrow] ([xshift=0.4cm]login.south) -- node[right] {D4} ([xshift=0.4cm]storage.north);
+\end{tikzpicture}%
+}
+\end{center}
+
+\noindent\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Tên đăng nhập và mật khẩu.
+\item \textbf{D2:} Dữ liệu nhập từ giao diện đăng nhập.
+\item \textbf{D3:} Thông tin tài khoản, mật khẩu đã băm, vai trò và trạng thái tài khoản.
+\item \textbf{D4:} Nhật ký đăng nhập hoặc thời điểm truy cập gần nhất nếu hệ thống ghi nhận.
+\item \textbf{D5:} Token đăng nhập, vai trò và thông tin điều hướng giao diện.
+\item \textbf{D6:} Thông báo đăng nhập thành công hoặc lỗi xác thực.
+\end{itemize}
+
+\noindent\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Nhận tên đăng nhập và mật khẩu từ người dùng.
+\item \textbf{B2:} Truy vấn tài khoản tương ứng trong bộ nhớ phụ.
+\item \textbf{B3:} Kiểm tra mật khẩu bằng bcrypt, trạng thái tài khoản và vai trò.
+\item \textbf{B4:} Nếu thông tin không hợp lệ, trả thông báo lỗi và kết thúc.
+\item \textbf{B5:} Nếu hợp lệ, sinh JWT, trả thông tin phiên làm việc và điều hướng vào màn hình phù hợp.
+\end{itemize}
+
+\paragraph{Chức năng Quản lý học sinh và ghi danh}
+
+\noindent\textbf{Sơ đồ luồng dữ liệu:}
+\begin{center}
+\resizebox{0.96\textwidth}{!}{%
+\begin{tikzpicture}[node distance=1.8cm and 2.6cm]
+    \node[dfdprocess] (student) {Quản lý học sinh\\và ghi danh};
+    \node[dfdentity, above=of student] (teacher) {Giáo viên};
+    \node[dfdentity, left=of student] (input) {Thiết bị nhập};
+    \node[dfdentity, right=of student] (output) {Thiết bị xuất};
+    \node[dfddatastore, below=of student] (storage) {Bộ nhớ phụ};
+
+    \draw[dfdarrow] ([xshift=-0.4cm]teacher.south) -- node[left] {D1} ([xshift=-0.4cm]student.north);
+    \draw[dfdbluearrow] ([xshift=0.4cm]student.north) -- node[right] {D6} ([xshift=0.4cm]teacher.south);
+    \draw[dfdbluearrow] (input.east) -- node[above] {D2} (student.west);
+    \draw[dfdarrow] (student.east) -- node[above] {D5} (output.west);
+    \draw[dfdarrow] ([xshift=-0.4cm]storage.north) -- node[left] {D3} ([xshift=-0.4cm]student.south);
+    \draw[dfdarrow] ([xshift=0.4cm]student.south) -- node[right] {D4} ([xshift=0.4cm]storage.north);
+\end{tikzpicture}%
+}
+\end{center}
+
+\noindent\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Thông tin học sinh, lớp ghi danh, Codeforces handle, số dư ban đầu hoặc trạng thái lưu trữ.
+\item \textbf{D2:} Dữ liệu nhập từ biểu mẫu thêm/sửa học sinh hoặc xử lý học sinh chờ lưu trữ.
+\item \textbf{D3:} Danh sách học sinh, lớp học, ghi danh hiện có và số dư tài chính liên quan.
+\item \textbf{D4:} Hồ sơ học sinh, bản ghi Enrollment hoặc trạng thái học sinh được cập nhật.
+\item \textbf{D5:} Danh sách học sinh, trạng thái ghi danh và kết quả lọc/tìm kiếm.
+\item \textbf{D6:} Thông báo thao tác thành công, lỗi ràng buộc hoặc cảnh báo còn công nợ.
+\end{itemize}
+
+\noindent\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Giáo viên chọn thao tác thêm, cập nhật, ghi danh, rút khỏi lớp hoặc lưu trữ học sinh.
+\item \textbf{B2:} Hệ thống kiểm tra giáo viên có quyền trên lớp và học sinh liên quan.
+\item \textbf{B3:} Kiểm tra dữ liệu bắt buộc như họ tên, Codeforces handle và lớp học khi tạo ghi danh.
+\item \textbf{B4:} Nếu học sinh còn số dư hoặc công nợ khi lưu trữ, hệ thống chuyển sang trạng thái chờ xử lý hoặc cảnh báo theo quy định.
+\item \textbf{B5:} Ghi nhận thay đổi vào Student và Enrollment, sau đó trả danh sách mới cho giao diện.
+\end{itemize}
+
+\paragraph{Chức năng Điểm danh buổi học và phát sinh học phí}
+
+\noindent\textbf{Sơ đồ luồng dữ liệu:}
+\begin{center}
+\resizebox{0.96\textwidth}{!}{%
+\begin{tikzpicture}[node distance=1.8cm and 2.6cm]
+    \node[dfdprocess] (attendance) {Điểm danh\\buổi học};
+    \node[dfdentity, above=of attendance] (teacher) {Giáo viên};
+    \node[dfdentity, left=of attendance] (discord) {Discord};
+    \node[dfdentity, right=of attendance] (output) {Thiết bị xuất};
+    \node[dfddatastore, below=of attendance] (storage) {Bộ nhớ phụ};
+
+    \draw[dfdarrow] ([xshift=-0.4cm]teacher.south) -- node[left] {D1} ([xshift=-0.4cm]attendance.north);
+    \draw[dfdbluearrow] ([xshift=0.4cm]attendance.north) -- node[right] {D6} ([xshift=0.4cm]teacher.south);
+    \draw[dfdbluearrow] (discord.east) -- node[above] {D2} (attendance.west);
+    \draw[dfdarrow] (attendance.east) -- node[above] {D5} (output.west);
+    \draw[dfdarrow] ([xshift=-0.4cm]storage.north) -- node[left] {D3} ([xshift=-0.4cm]attendance.south);
+    \draw[dfdarrow] ([xshift=0.4cm]attendance.south) -- node[right] {D4} ([xshift=0.4cm]storage.north);
+\end{tikzpicture}%
+}
+\end{center}
+
+\noindent\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Buổi học cần điểm danh và trạng thái từng học sinh do giáo viên cập nhật.
+\item \textbf{D2:} Dữ liệu voice state từ Discord nếu lớp có voice channel điểm danh.
+\item \textbf{D3:} Buổi học, danh sách ghi danh, bản ghi điểm danh và khoản học phí đã phát sinh.
+\item \textbf{D4:} Attendance mới/cập nhật và FeeRecord tương ứng với buổi học.
+\item \textbf{D5:} Bảng điểm danh, trạng thái buổi học và khoản phí phát sinh.
+\item \textbf{D6:} Thông báo lưu điểm danh, lỗi buổi học bị hủy hoặc lỗi quyền truy cập.
+\end{itemize}
+
+\noindent\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Giáo viên mở buổi học và nhập hoặc xác nhận trạng thái điểm danh.
+\item \textbf{B2:} Hệ thống đọc danh sách học sinh đang ghi danh trong lớp và trạng thái buổi học.
+\item \textbf{B3:} Nếu có cấu hình Discord voice channel, hệ thống có thể dùng dữ liệu voice state để gợi ý điểm danh.
+\item \textbf{B4:} Khi học sinh được ghi nhận có mặt, hệ thống tạo hoặc kích hoạt FeeRecord cho buổi học.
+\item \textbf{B5:} Nếu buổi học đã hủy hoặc không thuộc giáo viên, hệ thống từ chối cập nhật.
+\end{itemize}
+
+\paragraph{Chức năng Quản lý tài chính và báo cáo}
+
+\noindent\textbf{Sơ đồ luồng dữ liệu:}
+\begin{center}
+\resizebox{0.96\textwidth}{!}{%
+\begin{tikzpicture}[node distance=1.8cm and 2.6cm]
+    \node[dfdprocess] (finance) {Quản lý giao dịch\\và báo cáo};
+    \node[dfdentity, above=of finance] (teacher) {Giáo viên};
+    \node[dfdentity, left=of finance] (input) {Thiết bị nhập};
+    \node[dfdentity, right=of finance] (output) {Thiết bị xuất};
+    \node[dfddatastore, below=of finance] (storage) {Bộ nhớ phụ};
+
+    \draw[dfdarrow] ([xshift=-0.4cm]teacher.south) -- node[left] {D1} ([xshift=-0.4cm]finance.north);
+    \draw[dfdbluearrow] ([xshift=0.4cm]finance.north) -- node[right] {D6} ([xshift=0.4cm]teacher.south);
+    \draw[dfdbluearrow] (input.east) -- node[above] {D2} (finance.west);
+    \draw[dfdarrow] (finance.east) -- node[above] {D5} (output.west);
+    \draw[dfdarrow] ([xshift=-0.4cm]storage.north) -- node[left] {D3} ([xshift=-0.4cm]finance.south);
+    \draw[dfdarrow] ([xshift=0.4cm]finance.south) -- node[right] {D4} ([xshift=0.4cm]storage.north);
+\end{tikzpicture}%
+}
+\end{center}
+
+\noindent\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Thông tin giao dịch thu tiền/hoàn tiền hoặc tiêu chí báo cáo.
+\item \textbf{D2:} Dữ liệu nhập từ biểu mẫu giao dịch, bộ lọc lớp, học sinh và khoảng thời gian.
+\item \textbf{D3:} FeeRecord, Transaction, số dư học sinh và dữ liệu lớp/buổi học liên quan.
+\item \textbf{D4:} Giao dịch mới, trạng thái FeeRecord hoặc dữ liệu đối soát được cập nhật.
+\item \textbf{D5:} Bảng công nợ, lịch sử giao dịch và báo cáo tài chính.
+\item \textbf{D6:} Kết quả lưu giao dịch, lỗi số tiền hoặc báo cáo được kết xuất.
+\end{itemize}
+
+\noindent\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Giáo viên nhập khoản thu, khoản hoàn hoặc chọn tiêu chí xem báo cáo.
+\item \textbf{B2:} Hệ thống kiểm tra học sinh/lớp thuộc phạm vi giáo viên và số tiền không âm.
+\item \textbf{B3:} Hệ thống ghi Transaction, cập nhật trạng thái các FeeRecord nếu có đối soát.
+\item \textbf{B4:} Khi lập báo cáo, hệ thống tổng hợp phải thu, đã thu, hoàn tiền và số dư theo kỳ.
+\item \textbf{B5:} Trả bảng công nợ hoặc báo cáo tài chính cho giao diện.
+\end{itemize}
+
+\paragraph{Chức năng Tích hợp Discord và Codeforces Gym}
+
+\noindent\textbf{Sơ đồ luồng dữ liệu:}
+\begin{center}
+\resizebox{0.96\textwidth}{!}{%
+\begin{tikzpicture}[node distance=1.8cm and 2.4cm]
+    \node[dfdprocess] (integration) {Tích hợp Discord\\và Codeforces Gym};
+    \node[dfdentity, above=of integration] (teacher) {Giáo viên/\\Quản trị viên};
+    \node[dfdentity, left=of integration] (discord) {Discord};
+    \node[dfdentity, right=of integration] (codeforces) {Codeforces};
+    \node[dfddatastore, below=of integration] (storage) {Bộ nhớ phụ};
+
+    \draw[dfdarrow] ([xshift=-0.4cm]teacher.south) -- node[left] {D1} ([xshift=-0.4cm]integration.north);
+    \draw[dfdbluearrow] ([xshift=0.4cm]integration.north) -- node[right] {D6} ([xshift=0.4cm]teacher.south);
+    \draw[dfdbluearrow] (discord.east) -- node[above] {D2} (integration.west);
+    \draw[dfdbluearrow] (codeforces.west) -- node[above] {D5} (integration.east);
+    \draw[dfdarrow] ([xshift=-0.4cm]storage.north) -- node[left] {D3} ([xshift=-0.4cm]integration.south);
+    \draw[dfdarrow] ([xshift=0.4cm]integration.south) -- node[right] {D4} ([xshift=0.4cm]storage.north);
+\end{tikzpicture}%
+}
+\end{center}
+
+\noindent\textbf{Mô tả luồng dữ liệu:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{D1:} Bot credential, yêu cầu liên kết Discord, chọn guild/channel, gửi thông báo hoặc gắn Gym cho lớp.
+\item \textbf{D2:} OAuth callback, danh sách guild/channel, trạng thái gửi tin hoặc voice state từ Discord.
+\item \textbf{D3:} Credential, guild/channel cache, class binding, Gym, GymProblem và GymStanding đã lưu.
+\item \textbf{D4:} Credential đã mã hóa/ẩn, cấu hình lớp, nhật ký gửi tin hoặc dữ liệu Gym đồng bộ.
+\item \textbf{D5:} Danh sách Gym, bài trong Gym và bảng xếp hạng từ Codeforces.
+\item \textbf{D6:} Kết quả xác minh, cấu hình, gửi thông báo hoặc hiển thị bảng xếp hạng Gym.
+\end{itemize}
+
+\noindent\textbf{Thuật toán:}
+\begin{itemize}[leftmargin=*]
+\item \textbf{B1:} Quản trị viên cấu hình bot Discord hoặc giáo viên liên kết Discord/Codeforces cho lớp.
+\item \textbf{B2:} Hệ thống kiểm tra quyền, callback OAuth, credential và lớp học thuộc giáo viên.
+\item \textbf{B3:} Với Discord, hệ thống cache guild/channel, lưu binding và gửi thông báo/DM khi có yêu cầu.
+\item \textbf{B4:} Với Codeforces, hệ thống dùng credential để đồng bộ Gym, GymProblem và GymStanding.
+\item \textbf{B5:} Nếu API ngoài lỗi, hệ thống trả thông báo rõ ràng và ưu tiên dùng dữ liệu cache khi phù hợp.
+\end{itemize}
+
+\subsection{Sơ đồ sử dụng chức năng (Use Case Diagram)}
+
+\subsubsection{Danh sách Use Case chính}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|C{0.8cm}|L{2.8cm}|Y|}
+\hline
+\textbf{STT} & \textbf{Tác nhân} & \textbf{Use Case chính} \\
+\hline
+1 & Giáo viên & Đăng nhập; xem tổng quan giảng dạy; cập nhật hồ sơ cá nhân; liên kết Discord; quản lý học sinh; quản lý ghi danh; xử lý học sinh chờ lưu trữ; quản lý lớp học, lịch học và buổi học; điểm danh; theo dõi kết quả học tập; quản lý giao dịch tài chính; xem báo cáo tài chính; thiết lập Discord cho lớp; gửi thông báo; gắn Gym Codeforces; xem bảng xếp hạng Gym. \\
+\hline
+2 & Quản trị viên & Đăng nhập; quản lý tài khoản giáo viên; cấu hình bot Discord toàn hệ thống. \\
+\hline
+3 & Học sinh & Uỷ quyền Discord OAuth để hệ thống lưu danh tính Discord và hỗ trợ quản lý membership trong guild lớp học. \\
+\hline
+4 & Discord & Hỗ trợ xác minh OAuth, cung cấp guild/\allowbreak channel/\allowbreak member/\allowbreak voice state và tiếp nhận yêu cầu gửi thông báo hoặc DM. \\
+\hline
+5 & Codeforces & Cung cấp dữ liệu Gym, bài trong Gym và bảng xếp hạng để hệ thống đồng bộ và hiển thị cho giáo viên. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Sơ đồ Use Case tổng quan}
+
+Sơ đồ Use Case tổng quan nên thể hiện một hệ thống duy nhất với năm tác nhân:
+Giáo viên, Quản trị viên, Học sinh, Discord và Codeforces. Nếu nhóm đã xuất file
+ảnh từ công cụ UML, có thể đặt ảnh vào một trong các đường dẫn bên dưới để
+Overleaf tự nạp.
+
+\begin{figure}[!htbp]
+\centering
+\IfFileExists{images/use-case-overview.png}{%
+    \includegraphics[width=0.96\textwidth]{images/use-case-overview.png}%
+}{%
+\IfFileExists{report/functional-requirements/diagrams/use-case-overview.png}{%
+    \includegraphics[width=0.96\textwidth]{report/functional-requirements/diagrams/use-case-overview.png}%
+}{%
+    \fbox{\parbox[c][5cm][c]{0.9\textwidth}{\centering
+    Chưa tìm thấy ảnh sơ đồ Use Case tổng quan.\\[4pt]
+    Có thể đặt file tại \code{images/use-case-overview.png}.}}
+}}%
+\caption{Sơ đồ Use Case tổng quan của hệ thống giúp giáo viên quản lý lớp học lập trình thi đấu}
+\end{figure}
+
+\subsubsection{Đặc tả Use Case tiêu biểu}
+
+\begin{table}[!htbp]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|L{3cm}|Y|Y|Y|}
+\hline
+\textbf{Use Case} & \textbf{Tóm tắt} & \textbf{Dòng sự kiện chính} & \textbf{Dòng sự kiện phụ} \\
+\hline
+Quản lý học sinh & Giáo viên tạo, cập nhật, tra cứu và xử lý trạng thái học sinh. & Giáo viên nhập thông tin học sinh; hệ thống kiểm tra quyền sở hữu, dữ liệu bắt buộc và Codeforces handle; hệ thống lưu \code{Student}/\code{Enrollment} và cập nhật danh sách. & Nếu thiếu dữ liệu, trùng hoặc học sinh còn công nợ khi lưu trữ, hệ thống báo lỗi hoặc chuyển sang trạng thái chờ xử lý. \\
+\hline
+Điểm danh buổi học & Giáo viên ghi nhận trạng thái tham gia buổi học và hệ thống phát sinh học phí. & Giáo viên chọn buổi học; hệ thống tải danh sách ghi danh; giáo viên cập nhật trạng thái; hệ thống lưu \code{Attendance} và \code{FeeRecord}. & Nếu buổi học bị hủy, không thuộc giáo viên hoặc học sinh không còn ghi danh, hệ thống từ chối cập nhật. \\
+\hline
+Quản lý giao dịch tài chính & Giáo viên ghi nhận khoản thu/hoàn tiền và đối soát công nợ. & Giáo viên nhập giao dịch; hệ thống kiểm tra học sinh, số tiền và loại giao dịch; hệ thống lưu \code{Transaction}, cập nhật \code{FeeRecord} và số dư. & Nếu số tiền không hợp lệ hoặc giao dịch vượt phạm vi dữ liệu của giáo viên, hệ thống báo lỗi. \\
+\hline
+Thiết lập Discord cho lớp học & Giáo viên chọn guild, channel thông báo và voice channel cho lớp. & Giáo viên liên kết Discord; hệ thống lấy guild/\allowbreak channel; giáo viên chọn cấu hình cho lớp; hệ thống lưu \code{ClassDiscordBinding}. & Nếu bot chưa được cấu hình, guild/\allowbreak channel không hợp lệ hoặc không thuộc dữ liệu Discord đã cache, hệ thống báo lỗi. \\
+\hline
+Gắn Gym Codeforces cho lớp học & Giáo viên gắn Gym đã đồng bộ vào lớp và xem standing. & Giáo viên chọn lớp và Gym; hệ thống kiểm tra quyền lớp; hệ thống lưu liên kết Gym; giáo viên xem \code{GymProblem} và \code{GymStanding}. & Nếu Gym chưa đồng bộ, credential Codeforces lỗi hoặc lớp không hợp lệ, hệ thống thông báo nguyên nhân. \\
+\hline
+Uỷ quyền Discord của học sinh & Học sinh xác nhận OAuth để hệ thống lưu danh tính Discord. & Học sinh mở liên kết uỷ quyền; Discord trả callback; hệ thống kiểm tra token và lưu \code{StudentDiscordCredential}. & Nếu callback không hợp lệ, học sinh không tồn tại hoặc Discord từ chối quyền, hệ thống không lưu credential. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\end{document}

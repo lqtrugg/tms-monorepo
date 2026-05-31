@@ -165,7 +165,7 @@ For every documented function, record a diagram decision:
 
 - DFD included.
 - Activity diagram included.
-- Diagrams included.
+- Diagrams included.ki
 - Diagrams omitted.
 - Justification for each omitted sequence or collaboration diagram.
 
