@@ -24,5 +24,4 @@ export const gymListQuerySchema = z.object({
 
 export const bindClassGymBodySchema = z.object({
   gym_id: requiredTrimmedStringSchema.regex(/^\d+$/, 'gym_id must be numeric'),
-  pull_interval_minutes: positiveIntegerSchema.optional(),
 });

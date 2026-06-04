@@ -9,7 +9,6 @@ export type GymListQuery = {
 
 export type BindClassGymInput = {
   gym_id: string;
-  pull_interval_minutes?: number;
 };
 
 export type GymSummarySource = {
@@ -214,13 +213,11 @@ export type ClassDetails = {
   active_students: ClassDetailStudentSummary[];
   topics: Array<{
     id: number;
-    teacher_id: number;
     class_id: number;
     title: string;
     gym_link: string;
     gym_id: string | null;
     closed_at: Date | null;
-    pull_interval_minutes: number;
     last_pulled_at: Date | null;
     created_at: Date;
     status: GymStatusFilter;

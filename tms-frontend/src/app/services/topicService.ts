@@ -4,13 +4,11 @@ export type BackendTopicStatus = "active";
 
 export interface BackendTopic {
   id: number;
-  teacher_id: number;
   class_id: number | null;
   title: string;
   gym_link: string;
   gym_id: string | null;
   closed_at: string | null;
-  pull_interval_minutes: number;
   last_pulled_at: string | null;
   created_at: string;
   status: BackendTopicStatus;
@@ -89,7 +87,7 @@ export async function listTopics(filters?: {
 
 export async function bindClassTopic(
   classId: number,
-  payload: { gym_id: string; pull_interval_minutes?: number },
+  payload: { gym_id: string },
 ): Promise<BackendTopic> {
   const data = await apiRequest<{ gym: BackendTopic }>(`/classes/${classId}/gyms`, {
     method: "POST",

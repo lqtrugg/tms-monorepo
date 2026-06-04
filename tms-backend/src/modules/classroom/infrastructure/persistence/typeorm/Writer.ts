@@ -173,7 +173,6 @@ export async function assertClassArchivable(
 
   const activeTopicCount = await gymRepo.count({
     where: {
-      teacher_id: teacherId,
       class_id: classId,
     },
   });
@@ -916,32 +915,40 @@ export class TypeOrmGymWriter {
   }
 
   findOwnedGym(teacherId: number, gymId: number) {
-    return this.manager.getRepository(Gym).findOneBy({
-      id: gymId,
-      teacher_id: teacherId,
+    return this.findCurrentOwnerHandle(teacherId).then((ownerHandle) => {
+      if (!ownerHandle) {
+        return null;
+      }
+
+      return this.manager.getRepository(Gym).findOneBy({
+        id: gymId,
+        owner_handle: ownerHandle,
+      });
     });
   }
 
-  findClassGymByCodeforcesGymId(teacherId: number, classId: number, codeforcesGymId: string) {
-    return this.manager.getRepository(Gym).findOneBy({
+  async findCurrentOwnerHandle(teacherId: number): Promise<string | null> {
+    const config = await this.manager.getRepository(TeacherCodeforcesCredential).findOneBy({
       teacher_id: teacherId,
-      class_id: classId,
-      gym_id: codeforcesGymId,
     });
+    return config?.codeforces_handle?.trim().toLowerCase() || null;
   }
 
-  findCatalogGym(teacherId: number, codeforcesGymId: string) {
+  async findTeacherGymByCodeforcesGymId(teacherId: number, codeforcesGymId: string) {
+    const ownerHandle = await this.findCurrentOwnerHandle(teacherId);
+    if (!ownerHandle) {
+      return null;
+    }
+
     return this.manager.getRepository(Gym).findOneBy({
-      teacher_id: teacherId,
+      owner_handle: ownerHandle,
       gym_id: codeforcesGymId,
-      class_id: IsNull(),
     });
   }
 
   findOwnedClassGym(teacherId: number, classId: number, gymId: number) {
     return this.manager.getRepository(Gym).findOneBy({
       id: gymId,
-      teacher_id: teacherId,
       class_id: classId,
     });
   }
@@ -956,6 +963,7 @@ export class TypeOrmGymWriter {
 
   async syncCodeforcesGymCatalog(
     teacherId: number,
+    ownerHandle: string,
     ownedGyms: CodeforcesContestListItem[],
     pulledAt: Date,
   ): Promise<number> {
@@ -965,9 +973,8 @@ export class TypeOrmGymWriter {
     for (const gym of ownedGyms) {
       const gymId = String(gym.id);
       const existing = await gymRepo.findOneBy({
-        teacher_id: teacherId,
+        owner_handle: ownerHandle,
         gym_id: gymId,
-        class_id: IsNull(),
       });
 
       if (existing) {
@@ -979,18 +986,17 @@ export class TypeOrmGymWriter {
       }
 
       await gymRepo.save(gymRepo.create({
-        teacher_id: teacherId,
+        owner_handle: ownerHandle,
         class_id: null,
         gym_id: gymId,
         title: gym.name.trim(),
         gym_link: buildCodeforcesGymLink(gymId),
-        pull_interval_minutes: 60,
         last_pulled_at: pulledAt,
       }));
     }
 
     const catalogGyms = await gymRepo.find({
-      where: { teacher_id: teacherId, class_id: IsNull() },
+      where: { owner_handle: ownerHandle, class_id: IsNull() },
       select: { id: true, gym_id: true },
     });
     const staleIds = catalogGyms
@@ -1018,7 +1024,6 @@ export class TypeOrmGymWriter {
 
       const gym = await gymRepo.findOneBy({
         id: input.gymId,
-        teacher_id: input.teacherId,
         class_id: input.classId,
       });
       if (!gym) {
@@ -1170,15 +1175,12 @@ export class TypeOrmGymWriter {
 
   async deleteGym(gym: Gym): Promise<Gym> {
     await this.manager.getRepository(GymStanding).delete({
-      teacher_id: gym.teacher_id,
       topic_id: gym.id,
     });
     await this.manager.getRepository(GymProblem).delete({
-      teacher_id: gym.teacher_id,
       topic_id: gym.id,
     });
     await this.manager.getRepository(Gym).delete({
-      teacher_id: gym.teacher_id,
       id: gym.id,
     });
 

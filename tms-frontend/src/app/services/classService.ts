@@ -46,13 +46,11 @@ export interface BackendClassDetailStudent {
 
 export interface BackendClassDetailTopic {
   id: number;
-  teacher_id: number;
   class_id: number;
   title: string;
   gym_link: string;
   gym_id: string | null;
   closed_at: string | null;
-  pull_interval_minutes: number;
   last_pulled_at: string | null;
   created_at: string;
   status: "active";

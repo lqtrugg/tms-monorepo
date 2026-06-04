@@ -123,7 +123,7 @@ export class CodeforcesWorker {
 
     // Step 3: Sync gym catalog (upsert catalog topics with class_id = NULL)
     try {
-      syncedCatalog = await gymWriter.syncCodeforcesGymCatalog(teacherId, ownedGyms, now);
+      syncedCatalog = await gymWriter.syncCodeforcesGymCatalog(teacherId, config.ownerHandle, ownedGyms, now);
     } catch (error) {
       console.warn(`[codeforces-sync] teacher=${teacherId}, failed to sync gym catalog`, error);
     }

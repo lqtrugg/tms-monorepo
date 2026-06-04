@@ -6,6 +6,7 @@ import { DiscordGuildChannelCache } from '../../../../../infrastructure/external
 import { DiscordUserGuild } from '../../../../../infrastructure/external/discord/cache/entities/discord-user-guild.entity.js';
 import { ClassDiscordBinding } from '../../../../../infrastructure/database/entities/discord/class-discord-binding.entity.js';
 import { Enrollment } from '../../../../../infrastructure/database/entities/enrollment.entity.js';
+import { Gym } from '../../../../../infrastructure/database/entities/gym/gym.entity.js';
 import { Student } from '../../../../../infrastructure/database/entities/student.entity.js';
 import { Teacher } from '../../../../../infrastructure/database/entities/teacher.entity.js';
 import { TeacherCodeforcesCredential } from '../../../../../infrastructure/database/entities/teacher-codeforces-credential.entity.js';
@@ -311,6 +312,7 @@ export class TypeOrmTeacherWriter {
     const repo = AppDataSource.getRepository(TeacherCodeforcesCredential);
     const existing = await repo.findOneBy({ teacher_id: teacherId });
     const config = existing ?? repo.create({ teacher_id: teacherId });
+    const previousOwnerHandle = existing?.codeforces_handle?.trim().toLowerCase() || null;
     const nextHandle = hasHandleInput
       ? input.codeforces_handle?.trim() || null
       : config.codeforces_handle;
@@ -342,6 +344,16 @@ export class TypeOrmTeacherWriter {
 
     config.updated_at = new Date();
     const saved = await repo.save(config);
+
+    const nextOwnerHandle = saved.codeforces_handle?.trim().toLowerCase() || null;
+    const handleChanged = previousOwnerHandle !== nextOwnerHandle;
+
+    if (handleChanged && previousOwnerHandle) {
+      await AppDataSource.getRepository(Gym).update(
+        { owner_handle: previousOwnerHandle },
+        { class_id: null },
+      );
+    }
 
     return saved;
   }

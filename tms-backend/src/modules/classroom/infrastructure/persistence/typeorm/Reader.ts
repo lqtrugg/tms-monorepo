@@ -1,4 +1,4 @@
-import { type EntityManager, type FindOptionsWhere, In, IsNull, Not } from 'typeorm';
+import { type EntityManager, type FindOptionsWhere, In, IsNull } from 'typeorm';
 import { type AttendanceListFilters, type AttendanceRecordSummary, type ClassDetails, type ClassDiscordGuildSummary, type ClassListFilters, type ClassScheduleSummary, type ClassStatus, type ClassSummary, type SessionAttendanceSummary, type SessionListFilters, SessionStatus, type SessionSummary } from '../../../contracts/types.js';
 import { HttpError } from '../../../../../shared/errors/HttpError.js';
 import { Attendance } from '../../../../../infrastructure/database/entities/attendance.entity.js';
@@ -17,6 +17,7 @@ import { AppDataSource } from '../../../../../infrastructure/database/data-sourc
 import { DiscordGuildChannelCache } from '../../../../../infrastructure/external/discord/cache/entities/discord-guild-channel-cache.entity.js';
 import { DiscordUserGuild } from '../../../../../infrastructure/external/discord/cache/entities/discord-user-guild.entity.js';
 import { TypeOrmDiscordCacheStore } from '../../../../../infrastructure/external/discord/cache/discord-cache.store.js';
+import { TeacherCodeforcesCredential } from '../../../../../infrastructure/database/entities/teacher-codeforces-credential.entity.js';
 import { findTeacherDiscordUserId } from '../../../../account/infrastructure/persistence/typeorm/Writer.js';
 
 export type ClassDiscordBindingContext = {
@@ -185,12 +186,10 @@ export async function listTeacherDiscordChannelsForGuild(
 
 export type CodeforcesBoundGymSyncTarget = {
   id: number;
-  teacher_id: number;
   class_id: number;
   title: string;
   gym_link: string;
   gym_id: string | null;
-  pull_interval_minutes: number;
   last_pulled_at: Date | null;
   created_at: Date;
 };
@@ -198,15 +197,39 @@ export type CodeforcesBoundGymSyncTarget = {
 export class TypeOrmGymReader {
   constructor(private readonly manager: EntityManager) {}
 
-  listGymsForTeacher(teacherId: number, filters: { class_id?: number | null }) {
+  private async findCurrentOwnerHandle(teacherId: number): Promise<string | null> {
+    const credential = await this.manager.getRepository(TeacherCodeforcesCredential).findOneBy({
+      teacher_id: teacherId,
+    });
+    return credential?.codeforces_handle?.trim().toLowerCase() || null;
+  }
+
+  async listGymsForTeacher(teacherId: number, filters: { class_id?: number | null }) {
+    const currentOwnerHandle = await this.findCurrentOwnerHandle(teacherId);
+    if (filters.class_id !== undefined) {
+      if (filters.class_id === null && !currentOwnerHandle) {
+        return [];
+      }
+
+      return this.manager.getRepository(Gym).find({
+        where: {
+          ...(filters.class_id === null
+            ? currentOwnerHandle ? { owner_handle: currentOwnerHandle, class_id: IsNull() } : {}
+            : { class_id: filters.class_id }),
+        },
+        order: {
+          created_at: 'DESC',
+        },
+      });
+    }
+
+    if (!currentOwnerHandle) {
+      return [];
+    }
+
     return this.manager.getRepository(Gym).find({
       where: {
-        teacher_id: teacherId,
-        ...(filters.class_id === null
-          ? { class_id: IsNull() }
-          : filters.class_id !== undefined
-            ? { class_id: filters.class_id }
-            : {}),
+        owner_handle: currentOwnerHandle,
       },
       order: {
         created_at: 'DESC',
@@ -215,16 +238,21 @@ export class TypeOrmGymReader {
   }
 
   findOwnedGym(teacherId: number, gymId: number) {
-    return this.manager.getRepository(Gym).findOneBy({
-      id: gymId,
-      teacher_id: teacherId,
+    return this.findCurrentOwnerHandle(teacherId).then((ownerHandle) => {
+      if (!ownerHandle) {
+        return null;
+      }
+
+      return this.manager.getRepository(Gym).findOneBy({
+        id: gymId,
+        owner_handle: ownerHandle,
+      });
     });
   }
 
   findOwnedClassGym(teacherId: number, classId: number, gymId: number) {
     return this.manager.getRepository(Gym).findOneBy({
       id: gymId,
-      teacher_id: teacherId,
       class_id: classId,
     });
   }
@@ -272,10 +300,20 @@ export class TypeOrmGymReader {
   }
 
   async listBoundCodeforcesGymsForTeacher(teacherId: number): Promise<CodeforcesBoundGymSyncTarget[]> {
-    const gyms = await this.manager.getRepository(Gym).find({
+    const classes = await this.manager.getRepository(Class).find({
       where: {
         teacher_id: teacherId,
-        class_id: Not(IsNull()),
+      },
+      select: { id: true },
+    });
+    const classIds = classes.map((classEntity) => classEntity.id);
+    if (classIds.length === 0) {
+      return [];
+    }
+
+    const gyms = await this.manager.getRepository(Gym).find({
+      where: {
+        class_id: In(classIds),
       },
     });
 
@@ -283,12 +321,10 @@ export class TypeOrmGymReader {
       .filter((gym): gym is Gym & { class_id: number } => gym.class_id !== null)
       .map((gym) => ({
         id: gym.id,
-        teacher_id: gym.teacher_id,
         class_id: gym.class_id,
         title: gym.title,
         gym_link: gym.gym_link,
         gym_id: gym.gym_id,
-        pull_interval_minutes: gym.pull_interval_minutes,
         last_pulled_at: gym.last_pulled_at,
         created_at: gym.created_at,
       }));
@@ -415,6 +451,13 @@ export class TypeOrmAttendanceReader {
 export class TypeOrmClassReader {
   constructor(private readonly manager: EntityManager) {}
 
+  private async findCurrentOwnerHandle(teacherId: number): Promise<string | null> {
+    const credential = await this.manager.getRepository(TeacherCodeforcesCredential).findOneBy({
+      teacher_id: teacherId,
+    });
+    return credential?.codeforces_handle?.trim().toLowerCase() || null;
+  }
+
   countOwnedClasses(teacherId: number, classIds: number[]): Promise<number> {
     if (classIds.length === 0) {
       return Promise.resolve(0);
@@ -442,9 +485,19 @@ export class TypeOrmClassReader {
       return Promise.resolve(0);
     }
 
-    return this.manager.getRepository(Gym).countBy({
-      id: In(gymIds),
-      teacher_id: teacherId,
+    return this.findCurrentOwnerHandle(teacherId).then((ownerHandle) => {
+      const query = this.manager.getRepository(Gym)
+        .createQueryBuilder('gym')
+        .leftJoin(Class, 'classEntity', 'classEntity.id = gym.class_id')
+        .where('gym.id IN (:...gymIds)', { gymIds })
+        .andWhere(
+          ownerHandle
+            ? '(classEntity.teacher_id = :teacherId OR (gym.class_id IS NULL AND gym.owner_handle = :ownerHandle))'
+            : 'classEntity.teacher_id = :teacherId',
+          { teacherId, ownerHandle },
+        );
+
+      return query.getCount();
     });
   }
 
@@ -503,6 +556,8 @@ export class TypeOrmClassReader {
       return null;
     }
 
+    const currentOwnerHandle = await this.findCurrentOwnerHandle(teacherId);
+
     const [schedules, discordGuild, activeStudents, topics] = await Promise.all([
       this.manager.getRepository(ClassSchedule).find({
         where: {
@@ -552,15 +607,17 @@ export class TypeOrmClassReader {
           status: string;
           enrolled_at: Date;
         }>(),
-      this.manager.getRepository(Gym).find({
-        where: {
-          teacher_id: teacherId,
-          class_id: classId,
-        },
-        order: {
-          created_at: 'DESC',
-        },
-      }),
+      currentOwnerHandle
+        ? this.manager.getRepository(Gym).find({
+          where: {
+            class_id: classId,
+            owner_handle: currentOwnerHandle,
+          },
+          order: {
+            created_at: 'DESC',
+          },
+        })
+        : Promise.resolve([] as Gym[]),
     ]);
 
     const topicIds = topics.map((topic) => topic.id);
@@ -641,13 +698,11 @@ export class TypeOrmClassReader {
 
         return {
           id: topic.id,
-          teacher_id: topic.teacher_id,
           class_id: classId,
           title: topic.title,
           gym_link: topic.gym_link,
           gym_id: topic.gym_id,
           closed_at: topic.closed_at,
-          pull_interval_minutes: topic.pull_interval_minutes,
           last_pulled_at: topic.last_pulled_at,
           created_at: topic.created_at,
           status: 'active' as const,

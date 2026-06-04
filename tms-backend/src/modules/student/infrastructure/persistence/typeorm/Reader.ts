@@ -677,7 +677,7 @@ export class TypeOrmStudentReportSourceReader {
 
   findTopicsByIds(teacherId: number, topicIds: number[]): Promise<Gym[]> {
     return topicIds.length > 0
-      ? AppDataSource.getRepository(Gym).findBy({ teacher_id: teacherId, id: In(topicIds) })
+      ? AppDataSource.getRepository(Gym).findBy({ id: In(topicIds) })
       : Promise.resolve([]);
   }
 
