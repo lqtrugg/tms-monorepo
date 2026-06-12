@@ -1,0 +1,468 @@
+\documentclass[12pt,a4paper]{article}
+
+%!TEX program = pdflatex
+
+% =============================================================================
+% 1. PHÔNG CHỮ & NGÔN NGỮ (Hỗ trợ Tiếng Việt)
+% =============================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usepackage[vietnamese]{babel}
+
+% =============================================================================
+% 2. BỐ CỤC TRANG (LAYOUT)
+% =============================================================================
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+% =============================================================================
+% 3. ĐỒ HỌA & BIỂU ĐỒ
+% =============================================================================
+\usepackage{graphicx}
+\usepackage{float}
+
+% =============================================================================
+% 4. BẢNG BIỂU & DANH SÁCH
+% =============================================================================
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{tabularx}
+
+% =============================================================================
+% 5. TIỆN ÍCH VĂN BẢN & LIÊN KẾT
+% =============================================================================
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{xurl}
+\usepackage{seqsplit}
+\usepackage{hyperref}
+
+\hypersetup{
+    colorlinks=false,
+    hidelinks,
+    pdftitle={Tổng quan và thu thập yêu cầu hệ thống TMS},
+    pdfauthor={Nhóm thực hiện}
+}
+
+% =============================================================================
+% 6. ĐỊNH DẠNG ĐOẠN VĂN & ĐÁNH SỐ MỤC
+% =============================================================================
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setcounter{secnumdepth}{3}
+
+\renewcommand{\thesection}{\Roman{section}}
+\renewcommand{\thesubsection}{\arabic{subsection}}
+\renewcommand{\thesubsubsection}{\thesubsection.\arabic{subsubsection}}
+
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}{\normalsize\itshape\bfseries}{\thesubsubsection.}{0.5em}{}
+
+\renewcommand{\cftsecaftersnum}{.}
+\renewcommand{\cftsubsecaftersnum}{.}
+\renewcommand{\cftsubsubsecaftersnum}{.}
+
+% =============================================================================
+% 7. CUSTOM COMMANDS & COLUMN TYPES
+% =============================================================================
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\code}[1]{{\ttfamily\seqsplit{#1}}}
+\newcommand{\tablesetup}{\small\setlength{\tabcolsep}{3pt}\renewcommand{\arraystretch}{1.2}}
+
+\begin{document}
+
+\section{Tổng quan đề tài}
+
+\subsection{Giới thiệu đề tài}
+
+Trong hoạt động dạy học theo mô hình lớp nhỏ hoặc gia sư, giáo viên thường phải
+quản lý đồng thời nhiều nhóm thông tin: danh sách học sinh, lớp học, lịch học,
+buổi học thực tế, điểm danh, học phí, giao dịch tài chính và kết quả luyện tập.
+Nếu các dữ liệu này được ghi nhận rời rạc bằng sổ tay, bảng tính hoặc tin nhắn
+riêng lẻ, việc theo dõi tình hình học tập và vận hành lớp học dễ phát sinh sai
+sót, trùng lặp và thiếu tính kịp thời.
+
+Bên cạnh đó, nhiều hoạt động hỗ trợ học tập hiện nay diễn ra trên các nền tảng
+ngoài hệ thống chính. Discord thường được dùng để tổ chức kênh trao đổi, gửi
+thông báo và hỗ trợ điểm danh qua kênh thoại. Codeforces Gym được dùng để
+giao bài luyện tập và theo dõi bảng xếp hạng. Khi các dữ liệu này không được
+kết nối với hệ thống quản lý lớp học, giáo viên phải đối chiếu thủ công giữa
+nhiều nguồn khác nhau, làm tăng thời gian vận hành và giảm khả năng nắm bắt
+tình hình thực tế.
+
+Vì vậy, đề tài ``Tutor Management System'' (TMS) được thực hiện nhằm xây dựng
+một hệ thống web tập trung cho nghiệp vụ quản lý dạy học. Hệ thống hỗ trợ giáo
+viên quản lý học sinh, lớp học, buổi học, điểm danh, tài chính, đồng thời tích
+hợp Discord và Codeforces để giảm thao tác thủ công trong các quy trình thường
+xuyên. Đối với quản trị viên, hệ thống cung cấp các chức năng quản lý tài khoản
+giáo viên và cấu hình bot Discord dùng chung.
+
+\subsection{Mục tiêu phần mềm}
+
+Phần mềm được xây dựng nhằm đạt được các mục tiêu cốt lõi sau:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Tin học hóa nghiệp vụ quản lý dạy học:} Tập trung hóa dữ liệu
+    về giáo viên, học sinh, lớp học, lịch học, buổi học và quá trình ghi danh
+    trên một hệ thống thống nhất.
+
+    \item \textbf{Theo dõi học sinh và lớp học chính xác:} Cho phép giáo viên
+    quản lý hồ sơ học sinh, trạng thái ghi danh, lịch sử học tập, lớp đang học
+    và các thay đổi như chuyển lớp, rút khỏi lớp hoặc lưu trữ học sinh.
+
+    \item \textbf{Hỗ trợ điểm danh và quản lý buổi học:} Cung cấp chức năng tạo
+    buổi học, cập nhật trạng thái buổi học và ghi nhận điểm danh để giáo viên
+    có dữ liệu phục vụ theo dõi học tập và tính phí.
+
+    \item \textbf{Quản lý tài chính học sinh:} Ghi nhận giao dịch, khoản phí
+    phát sinh từ buổi học, số dư của học sinh và các báo cáo tài chính phục vụ
+    đối soát.
+
+    \item \textbf{Tích hợp công cụ học tập và giao tiếp:} Kết nối Discord để hỗ
+    trợ thiết lập máy chủ/kênh, gửi thông báo và liên kết định danh; kết nối
+    Codeforces để quản lý Gym, bài tập và bảng xếp hạng luyện tập.
+
+    \item \textbf{Hỗ trợ ra quyết định:} Cung cấp màn hình tổng quan, báo cáo
+    học sinh, báo cáo tài chính và dữ liệu kết quả học tập để giáo viên nhanh
+    chóng nắm bắt tình hình lớp học.
+
+    \item \textbf{Kiểm soát truy cập và bảo mật:} Thiết lập cơ chế đăng nhập,
+    phân quyền theo vai trò quản trị viên và giáo viên, đồng thời giới hạn giáo
+    viên chỉ truy cập dữ liệu thuộc phạm vi quản lý của mình.
+\end{itemize}
+
+\subsection{Phạm vi phần mềm}
+
+Phạm vi của phần mềm tập trung vào các chức năng cần thiết cho một hệ thống web
+quản lý hoạt động dạy học. Hệ thống được phát triển theo các nhóm chức năng
+chính sau:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Quản lý tài khoản và phân quyền:} Hỗ trợ đăng nhập, quản lý
+    phiên làm việc, cập nhật hồ sơ cá nhân, quản lý tài khoản giáo viên và phân
+    quyền giữa quản trị viên với giáo viên.
+
+    \item \textbf{Quản lý học sinh:} Cho phép thêm, cập nhật, tra cứu, lưu trữ,
+    khôi phục học sinh; quản lý thông tin liên hệ, định danh Codeforces, trạng
+    thái học tập và liên kết Discord của học sinh.
+
+    \item \textbf{Quản lý ghi danh:} Theo dõi quan hệ giữa học sinh và lớp học,
+    hỗ trợ chuyển lớp, rút khỏi lớp và lưu lịch sử ghi danh theo thời gian.
+
+    \item \textbf{Quản lý lớp học và lịch học:} Cho phép tạo lớp, cập nhật thông
+    tin lớp, quản lý lịch học cố định, tạo buổi học từ lịch và theo dõi trạng
+    thái từng buổi học.
+
+    \item \textbf{Quản lý điểm danh:} Ghi nhận kết quả điểm danh của học sinh
+    trong từng buổi học, phục vụ theo dõi tham gia học tập và phát sinh khoản
+    phí liên quan.
+
+    \item \textbf{Quản lý tài chính:} Quản lý giao dịch, khoản phí, số dư học
+    sinh và báo cáo tài chính theo phạm vi dữ liệu của giáo viên.
+
+    \item \textbf{Tích hợp Discord:} Quản lý cấu hình bot Discord, liên kết định
+    danh giáo viên và học sinh, thiết lập Discord cho lớp học, chọn máy chủ/kênh
+    Discord và gửi thông báo đến học sinh.
+
+    \item \textbf{Tích hợp Codeforces Gym:} Quản lý thông tin Gym, gắn Gym cho
+    lớp học, đồng bộ bài tập và bảng xếp hạng để giáo viên theo dõi kết quả
+    luyện tập.
+
+    \item \textbf{Báo cáo và màn hình tổng quan:} Cung cấp màn hình tổng quan, báo cáo
+    học sinh, báo cáo tài chính và bảng xếp hạng Gym giúp giáo viên quan sát
+    nhanh tình hình vận hành.
+\end{itemize}
+
+Trong phạm vi hiện tại, hệ thống tập trung vào ứng dụng web cho giáo viên và
+quản trị viên. Hệ thống chưa bao gồm ứng dụng di động riêng, cổng thanh toán tự
+động, lớp học trực tuyến/video meeting, hệ thống chấm bài thay thế Codeforces
+hoặc cổng tự phục vụ đầy đủ cho học sinh. Các nội dung này có thể được xem là
+hướng mở rộng trong các giai đoạn phát triển tiếp theo.
+
+\section{Xác định và thu thập yêu cầu}
+
+\subsection{Kế hoạch và phương pháp khảo sát}
+
+\subsubsection{Đối tượng và địa điểm khảo sát}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Bối cảnh khảo sát:} Khảo sát được định hướng trên mô hình lớp
+    học/gia sư quy mô nhỏ, trong đó giáo viên quản lý nhiều lớp, nhiều học sinh,
+    nhiều buổi học và nhiều khoản thu chi phát sinh. Hoạt động hiện tại thường
+    kết hợp bảng tính, tin nhắn riêng, Discord và Codeforces nên dữ liệu bị phân
+    tán ở nhiều nơi.
+
+    \item \textbf{Giáo viên:} Là người dùng chính của hệ thống, trực tiếp quản lý
+    học sinh, lớp học, lịch học, buổi học, điểm danh, giao dịch tài chính, Discord
+    của lớp và Codeforces Gym.
+
+    \item \textbf{Quản trị viên:} Là người quản lý tài khoản giáo viên, kiểm soát
+    trạng thái tài khoản và cấu hình bot Discord dùng chung cho hệ thống.
+
+    \item \textbf{Học sinh:} Là đối tượng được giáo viên quản lý. Học sinh tham
+    gia lớp học, có lịch sử ghi danh, kết quả điểm danh, số dư tài chính, thông
+    tin Discord và kết quả luyện tập Codeforces.
+
+    \item \textbf{Hệ thống ngoài:} Discord và Codeforces là các nguồn dữ liệu,
+    kênh giao tiếp và công cụ học tập cần được khảo sát để xác định phạm vi tích
+    hợp phù hợp.
+\end{itemize}
+
+\subsubsection{Các phương pháp khảo sát}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Phỏng vấn:} Thu thập thông tin từ giáo viên và quản trị viên về
+    các khó khăn khi quản lý học sinh, lớp học, lịch học, điểm danh, học phí,
+    Discord và Codeforces bằng nhiều công cụ rời rạc.
+
+    \item \textbf{Nghiên cứu tài liệu nghiệp vụ:} Phân tích các dạng dữ liệu mà
+    hệ thống cần thay thế hoặc tập trung hóa, gồm danh sách học sinh, danh sách
+    lớp học, lịch học, bảng điểm danh, bảng giao dịch, bảng công nợ, cấu hình
+    Discord và bảng xếp hạng Codeforces Gym.
+
+    \item \textbf{Quan sát quy trình hiện tại:} Xem xét các thao tác thường gặp
+    như tạo lớp, ghi danh học sinh, tạo buổi học, điểm danh, ghi nhận khoản phí,
+    gửi thông báo lớp học và kiểm tra kết quả luyện tập trên Codeforces.
+
+    \item \textbf{Bảng câu hỏi:} Dùng để xác nhận mức độ ưu tiên của các chức
+    năng như màn hình tổng quan, quản lý học sinh, quản lý lớp, điểm danh, báo cáo tài
+    chính, tích hợp Discord và theo dõi Codeforces Gym.
+\end{itemize}
+
+\subsection{Khảo sát hiện trạng}
+
+\subsubsection{Hiện trạng tổ chức}
+
+Cơ cấu vận hành của hệ thống mục tiêu gồm các nhóm vai trò chính sau:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Quản trị viên:} Quản lý tài khoản giáo viên, kích hoạt hoặc vô
+    hiệu hóa tài khoản, thiết lập thông tin bot Discord và theo dõi cấu hình hệ
+    thống dùng chung.
+
+    \item \textbf{Giáo viên:} Quản lý toàn bộ nghiệp vụ dạy học trong phạm vi của
+    mình. Mỗi giáo viên có thể quản lý nhiều học sinh, nhiều lớp, nhiều buổi học,
+    nhiều giao dịch và nhiều Codeforces Gym.
+
+    \item \textbf{Học sinh:} Được ghi danh vào lớp, tham gia các buổi học, phát
+    sinh điểm danh và khoản phí, đồng thời có thể liên kết Discord hoặc Codeforces
+    để phục vụ giao tiếp và luyện tập.
+\end{itemize}
+
+Về phân quyền, hệ thống cần tách rõ dữ liệu quản trị và dữ liệu nghiệp vụ. Quản
+trị viên chỉ xử lý tài khoản giáo viên và cấu hình hệ thống; giáo viên chỉ được
+truy cập học sinh, lớp học, buổi học, giao dịch, cấu hình liên kết Discord và Gym thuộc
+phạm vi sở hữu của mình.
+
+\subsubsection{Hiện trạng nghiệp vụ}
+
+Kết quả khảo sát cho thấy các quy trình nghiệp vụ cốt lõi có quan hệ chặt chẽ
+với nhau nhưng thường bị xử lý trên nhiều công cụ khác nhau. Điều này làm giáo
+viên mất thời gian đối chiếu và khó nhìn thấy bức tranh tổng thể của từng học
+sinh hoặc từng lớp học.
+
+\paragraph{2.2.1. Quy trình quản lý học sinh và ghi danh}
+
+Quy trình này thường diễn ra theo trình tự sau:
+
+\begin{itemize}[leftmargin=*]
+    \item Giáo viên ghi nhận thông tin học sinh như họ tên, thông tin liên hệ,
+    trạng thái học tập và định danh Codeforces.
+    \item Khi học sinh tham gia lớp, giáo viên ghi nhận thông tin ghi danh vào
+    lớp tương ứng.
+    \item Nếu học sinh chuyển lớp hoặc ngừng học, giáo viên phải cập nhật lại
+    trạng thái ghi danh và lịch sử học tập.
+    \item Khi học sinh tạm ngừng hoặc không còn theo học, giáo viên cần lưu trữ
+    hồ sơ để dữ liệu cũ vẫn được bảo toàn cho báo cáo và đối soát.
+\end{itemize}
+
+Nếu quy trình này được thực hiện bằng bảng tính riêng lẻ, giáo viên dễ gặp tình
+trạng một học sinh xuất hiện ở nhiều nơi, trạng thái ghi danh không đồng nhất và
+khó truy xuất lịch sử thay đổi.
+
+\paragraph{2.2.2. Quy trình quản lý lớp học, lịch học và buổi học}
+
+\begin{itemize}[leftmargin=*]
+    \item Giáo viên tạo lớp học, cấu hình học phí mỗi buổi và thiết lập lịch học
+    cố định trong tuần.
+    \item Từ lịch học, giáo viên cần tạo hoặc theo dõi các buổi học cụ thể theo
+    ngày giờ thực tế.
+    \item Khi có thay đổi, buổi học có thể được cập nhật trạng thái hoặc hủy.
+    \item Mỗi buổi học cần liên kết với danh sách học sinh được ghi danh để phục
+    vụ điểm danh và phát sinh phí.
+\end{itemize}
+
+Trong cách làm thủ công, lịch học, buổi học và danh sách học sinh thường bị tách
+thành nhiều bảng hoặc nhiều tin nhắn. Khi lớp thay đổi lịch hoặc phát sinh buổi
+học đặc biệt, việc đồng bộ lại dữ liệu mất nhiều thời gian.
+
+\paragraph{2.2.3. Quy trình điểm danh và tài chính}
+
+\begin{itemize}[leftmargin=*]
+    \item Giáo viên mở buổi học và ghi nhận tình trạng tham gia của từng học
+    sinh.
+    \item Kết quả điểm danh được dùng làm căn cứ phát sinh khoản phí hoặc điều
+    chỉnh khoản phí cho học sinh.
+    \item Giáo viên ghi nhận các giao dịch tiền vào/tiền ra của học sinh để theo
+    dõi số dư.
+    \item Cuối kỳ hoặc khi cần đối soát, giáo viên tổng hợp khoản phí, giao dịch
+    và số dư để lập báo cáo tài chính.
+\end{itemize}
+
+Nếu điểm danh và tài chính không nằm trong cùng một hệ thống, giáo viên phải
+đối chiếu thủ công giữa buổi học, trạng thái tham gia và giao dịch. Việc này dễ
+dẫn đến sai lệch số dư, ghi thiếu phí hoặc khó giải thích lịch sử thay đổi cho
+từng học sinh.
+
+\paragraph{2.2.4. Quy trình tích hợp Discord và Codeforces}
+
+\begin{itemize}[leftmargin=*]
+    \item Với Discord, giáo viên cần liên kết định danh, chọn máy chủ/kênh cho
+    lớp học, gửi thông báo và quản lý thông tin học sinh liên quan Discord.
+    \item Với Codeforces, giáo viên cần gắn Gym cho lớp, đồng bộ bài tập và theo
+    dõi bảng xếp hạng của học sinh trong Gym.
+    \item Các dữ liệu từ Discord và Codeforces cần được liên hệ lại với lớp học,
+    học sinh và giáo viên tương ứng trong hệ thống TMS.
+\end{itemize}
+
+Khi thiếu tích hợp, giáo viên phải mở riêng Discord để gửi thông báo và mở riêng
+Codeforces để xem kết quả luyện tập. Dữ liệu học sinh trong các nền tảng này
+không tự động khớp với hồ sơ học sinh trong hệ thống quản lý lớp học.
+
+\subsubsection{Hiện trạng tin học}
+
+\textbf{2.3.1. Phần cứng đang sử dụng}
+
+\begin{itemize}[leftmargin=*]
+    \item Máy tính cá nhân hoặc laptop của giáo viên để quản lý bảng tính, truy
+    cập Discord, Codeforces và hệ thống web.
+    \item Điện thoại thông minh để trao đổi nhanh với học sinh, nhận thông báo
+    và kiểm tra thông tin khi không ngồi trước máy tính.
+    \item Kết nối Internet ổn định để truy cập hệ thống web và các nền tảng bên
+    ngoài.
+\end{itemize}
+
+\textbf{2.3.2. Phần mềm đang sử dụng}
+
+\begin{itemize}[leftmargin=*]
+    \item Bảng tính như Excel hoặc Google Sheets để lưu danh sách học sinh, lịch
+    học, điểm danh, giao dịch và công nợ.
+    \item Discord để trao đổi với học sinh, tổ chức kênh lớp học và gửi thông
+    báo.
+    \item Codeforces để giao Gym, xem bài tập và theo dõi bảng xếp hạng luyện
+    tập.
+    \item Các ứng dụng nhắn tin khác để trao đổi nhanh, nhưng dữ liệu từ các ứng
+    dụng này không được đồng bộ vào hệ thống quản lý.
+\end{itemize}
+
+\textbf{2.3.3. Trình độ công nghệ thông tin của người dùng}
+
+\begin{itemize}[leftmargin=*]
+    \item Giáo viên có thể sử dụng trình duyệt web, bảng tính, Discord và
+    Codeforces ở mức phục vụ công việc hằng ngày.
+    \item Quản trị viên có khả năng thao tác với tài khoản, cấu hình hệ thống và
+    kiểm tra trạng thái hoạt động.
+    \item Học sinh quen với việc sử dụng Discord và Codeforces, nhưng không phải
+    là nhóm người dùng chính thao tác sâu trong hệ thống quản lý.
+\end{itemize}
+
+\subsection{Đánh giá hiện trạng và những tính năng mong muốn}
+
+Từ kết quả khảo sát, nhóm tiến hành phân tích các ưu điểm, hạn chế và nhu cầu
+chính để xác định yêu cầu cho hệ thống TMS.
+
+\subsubsection{Ưu điểm}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Chi phí ban đầu thấp:} Bảng tính và các công cụ giao tiếp sẵn
+    có không yêu cầu triển khai hệ thống phức tạp ngay từ đầu.
+
+    \item \textbf{Linh hoạt:} Giáo viên có thể nhanh chóng thêm cột, sửa dòng,
+    ghi chú hoặc điều chỉnh thông tin theo tình huống thực tế.
+
+    \item \textbf{Dễ tiếp cận:} Người dùng đã quen với trình duyệt, bảng tính,
+    Discord và Codeforces nên không cần thay đổi hoàn toàn thói quen làm việc.
+\end{itemize}
+
+\subsubsection{Nhược điểm và khó khăn cần giải quyết}
+
+Đây là những vấn đề cốt lõi mà phần mềm mới cần giải quyết:
+
+\textbf{a) Dữ liệu phân tán và thiếu đồng bộ}
+
+Thông tin học sinh, lớp học, lịch học, điểm danh, giao dịch, Discord và
+Codeforces nằm ở nhiều nơi khác nhau. Hậu quả là giáo viên khó nhìn thấy trạng
+thái đầy đủ của một học sinh hoặc một lớp học tại một thời điểm.
+
+\textbf{b) Sai sót trong điểm danh và tài chính}
+
+Khi điểm danh và phát sinh phí được xử lý thủ công, hệ thống dễ ghi thiếu buổi,
+ghi nhầm học sinh hoặc tính sai số dư. Việc truy lại nguyên nhân sai lệch cũng
+mất nhiều thời gian vì dữ liệu không có lịch sử rõ ràng.
+
+\textbf{c) Khó kiểm soát quyền truy cập}
+
+Nếu nhiều giáo viên cùng sử dụng bảng tính hoặc thư mục chung, việc phân quyền
+theo phạm vi sở hữu dữ liệu không rõ ràng. Dữ liệu học sinh và tài chính cần
+được giới hạn theo giáo viên để bảo đảm bảo mật.
+
+\textbf{d) Thiếu báo cáo tổng hợp}
+
+Giáo viên cần biết nhanh số lượng học sinh, lớp đang hoạt động, buổi học gần
+đây, khoản phí, giao dịch và tình hình luyện tập. Nếu dữ liệu nằm rời rạc, báo
+cáo phải làm thủ công và thường có độ trễ.
+
+\textbf{e) Tích hợp ngoài hệ thống còn thủ công}
+
+Discord và Codeforces hỗ trợ trực tiếp cho hoạt động học tập nhưng thường được
+theo dõi riêng. Giáo viên phải tự đối chiếu định danh học sinh, thông báo lớp và
+kết quả Gym, dẫn đến tốn thời gian và dễ nhầm lẫn.
+
+\subsubsection{Giải pháp và tính năng mong muốn}
+
+Từ các khó khăn trên, nhóm tổng hợp được các tính năng người dùng mong muốn
+nhất:
+
+\begin{longtable}{L{3.2cm} L{11.2cm}}
+\toprule
+\textbf{Chủ thể} & \textbf{Mong muốn} \\
+\midrule
+\endhead
+Giáo viên & ``Tôi muốn quản lý học sinh, lớp học, lịch học, buổi học, điểm danh và học phí trong cùng một hệ thống, không phải đối chiếu nhiều bảng tính.'' \\
+Giáo viên & ``Tôi muốn khi điểm danh một buổi học, hệ thống có thể lưu kết quả và hỗ trợ theo dõi khoản phí, số dư của học sinh.'' \\
+Giáo viên & ``Tôi muốn gắn Discord và Codeforces Gym vào lớp học để gửi thông báo và xem kết quả luyện tập nhanh hơn.'' \\
+Quản trị viên & ``Tôi muốn quản lý tài khoản giáo viên, trạng thái hoạt động và cấu hình bot Discord ở một nơi rõ ràng.'' \\
+Học sinh & ``Tôi muốn nhận thông báo lớp học qua Discord và được ghi nhận kết quả luyện tập Codeforces đúng với lớp đang học.'' \\
+\bottomrule
+\end{longtable}
+
+\subsection{Xác định và thu thập yêu cầu}
+
+Kế hoạch thu thập yêu cầu được thực hiện thông qua việc phỏng vấn các bên liên
+quan chính, nghiên cứu dữ liệu nghiệp vụ hiện có và quan sát các quy trình
+thường xuyên như quản lý học sinh, ghi danh, tạo buổi học, điểm danh, ghi nhận
+giao dịch, gửi thông báo và theo dõi Codeforces Gym.
+
+Các yêu cầu thu thập được được phân nhóm thành các mảng chức năng chính:
+
+\begin{itemize}[leftmargin=*]
+    \item Quản lý tài khoản, đăng nhập, phân quyền và phạm vi truy cập dữ liệu.
+    \item Quản lý học sinh, hồ sơ học sinh, lưu trữ và khôi phục học sinh.
+    \item Quản lý ghi danh, chuyển lớp, rút khỏi lớp và lịch sử học tập.
+    \item Quản lý lớp học, lịch học cố định, buổi học và trạng thái buổi học.
+    \item Quản lý điểm danh và dữ liệu tham gia buổi học.
+    \item Quản lý giao dịch, khoản phí, số dư và báo cáo tài chính.
+    \item Tích hợp Discord cho định danh, cấu hình lớp học và gửi thông báo.
+    \item Tích hợp Codeforces Gym cho bài tập và bảng xếp hạng luyện tập.
+    \item Cung cấp màn hình tổng quan và báo cáo giúp giáo viên theo dõi hoạt động dạy
+    học một cách tập trung.
+\end{itemize}
+
+\end{document}

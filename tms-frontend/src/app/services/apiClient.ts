@@ -15,6 +15,8 @@ type ApiRequestOptions = RequestInit & {
 
 const apiBaseUrl = "/api";
 
+// Thêm mã xác thực, gửi yêu cầu và xử lý lỗi nếu có
+
 export async function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
   const { withAuth = true, headers, ...init } = options;
 

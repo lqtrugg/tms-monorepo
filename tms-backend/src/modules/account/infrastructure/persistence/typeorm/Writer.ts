@@ -75,7 +75,7 @@ export async function listTeacherIdsForCodeforcesSync(): Promise<number[]> {
   return teachers.map((teacher) => teacher.id);
 }
 
-export async function findTeacherCodeforcesSyncConfig(teacherId: number): Promise<{
+export async function getCodeforcesCredential(teacherId: number): Promise<{
   codeforces_handle: string | null;
   codeforces_api_key: string | null;
   codeforces_api_secret: string | null;
@@ -314,7 +314,7 @@ export class TypeOrmTeacherWriter {
     const config = existing ?? repo.create({ teacher_id: teacherId });
     const previousOwnerHandle = existing?.codeforces_handle?.trim().toLowerCase() || null;
     const nextHandle = hasHandleInput
-      ? input.codeforces_handle?.trim() || null
+      ? input.codeforces_handle?.trim().toLowerCase() || null
       : config.codeforces_handle;
     const nextApiKey = hasApiKeyInput
       ? input.codeforces_api_key?.trim() || null

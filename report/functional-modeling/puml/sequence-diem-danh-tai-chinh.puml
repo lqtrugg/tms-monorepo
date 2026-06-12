@@ -1,0 +1,66 @@
+@startuml
+title Sơ đồ tuần tự - Điểm danh buổi học
+skinparam shadowing false
+skinparam maxMessageSize 90
+
+actor "Giáo viên" as Teacher
+participant "Discord" as Discord
+boundary "Giao diện web" as Web
+control "API client" as ApiClient
+control "Route" as Route
+control "Security" as Security
+control "Controller" as Controller
+control "Classroom" as Classroom
+control "Student" as Student
+control "Finance" as Finance
+control "ClassroomReader" as ClassroomReader
+control "StudentReader" as StudentReader
+control "ClassroomWriter" as ClassroomWriter
+control "FinanceWriter" as FinanceWriter
+database "Azure Database Server\nCSDL TMS" as DB
+
+Teacher -> Web : Mở buổi học và cập nhật điểm danh
+Web -> ApiClient : Gửi trạng thái điểm danh
+ApiClient -> Route : Chuyển yêu cầu đến backend
+Route -> Security : Kiểm tra quyền truy cập
+Security --> Route : Yêu cầu hợp lệ
+Route -> Controller : Chuyển dữ liệu điểm danh
+Controller -> Classroom : Xử lý điểm danh buổi học
+
+opt Có dữ liệu tham gia từ Discord
+  Discord -> Classroom : Cung cấp trạng thái tham gia lớp
+end
+
+Classroom -> ClassroomReader : Đọc buổi học và danh sách lớp
+ClassroomReader -> DB : Lấy dữ liệu lớp học
+DB --> ClassroomReader : Dữ liệu lớp học
+ClassroomReader --> Classroom : Kết quả đọc
+Classroom -> Student : Kiểm tra học sinh trong lớp
+Student -> StudentReader : Đọc dữ liệu học sinh
+StudentReader -> DB : Lấy dữ liệu học sinh
+DB --> StudentReader : Dữ liệu học sinh
+StudentReader --> Student : Kết quả học sinh
+Student --> Classroom : Học sinh hợp lệ hoặc không hợp lệ
+
+alt Đủ điều kiện cập nhật
+  Classroom -> ClassroomWriter : Lưu trạng thái điểm danh
+  ClassroomWriter -> DB : Ghi dữ liệu điểm danh
+  DB --> ClassroomWriter : Đã lưu
+  Classroom -> Finance : Đồng bộ ảnh hưởng học phí
+  Finance -> FinanceWriter : Lưu thay đổi tài chính
+  FinanceWriter -> DB : Ghi dữ liệu tài chính
+  DB --> FinanceWriter : Đã lưu
+  Finance --> Classroom : Hoàn tất đồng bộ
+  Classroom --> Controller : Kết quả điểm danh mới
+  Controller --> Route : Kết quả thành công
+  Route --> ApiClient : Trả kết quả
+  ApiClient --> Web : Cập nhật bảng điểm danh
+  Web --> Teacher : Hiển thị kết quả
+else Không đủ điều kiện
+  Classroom --> Controller : Lý do từ chối
+  Controller --> Route : Kết quả lỗi
+  Route --> ApiClient : Trả thông báo
+  ApiClient --> Web : Hiển thị thông báo
+  Web --> Teacher : Yêu cầu kiểm tra lại
+end
+@enduml

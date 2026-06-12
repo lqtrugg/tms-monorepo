@@ -1010,7 +1010,11 @@ export class TypeOrmGymWriter {
     return ownedGyms.length;
   }
 
-  async syncCodeforcesGymStandingProjection(input: {
+  /**
+   * Sync one bound gym snapshot into local gym metadata, problems, and per-student standings.
+   * The Codeforces snapshot is matched to active class students by their Codeforces handles.
+   */
+  async syncGymStanding(input: {
     teacherId: number;
     gymId: number;
     classId: number;
@@ -1030,11 +1034,13 @@ export class TypeOrmGymWriter {
         return;
       }
 
+      // Keep the bound gym metadata aligned with the latest Codeforces contest snapshot.
       gym.gym_id = input.standings.gym_id;
       gym.title = input.standings.title;
       gym.last_pulled_at = input.pulledAt;
       await gymRepo.save(gym);
 
+      // Replace the local problem list with the current Codeforces problem set.
       const existingProblems = await gymProblemRepo.findBy({
         teacher_id: input.teacherId,
         topic_id: input.gymId,
@@ -1080,6 +1086,7 @@ export class TypeOrmGymWriter {
         : [];
       const savedProblemByIndex = new Map(savedProblems.map((problem) => [problem.problem_index, problem]));
 
+      // Only active students enrolled in the bound class should receive standing rows.
       const students = await new TypeOrmStudentReader(manager).listActiveCodeforcesStudentsForClass(
         input.teacherId,
         input.classId,
@@ -1093,6 +1100,7 @@ export class TypeOrmGymWriter {
         }
       });
 
+      // Convert Codeforces rows into local student/problem results using student handles.
       const resultByStudentProblem = new Map<string, { solved: boolean; penalty_minutes: number | null }>();
       input.standings.rows.forEach((row) => {
         const student = row.handles
@@ -1124,6 +1132,7 @@ export class TypeOrmGymWriter {
         .filter((standing) => !activeStudentIdSet.has(standing.student_id))
         .map((standing) => standing.id);
 
+      // Drop rows for students that are no longer actively enrolled in this class.
       for (const batch of chunkArray(staleStandingIds, MSSQL_IN_CLAUSE_BATCH_SIZE)) {
         await gymStandingRepo.delete({
           teacher_id: input.teacherId,
@@ -1139,6 +1148,7 @@ export class TypeOrmGymWriter {
       );
 
       const nextStandings: GymStanding[] = [];
+      // Ensure every active student has one row per synced problem, solved or not.
       for (const student of students) {
         for (const problem of savedProblems) {
           const key = `${student.id}:${problem.id}`;
@@ -1187,6 +1197,25 @@ export class TypeOrmGymWriter {
     return gym;
   }
 
+}
+
+export function syncCodeforcesGymCatalog(
+  teacherId: number,
+  ownerHandle: string,
+  ownedGyms: CodeforcesContestListItem[],
+  pulledAt: Date,
+): Promise<number> {
+  return new TypeOrmGymWriter().syncCodeforcesGymCatalog(teacherId, ownerHandle, ownedGyms, pulledAt);
+}
+
+export function syncGymStanding(input: {
+  teacherId: number;
+  gymId: number;
+  classId: number;
+  standings: CodeforcesGymSnapshot;
+  pulledAt: Date;
+}): Promise<boolean> {
+  return new TypeOrmGymWriter().syncGymStanding(input);
 }
 
 // TypeOrmClassCommandHandlers.ts

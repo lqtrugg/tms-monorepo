@@ -1,0 +1,55 @@
+@startuml
+title Sơ đồ tuần tự - Gắn Gym Codeforces cho lớp học
+skinparam shadowing false
+skinparam maxMessageSize 90
+
+actor "Giáo viên" as Teacher
+boundary "Giao diện web" as Web
+control "API client" as ApiClient
+control "Route" as Route
+control "Security" as Security
+control "Controller" as Controller
+control "Classroom" as Classroom
+control "ClassroomReader" as ClassroomReader
+control "ClassroomWriter" as ClassroomWriter
+database "Azure Database Server\nCSDL TMS" as DB
+participant "Codeforces" as Codeforces
+
+Teacher -> Web : Chọn Gym cho lớp học
+Web -> ApiClient : Gửi lớp và Gym được chọn
+ApiClient -> Route : Chuyển yêu cầu đến backend
+Route -> Security : Kiểm tra quyền truy cập
+Security --> Route : Yêu cầu hợp lệ
+Route -> Controller : Chuyển yêu cầu gắn Gym
+Controller -> Classroom : Xử lý gắn Gym cho lớp
+Classroom -> ClassroomReader : Đọc lớp và Gym hiện có
+ClassroomReader -> DB : Lấy dữ liệu lớp và dữ liệu đồng bộ
+DB --> ClassroomReader : Dữ liệu lớp và Gym
+ClassroomReader --> Classroom : Kết quả đọc
+
+opt Cần cập nhật dữ liệu luyện tập
+  Classroom -> Codeforces : Yêu cầu dữ liệu Gym
+  Codeforces --> Classroom : Dữ liệu luyện tập
+  Classroom -> ClassroomWriter : Lưu dữ liệu đồng bộ
+  ClassroomWriter -> DB : Ghi dữ liệu đồng bộ
+  DB --> ClassroomWriter : Đã lưu
+end
+
+alt Lớp và Gym hợp lệ
+  Classroom -> ClassroomWriter : Lưu gắn kết Gym của lớp
+  ClassroomWriter -> DB : Ghi dữ liệu nghiệp vụ
+  DB --> ClassroomWriter : Đã lưu
+  ClassroomWriter --> Classroom : Kết quả lưu
+  Classroom --> Controller : Danh sách Gym của lớp
+  Controller --> Route : Kết quả thành công
+  Route --> ApiClient : Trả kết quả
+  ApiClient --> Web : Cập nhật màn hình lớp
+  Web --> Teacher : Hiển thị Gym đã gắn
+else Không hợp lệ
+  Classroom --> Controller : Lý do từ chối
+  Controller --> Route : Kết quả lỗi
+  Route --> ApiClient : Trả thông báo
+  ApiClient --> Web : Hiển thị thông báo
+  Web --> Teacher : Yêu cầu chọn lại
+end
+@enduml

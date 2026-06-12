@@ -188,14 +188,13 @@ export type CodeforcesBoundGymSyncTarget = {
   id: number;
   class_id: number;
   title: string;
-  gym_link: string;
-  gym_id: string | null;
+  gym_id: string;
   last_pulled_at: Date | null;
   created_at: Date;
 };
 
 export class TypeOrmGymReader {
-  constructor(private readonly manager: EntityManager) {}
+  constructor(private readonly manager: EntityManager = AppDataSource.manager) {}
 
   private async findCurrentOwnerHandle(teacherId: number): Promise<string | null> {
     const credential = await this.manager.getRepository(TeacherCodeforcesCredential).findOneBy({
@@ -299,7 +298,12 @@ export class TypeOrmGymReader {
     });
   }
 
-  async listBoundCodeforcesGymsForTeacher(teacherId: number): Promise<CodeforcesBoundGymSyncTarget[]> {
+  async listBoundGyms(teacherId: number): Promise<CodeforcesBoundGymSyncTarget[]> {
+    const ownerHandle = await this.findCurrentOwnerHandle(teacherId);
+    if (!ownerHandle) {
+      return [];
+    }
+
     const classes = await this.manager.getRepository(Class).find({
       where: {
         teacher_id: teacherId,
@@ -313,22 +317,28 @@ export class TypeOrmGymReader {
 
     const gyms = await this.manager.getRepository(Gym).find({
       where: {
-        class_id: In(classIds),
+        owner_handle: ownerHandle,
       },
     });
+    const classIdSet = new Set(classIds);
 
     return gyms
-      .filter((gym): gym is Gym & { class_id: number } => gym.class_id !== null)
+      .filter((gym): gym is Gym & { class_id: number; gym_id: string } => (
+        gym.class_id !== null && classIdSet.has(gym.class_id) && gym.gym_id !== null
+      ))
       .map((gym) => ({
         id: gym.id,
         class_id: gym.class_id,
         title: gym.title,
-        gym_link: gym.gym_link,
         gym_id: gym.gym_id,
         last_pulled_at: gym.last_pulled_at,
         created_at: gym.created_at,
       }));
   }
+}
+
+export function listBoundGyms(teacherId: number): Promise<CodeforcesBoundGymSyncTarget[]> {
+  return new TypeOrmGymReader().listBoundGyms(teacherId);
 }
 
 // TypeOrmAttendanceReader.ts

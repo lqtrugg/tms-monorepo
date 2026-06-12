@@ -1,0 +1,847 @@
+% ============================================================
+% VII. THIET KE GIAO DIEN - TMS
+% File nay duoc thiet ke theo format bao cao mau:
+% 1. Danh sach cac man hinh
+% 2. Mo ta tung man hinh: a) Giao dien, b) Doi tuong, c) Bien co va xu ly
+% ============================================================
+
+\setcounter{section}{6}
+
+\providecommand{\tablesetup}{\scriptsize\setlength{\tabcolsep}{2pt}\renewcommand{\arraystretch}{1.18}}
+\providecommand{\uiscreenshot}[2]{%
+\begin{center}
+\IfFileExists{../section7/#1}{%
+    \includegraphics[width=0.92\textwidth,height=0.52\textheight,keepaspectratio]{../section7/#1}%
+}{%
+    \fbox{%
+        \parbox[c][0.24\textheight][c]{0.88\textwidth}{%
+            \centering
+            Chưa có ảnh giao diện: \texttt{\detokenize{#1}}\\[4pt]
+            #2%
+        }%
+    }%
+}%
+\end{center}
+}
+
+\section{Thiết kế giao diện}
+
+\subsection{Danh sách các màn hình}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.8cm}|p{3.2cm}|p{3.0cm}|X|}
+\hline
+\textbf{STT} & \textbf{Màn hình} & \textbf{Loại màn hình} & \textbf{Chức năng} \\
+\hline
+1 & Đăng nhập & Màn hình xác thực & Cho phép giáo viên hoặc quản trị viên đăng nhập bằng username và mật khẩu. Sau khi xác thực thành công, hệ thống điều hướng đến Dashboard hoặc Quản lý tài khoản theo vai trò. \\
+\hline
+2 & Đăng ký & Màn hình xác thực & Cho phép tạo tài khoản giáo viên mới bằng username, mật khẩu và xác nhận mật khẩu. \\
+\hline
+3 & Dashboard & Màn hình tổng quan & Hiển thị số học sinh đang học, số lớp đang mở, tổng nợ hiện tại, doanh thu tháng, danh sách học sinh nợ nhiều nhất và danh sách lớp học đang mở. \\
+\hline
+4 & Quản lý tài khoản & Màn hình quản trị & Cho phép quản trị viên quản lý tài khoản giáo viên, cập nhật thông tin, đặt lại mật khẩu, kích hoạt/vô hiệu hóa tài khoản và cấu hình Discord bot toàn hệ thống. \\
+\hline
+5 & Quản lý học sinh & Màn hình danh sách & Cho phép giáo viên thêm, sửa, tìm kiếm, lọc trạng thái, chuyển lớp, cho nghỉ học, khôi phục, gửi tin nhắn Discord và sao chép link uỷ quyền Discord của học sinh. \\
+\hline
+6 & Chi tiết học sinh & Màn hình chi tiết & Hiển thị hồ sơ học sinh, lớp hiện tại, trạng thái học tập, số dư, tiến độ Codeforces Gym, giao dịch tài chính và học phí phát sinh. \\
+\hline
+7 & Quản lý lớp học & Màn hình danh sách & Cho phép giáo viên tạo lớp, sửa lớp, thiết lập học phí mỗi buổi, lịch học định kỳ, xem lớp đang mở/lớp đã đóng và gửi thông báo Discord theo lớp. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.8cm}|p{3.2cm}|p{3.0cm}|X|}
+\hline
+\textbf{STT} & \textbf{Màn hình} & \textbf{Loại màn hình} & \textbf{Chức năng} \\
+\hline
+8 & Chi tiết lớp học & Màn hình chi tiết/cấu hình & Hiển thị thông tin lớp, lịch học, học sinh active, cấu hình Discord guild/channel và danh sách Codeforces Gym đã gắn với lớp. \\
+\hline
+9 & Quản lý buổi học & Màn hình danh sách & Cho phép giáo viên xem danh sách buổi học, lọc theo trạng thái hoặc ngày học, tạo buổi học thủ công và hủy buổi học. \\
+\hline
+10 & Chi tiết buổi học / Điểm danh & Màn hình nhập liệu & Cho phép giáo viên xem thông tin buổi học, cập nhật điểm danh từng học sinh, nhập ghi chú và theo dõi nguồn điểm danh. \\
+\hline
+11 & Quản lý tài chính & Màn hình danh sách/tổng hợp & Cho phép giáo viên ghi nhận giao dịch thu tiền/hoàn tiền, tìm kiếm, lọc giao dịch, sửa giao dịch và chuyển sang tab báo cáo. \\
+\hline
+12 & Báo cáo và thống kê & Màn hình báo cáo & Cho phép giáo viên lọc báo cáo theo thời gian, lớp, trạng thái học sinh; xem tiền vào, tiền ra, lợi nhuận, học sinh đang nợ và xuất CSV. \\
+\hline
+13 & Bảng xếp hạng Codeforces Gym & Màn hình báo cáo học tập & Hiển thị ma trận kết quả học sinh theo từng bài trong Codeforces Gym đã gắn với lớp, hỗ trợ mở Codeforces và quay lại chi tiết lớp. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Mô tả các màn hình}
+
+\subsubsection{Đăng nhập}
+
+\noindent\textbf{a) Giao diện}
+
+\uiscreenshot{dangnhap.png}{Màn hình Đăng nhập}
+
+\noindent\textbf{b) Mô tả các đối tượng trên màn hình}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{3.2cm}|p{2.4cm}|p{3.0cm}|X|}
+\hline
+\textbf{STT} & \textbf{Tên} & \textbf{Kiểu} & \textbf{Ràng buộc} & \textbf{Chức năng} \\
+\hline
+1 & Tiêu đề Đăng nhập & Label/Header & Read-only & Thể hiện chế độ hiện tại của form xác thực. \\
+\hline
+2 & Tab Đăng nhập & Button/Tab & Không & Chuyển form sang chế độ đăng nhập. \\
+\hline
+3 & Tab Đăng ký & Button/Tab & Không & Chuyển form sang chế độ đăng ký tài khoản giáo viên. \\
+\hline
+4 & Username & Textbox & Bắt buộc nhập & Nhập tên đăng nhập của giáo viên hoặc quản trị viên. \\
+\hline
+5 & Mật khẩu & Password Textbox & Bắt buộc nhập & Nhập mật khẩu, dữ liệu được che trên giao diện. \\
+\hline
+6 & Thông báo lỗi & Alert/Label & Chỉ hiển thị khi có lỗi & Hiển thị lỗi thiếu dữ liệu, sai thông tin đăng nhập, tài khoản bị khóa hoặc lỗi kết nối. \\
+\hline
+7 & Nút Đăng nhập & Button & Không & Gửi yêu cầu xác thực tài khoản lên hệ thống. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent\textbf{c) Danh sách biến cố và xử lý}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{5.2cm}|X|}
+\hline
+\textbf{STT} & \textbf{Biến cố} & \textbf{Xử lý} \\
+\hline
+1 & Người dùng nhấn Đăng nhập khi chưa nhập username hoặc mật khẩu & Hệ thống kiểm tra dữ liệu nhập, không gửi request xác thực và hiển thị thông báo ``Vui lòng nhập username và mật khẩu''. \\
+\hline
+2 & Người dùng nhập đúng tài khoản và mật khẩu & Hệ thống xác thực thành công, lưu access token và thông tin người dùng. Nếu vai trò là teacher thì chuyển đến Dashboard, nếu vai trò là admin thì chuyển đến Quản lý tài khoản. \\
+\hline
+3 & Người dùng nhập sai tài khoản hoặc mật khẩu & Hệ thống không tạo phiên đăng nhập và hiển thị thông báo lỗi do backend trả về. \\
+\hline
+4 & Tài khoản không còn hoạt động & Hệ thống xóa phiên cũ nếu có, từ chối truy cập và yêu cầu đăng nhập lại bằng tài khoản hợp lệ. \\
+\hline
+5 & Người dùng chọn tab Đăng ký & Hệ thống chuyển form sang chế độ Đăng ký và xóa thông báo lỗi hiện tại. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Đăng ký}
+
+\noindent\textbf{a) Giao diện}
+
+\uiscreenshot{dangki.png}{Màn hình Đăng ký}
+
+\noindent\textbf{b) Mô tả các đối tượng trên màn hình}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{3.2cm}|p{2.4cm}|p{3.0cm}|X|}
+\hline
+\textbf{STT} & \textbf{Tên} & \textbf{Kiểu} & \textbf{Ràng buộc} & \textbf{Chức năng} \\
+\hline
+1 & Tiêu đề Đăng ký & Label/Header & Read-only & Thể hiện người dùng đang ở chế độ tạo tài khoản giáo viên. \\
+\hline
+2 & Tab Đăng nhập & Button/Tab & Không & Quay lại form đăng nhập. \\
+\hline
+3 & Tab Đăng ký & Button/Tab & Đang được chọn & Hiển thị các trường phục vụ tạo tài khoản mới. \\
+\hline
+4 & Username & Textbox & Bắt buộc nhập, không trùng & Nhập tên đăng nhập cho tài khoản giáo viên. \\
+\hline
+5 & Mật khẩu & Password Textbox & Bắt buộc nhập & Nhập mật khẩu cho tài khoản mới. \\
+\hline
+6 & Xác nhận mật khẩu & Password Textbox & Bắt buộc nhập, phải khớp với mật khẩu & Nhập lại mật khẩu để tránh sai sót. \\
+\hline
+8 & Nút Đăng ký & Button & Không & Gửi yêu cầu tạo tài khoản giáo viên mới. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent\textbf{c) Danh sách biến cố và xử lý}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{5.2cm}|X|}
+\hline
+\textbf{STT} & \textbf{Biến cố} & \textbf{Xử lý} \\
+\hline
+1 & Người dùng nhấn Đăng ký khi chưa nhập đủ username hoặc mật khẩu & Hệ thống kiểm tra dữ liệu và hiển thị thông báo yêu cầu nhập username và mật khẩu. \\
+\hline
+2 & Mật khẩu xác nhận không khớp & Hệ thống không gửi request tạo tài khoản và hiển thị thông báo ``Mật khẩu xác nhận không khớp''. \\
+\hline
+3 & Username đã tồn tại & Backend từ chối tạo tài khoản, hệ thống hiển thị thông báo lỗi để người dùng đổi username khác. \\
+\hline
+4 & Thông tin hợp lệ & Hệ thống tạo tài khoản giáo viên, lưu access token, lưu thông tin người dùng và điều hướng theo vai trò được trả về. \\
+\hline
+5 & Người dùng chọn tab Đăng nhập & Hệ thống chuyển về form đăng nhập và xóa lỗi đang hiển thị. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Dashboard}
+
+\noindent\textbf{a) Giao diện}
+
+\uiscreenshot{dashboard.png}{Màn hình Dashboard}
+
+\noindent\textbf{b) Mô tả các đối tượng trên màn hình}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{3.2cm}|p{2.4cm}|p{3.0cm}|X|}
+\hline
+\textbf{STT} & \textbf{Tên} & \textbf{Kiểu} & \textbf{Ràng buộc} & \textbf{Chức năng} \\
+\hline
+1 & Sidebar & Menu & Hiển thị sau đăng nhập & Điều hướng đến Dashboard, Học sinh, Lớp học, Buổi học, Tài chính và Cài đặt. \\
+\hline
+2 & Menu tài khoản & Dropdown/Button & Theo người dùng đang đăng nhập & Hiển thị username, vai trò, cho phép vào Cài đặt hoặc Đăng xuất. \\
+\hline
+3 & Thẻ Học sinh đang học & Card/Label & Read-only & Hiển thị tổng số học sinh active thuộc giáo viên hiện tại. \\
+\hline
+4 & Thẻ Lớp đang mở & Card/Label & Read-only & Hiển thị số lớp active thuộc giáo viên hiện tại. \\
+\hline
+5 & Thẻ Tổng nợ hiện tại & Card/Label & Read-only & Hiển thị tổng công nợ của học sinh đang học. \\
+\hline
+6 & Thẻ Doanh thu tháng & Card/Label & Read-only & Hiển thị doanh thu trong tháng hiện tại. \\
+\hline
+7 & Danh sách học sinh nợ nhiều nhất & List/Card & Read-only & Hiển thị tối đa các học sinh có số dư âm cao nhất để giáo viên ưu tiên xử lý. \\
+\hline
+8 & Danh sách lớp học đang mở & List/Card & Read-only & Hiển thị tên lớp, lịch học tóm tắt, số học sinh và học phí mỗi buổi. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent\textbf{c) Danh sách biến cố và xử lý}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{5.2cm}|X|}
+\hline
+\textbf{STT} & \textbf{Biến cố} & \textbf{Xử lý} \\
+\hline
+1 & Giáo viên mở Dashboard & Hệ thống tải summary dashboard, danh sách số dư học sinh, lớp active và học sinh active; sau đó tổng hợp thành các thẻ và danh sách. \\
+\hline
+2 & Dữ liệu đang tải & Hệ thống hiển thị dấu ``...'' hoặc thông báo đang tải tại các vị trí số liệu. \\
+\hline
+3 & Không có học sinh nợ & Hệ thống hiển thị trạng thái rỗng ``Không có học sinh đang nợ''. \\
+\hline
+4 & Không có lớp đang mở & Hệ thống hiển thị trạng thái rỗng ``Chưa có lớp đang mở''. \\
+\hline
+5 & Người dùng chọn mục trên Sidebar & Hệ thống điều hướng sang module tương ứng và giữ nguyên layout chung. \\
+\hline
+6 & Người dùng chọn Đăng xuất trong menu tài khoản & Hệ thống xóa token, xóa thông tin người dùng và chuyển về màn hình Đăng nhập. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Quản lý tài khoản}
+
+\noindent\textbf{a) Giao diện}
+
+\uiscreenshot{admin.png}{Màn hình Quản lý tài khoản}
+
+\noindent\textbf{b) Mô tả các đối tượng trên màn hình}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{3.2cm}|p{2.4cm}|p{3.0cm}|X|}
+\hline
+\textbf{STT} & \textbf{Tên} & \textbf{Kiểu} & \textbf{Ràng buộc} & \textbf{Chức năng} \\
+\hline
+1 & Sidebar quản trị & Menu & Chỉ hiển thị với admin & Điều hướng đến màn hình Quản trị tài khoản. \\
+\hline
+2 & Khu vực Discord bot của hệ thống & Card & Quyền admin & Hiển thị trạng thái cấu hình bot, client ID, permissions, scopes và tình trạng credential. \\
+\hline
+3 & Nút Cấu hình Discord bot & Button & Quyền admin & Mở modal nhập bot token, client ID, client secret, permissions và scopes. \\
+\hline
+4 & Nút Thêm tài khoản & Button & Quyền admin & Mở modal tạo/cập nhật tài khoản giáo viên. \\
+\hline
+5 & Bảng danh sách tài khoản & DataGrid/Table & Read-only & Hiển thị username, trạng thái active/inactive, vai trò và thông tin Codeforces liên quan. \\
+\hline
+6 & Nút Cập nhật tài khoản & Button/Icon & Theo từng dòng tài khoản & Mở modal cập nhật username, mật khẩu mới và Codeforces credential của giáo viên. \\
+\hline
+7 & Nút Đặt lại mật khẩu & Button/Icon & Theo từng dòng tài khoản & Mở modal nhập mật khẩu mới cho tài khoản giáo viên. \\
+\hline
+8 & Nút Kích hoạt/Vô hiệu hóa & Button/Icon & Theo trạng thái hiện tại & Đổi trạng thái hoạt động của tài khoản mà không xóa dữ liệu. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent\textbf{c) Danh sách biến cố và xử lý}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{5.2cm}|X|}
+\hline
+\textbf{STT} & \textbf{Biến cố} & \textbf{Xử lý} \\
+\hline
+1 & Quản trị viên mở màn hình & Hệ thống kiểm tra quyền admin, tải danh sách tài khoản giáo viên và cấu hình Discord bot hiện tại. \\
+\hline
+2 & Nhấn Thêm/Cập nhật tài khoản & Hệ thống mở modal, nhận username, mật khẩu nếu có, Codeforces owner handle, API key và API secret; sau đó lưu nếu dữ liệu hợp lệ. \\
+\hline
+3 & Nhấn Đặt lại mật khẩu & Hệ thống mở modal nhập mật khẩu mới, băm mật khẩu và cập nhật cho tài khoản được chọn. \\
+\hline
+4 & Nhấn Kích hoạt/Vô hiệu hóa & Hệ thống yêu cầu xác nhận nếu cần, cập nhật trường trạng thái và tải lại danh sách tài khoản. \\
+\hline
+5 & Nhấn Cấu hình Discord bot & Hệ thống mở modal credential bot, lưu token/secret bảo mật và chỉ hiển thị trạng thái đã cấu hình thay vì hiển thị nguyên văn dữ liệu nhạy cảm. \\
+\hline
+6 & Người dùng không phải admin truy cập route quản trị & Hệ thống chặn bằng loader phân quyền và điều hướng về màn hình phù hợp với vai trò. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Quản lý học sinh}
+
+\noindent\textbf{a) Giao diện}
+
+\uiscreenshot{quan-ly-hoc-sinh.png}{Màn hình Quản lý học sinh}
+
+\noindent\textbf{b) Mô tả các đối tượng trên màn hình}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{3.2cm}|p{2.4cm}|p{3.0cm}|X|}
+\hline
+\textbf{STT} & \textbf{Tên} & \textbf{Kiểu} & \textbf{Ràng buộc} & \textbf{Chức năng} \\
+\hline
+1 & Ô tìm kiếm & Textbox & Cho phép rỗng & Tìm học sinh theo họ tên, Discord username hoặc Codeforces handle. \\
+\hline
+2 & Bộ lọc trạng thái & Button Group & Tất cả, Đang học, Chờ xử lý, Đã lưu trữ & Lọc danh sách học sinh theo vòng đời học tập. \\
+\hline
+3 & Nút Thêm học sinh & Button & Quyền giáo viên & Mở modal tạo hồ sơ học sinh và ghi danh vào lớp. \\
+\hline
+4 & Bảng học sinh & DataGrid/Table & Read-only & Hiển thị học sinh, Codeforces handle, Discord username, lớp, trạng thái, số dư và thao tác. \\
+\hline
+5 & Checkbox chọn học sinh & Checkbox & Chỉ chọn được học sinh active & Chọn nhiều học sinh để gửi tin nhắn, chuyển lớp hoặc cho nghỉ hàng loạt. \\
+\hline
+6 & Thanh thao tác hàng loạt & Action Bar & Chỉ hiển thị khi đã chọn học sinh & Thực hiện gửi tin nhắn, chuyển lớp hàng loạt, cho nghỉ hàng loạt hoặc bỏ chọn. \\
+\hline
+7 & Nhóm trạng thái chờ xử lý & Summary/Card & Read-only & Tách học sinh chờ thu, chờ hoàn và đủ điều kiện lưu trữ. \\
+\hline
+8 & Nút thao tác từng dòng & Button/Icon & Theo trạng thái học sinh & Nhắn tin, sửa, copy link Discord, chuyển lớp, cho nghỉ học hoặc khôi phục. \\
+\hline
+9 & Modal thêm/sửa/chuyển lớp/cho nghỉ/khôi phục & Modal/Form & Theo quy định nghiệp vụ & Nhập thông tin học sinh, lớp đích, Codeforces handle, số điện thoại hoặc xác nhận thao tác. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent\textbf{c) Danh sách biến cố và xử lý}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{5.2cm}|X|}
+\hline
+\textbf{STT} & \textbf{Biến cố} & \textbf{Xử lý} \\
+\hline
+1 & Nhập từ khóa tìm kiếm & Hệ thống lọc danh sách học sinh theo họ tên, Discord username hoặc Codeforces handle. \\
+\hline
+2 & Chọn bộ lọc trạng thái & Hệ thống chỉ hiển thị học sinh thuộc trạng thái tương ứng: active, pending\_archive hoặc archived. \\
+\hline
+3 & Nhấn Thêm học sinh và lưu form & Hệ thống kiểm tra họ tên, lớp, Codeforces handle; sau đó tạo Student và Enrollment mới. \\
+\hline
+4 & Nhấn Sửa thông tin & Hệ thống mở modal với dữ liệu học sinh hiện tại, cho phép cập nhật họ tên, Codeforces handle, số điện thoại và ghi chú. \\
+\hline
+5 & Nhấn Copy link authorize Discord & Hệ thống gọi API lấy link OAuth của học sinh, sao chép vào clipboard và hiển thị thông báo kết quả. \\
+\hline
+6 & Nhấn Chuyển lớp & Hệ thống mở modal chọn lớp mới, đóng ghi danh cũ và tạo ghi danh mới sau khi xác nhận. \\
+\hline
+7 & Nhấn Cho nghỉ học & Hệ thống cập nhật trạng thái học sinh dựa trên số dư; nếu còn công nợ hoặc cần hoàn tiền thì đưa vào trạng thái chờ xử lý. \\
+\hline
+8 & Nhấn Thêm trở lại & Hệ thống mở modal chọn lớp mới và khôi phục học sinh vào lớp đang hoạt động. \\
+\hline
+9 & Gửi tin nhắn Discord cho một hoặc nhiều học sinh & Hệ thống kiểm tra nội dung tin nhắn, lọc học sinh có Discord credential và gửi tin nhắn qua Discord API. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Chi tiết học sinh}
+
+\noindent\textbf{a) Giao diện}
+
+\uiscreenshot{detail.png}{Màn hình Chi tiết học sinh}
+
+\noindent\textbf{b) Mô tả các đối tượng trên màn hình}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{3.2cm}|p{2.4cm}|p{3.0cm}|X|}
+\hline
+\textbf{STT} & \textbf{Tên} & \textbf{Kiểu} & \textbf{Ràng buộc} & \textbf{Chức năng} \\
+\hline
+1 & Nút quay lại danh sách & Button/Link & Không & Quay lại màn hình Quản lý học sinh. \\
+\hline
+2 & Thẻ hồ sơ học sinh & Card/Header & Read-only & Hiển thị họ tên, trạng thái học sinh và các thông tin tóm tắt. \\
+\hline
+3 & Thẻ Lớp học & Card/Label & Read-only & Hiển thị lớp hiện tại của học sinh. \\
+\hline
+4 & Thẻ Đã đóng & Card/Label & Read-only & Hiển thị tổng giao dịch thu tiền/hoàn tiền của học sinh. \\
+\hline
+5 & Thẻ Học phí & Card/Label & Read-only & Hiển thị tổng khoản phí còn hiệu lực. \\
+\hline
+6 & Thẻ Số dư & Card/Label & Read-only & Hiển thị số dư hiện tại của học sinh. \\
+\hline
+7 & Khu vực Tiến độ chuyên đề & Card/List & Read-only & Hiển thị các Gym/chuyên đề, số bài đã giải, danh sách bài và link Codeforces. \\
+\hline
+8 & Tab Giao dịch & Tab/Table & Read-only & Hiển thị lịch sử giao dịch tài chính của học sinh. \\
+\hline
+9 & Tab Học phí phát sinh & Tab/Table/Select & Có thể cập nhật trạng thái khoản phí & Hiển thị FeeRecord, số tiền, trạng thái active/cancelled và nút xem thêm. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent\textbf{c) Danh sách biến cố và xử lý}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{5.2cm}|X|}
+\hline
+\textbf{STT} & \textbf{Biến cố} & \textbf{Xử lý} \\
+\hline
+1 & Giáo viên mở chi tiết học sinh & Hệ thống tải hồ sơ học sinh, lớp hiện tại, giao dịch, học phí phát sinh và hồ sơ học tập Codeforces. \\
+\hline
+2 & Dữ liệu học sinh không tồn tại hoặc ID không hợp lệ & Hệ thống hiển thị thông báo lỗi và cung cấp nút quay lại danh sách. \\
+\hline
+3 & Chọn tab Giao dịch & Hệ thống hiển thị danh sách giao dịch gồm ngày, mô tả, loại giao dịch và số tiền. \\
+\hline
+4 & Chọn tab Học phí phát sinh & Hệ thống hiển thị bảng FeeRecord, cho phép xem trạng thái từng khoản phí. \\
+\hline
+5 & Đổi trạng thái khoản phí & Hệ thống cập nhật trạng thái FeeRecord, tải lại dữ liệu và tính lại số dư học sinh. \\
+\hline
+6 & Nhấn link Codeforces ở chuyên đề & Hệ thống mở trang Codeforces Gym trong tab mới. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Quản lý lớp học}
+
+\noindent\textbf{a) Giao diện}
+
+\uiscreenshot{quan-ly-lop-hoc.png}{Màn hình Quản lý lớp học}
+
+\noindent\textbf{b) Mô tả các đối tượng trên màn hình}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{3.2cm}|p{2.4cm}|p{3.0cm}|X|}
+\hline
+\textbf{STT} & \textbf{Tên} & \textbf{Kiểu} & \textbf{Ràng buộc} & \textbf{Chức năng} \\
+\hline
+1 & Nút Thêm lớp & Button & Quyền giáo viên & Mở modal tạo lớp học mới. \\
+\hline
+2 & Danh sách lớp đang mở & Card List & Read-only & Hiển thị các lớp active, số học sinh, học phí và lịch học. \\
+\hline
+3 & Danh sách lớp đã đóng & Card List & Read-only & Hiển thị các lớp archived để giáo viên tra cứu lịch sử. \\
+\hline
+4 & Nút Sửa lớp & Button/Icon & Theo từng lớp & Mở modal chỉnh sửa tên lớp, học phí và lịch học. \\
+\hline
+5 & Nút Nhắn nhóm & Button/Icon & Lớp cần có cấu hình Discord phù hợp & Mở modal gửi thông báo vào channel Discord của lớp. \\
+\hline
+6 & Nút Đóng/Lưu trữ lớp & Button/Icon & Có xác nhận & Chuyển trạng thái lớp sang archived thay vì xóa dữ liệu. \\
+\hline
+7 & Modal thêm/sửa lớp & Modal/Form & Tên lớp, học phí và lịch học hợp lệ & Nhập tên lớp, học phí mỗi buổi, thứ học, giờ bắt đầu và giờ kết thúc. \\
+\hline
+8 & Modal nhắn nhóm & Modal/Textarea & Nội dung không được rỗng & Nhập nội dung thông báo gửi vào Discord channel của lớp. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent\textbf{c) Danh sách biến cố và xử lý}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{5.2cm}|X|}
+\hline
+\textbf{STT} & \textbf{Biến cố} & \textbf{Xử lý} \\
+\hline
+1 & Giáo viên nhấn Thêm lớp & Hệ thống mở modal nhập tên lớp, học phí và lịch học định kỳ. \\
+\hline
+2 & Lưu lớp mới hoặc cập nhật lớp & Hệ thống kiểm tra tên lớp không rỗng, học phí không âm, giờ kết thúc sau giờ bắt đầu rồi lưu dữ liệu. \\
+\hline
+3 & Nhấn vào thẻ lớp & Hệ thống điều hướng đến màn hình Chi tiết lớp học tương ứng. \\
+\hline
+4 & Nhấn Nhắn nhóm & Hệ thống mở modal nhập nội dung, gửi thông báo vào Discord channel của lớp và trả kết quả. \\
+\hline
+5 & Nhấn Đóng/Lưu trữ lớp & Hệ thống yêu cầu xác nhận, chuyển trạng thái lớp sang archived nếu hợp lệ và tải lại danh sách. \\
+\hline
+6 & Không có lớp trong một nhóm trạng thái & Hệ thống hiển thị trạng thái rỗng cho danh sách lớp đang mở hoặc lớp đã đóng. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Chi tiết lớp học}
+
+\noindent\textbf{a) Giao diện}
+
+\uiscreenshot{class_detail.png}{Màn hình Chi tiết lớp học}
+
+\noindent\textbf{b) Mô tả các đối tượng trên màn hình}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{3.2cm}|p{2.4cm}|p{3.0cm}|X|}
+\hline
+\textbf{STT} & \textbf{Tên} & \textbf{Kiểu} & \textbf{Ràng buộc} & \textbf{Chức năng} \\
+\hline
+1 & Nút quay lại & Button/Link & Không & Quay lại màn hình Quản lý lớp học. \\
+\hline
+2 & Thẻ Học phí/buổi & Card/Label & Read-only & Hiển thị học phí mỗi buổi của lớp. \\
+\hline
+3 & Thẻ Học sinh active & Card/Label & Read-only & Hiển thị số học sinh đang ghi danh trong lớp. \\
+\hline
+4 & Thẻ Discord guild & Card/Label & Read-only & Hiển thị Discord server đã gắn với lớp hoặc trạng thái chưa gắn. \\
+\hline
+5 & Thẻ GYM & Card/Label & Read-only & Hiển thị số Codeforces Gym đã gắn với lớp. \\
+\hline
+6 & Khu vực Lịch học & List/Card & Read-only & Hiển thị thứ học, giờ bắt đầu và giờ kết thúc. \\
+\hline
+7 & Khu vực Discord & Card/Form/Button & Cần giáo viên xác thực Discord và bot có quyền & Chọn hoặc gỡ guild, general channel và voice channel cho lớp. \\
+\hline
+8 & Khu vực Codeforces Gym & Card/List/Button & Gym đã đồng bộ hoặc Gym ID hợp lệ & Gắn/gỡ Gym, xem số bài, số bài solved, số học sinh hoàn thành và mở standing. \\
+\hline
+9 & Danh sách học sinh & Table/List & Read-only & Hiển thị học sinh active trong lớp. \\
+\hline
+10 & Modal chọn Discord server/Gym & Modal/Search/Form & Dữ liệu hợp lệ & Tìm guild/channel hoặc Gym đã sync và lưu cấu hình cho lớp. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent\textbf{c) Danh sách biến cố và xử lý}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{5.2cm}|X|}
+\hline
+\textbf{STT} & \textbf{Biến cố} & \textbf{Xử lý} \\
+\hline
+1 & Giáo viên mở chi tiết lớp & Hệ thống tải thông tin lớp, lịch học, học sinh active, Discord binding và danh sách Gym đã gắn. \\
+\hline
+2 & Nhấn Chọn Discord server cho lớp & Hệ thống mở modal, tải danh sách guild/channel, kiểm tra channel thuộc đúng guild và lưu ClassDiscordBinding. \\
+\hline
+3 & Nhấn Gỡ Discord server khỏi lớp & Hệ thống yêu cầu xác nhận và xóa liên kết Discord của lớp nếu hợp lệ. \\
+\hline
+4 & Nhấn Chọn GYM đã sync & Hệ thống mở modal tìm Gym, cho phép chọn Gym phù hợp và gắn vào lớp. \\
+\hline
+5 & Nhấn Gỡ Gym & Hệ thống yêu cầu xác nhận và gỡ liên kết Gym khỏi lớp. \\
+\hline
+6 & Nhấn Xem standing & Hệ thống điều hướng đến màn hình Bảng xếp hạng Codeforces Gym của Gym được chọn. \\
+\hline
+7 & Không tìm thấy lớp hoặc lớp không thuộc giáo viên & Hệ thống hiển thị lỗi hoặc điều hướng về danh sách lớp. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Quản lý buổi học}
+
+\noindent\textbf{a) Giao diện}
+
+\uiscreenshot{sessions.png}{Màn hình Quản lý buổi học}
+
+\noindent\textbf{b) Mô tả các đối tượng trên màn hình}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{3.2cm}|p{2.4cm}|p{3.0cm}|X|}
+\hline
+\textbf{STT} & \textbf{Tên} & \textbf{Kiểu} & \textbf{Ràng buộc} & \textbf{Chức năng} \\
+\hline
+1 & Bộ lọc trạng thái & Button Group & Tất cả, Sắp diễn ra, Đang diễn ra, Đã hoàn thành, Đã hủy & Lọc danh sách buổi học theo trạng thái. \\
+\hline
+2 & Bộ lọc ngày học & Date Picker & Cho phép rỗng & Lọc buổi học theo ngày cụ thể. \\
+\hline
+3 & Nút Xem tất cả/7 ngày tới & Button & Chỉ hiện với các trạng thái phù hợp & Chuyển phạm vi hiển thị giữa 7 ngày tới và toàn bộ buổi học. \\
+\hline
+4 & Nút Thêm buổi học & Button & Quyền giáo viên & Mở modal tạo buổi học thủ công. \\
+\hline
+5 & Danh sách buổi học & Card Grid & Read-only & Hiển thị lớp, ngày, giờ, trạng thái và loại buổi học recurring/thủ công. \\
+\hline
+6 & Nút Hủy buổi học & Button/Icon & Chỉ áp dụng với buổi scheduled hoặc in\_progress & Chuyển buổi học sang trạng thái đã hủy. \\
+\hline
+7 & Modal thêm buổi học & Modal/Form & Lớp, ngày, giờ bắt đầu, giờ kết thúc hợp lệ & Tạo buổi học ngoài lịch recurring. \\
+\hline
+8 & Thông báo rỗng & Empty State & Khi không có dữ liệu & Hiển thị thông báo không có buổi học nào theo bộ lọc. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent\textbf{c) Danh sách biến cố và xử lý}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{5.2cm}|X|}
+\hline
+\textbf{STT} & \textbf{Biến cố} & \textbf{Xử lý} \\
+\hline
+1 & Thay đổi trạng thái lọc hoặc ngày học & Hệ thống gọi lại API danh sách buổi học theo bộ lọc mới. \\
+\hline
+2 & Nhấn Thêm buổi học & Hệ thống mở modal chọn lớp, ngày học, giờ bắt đầu và giờ kết thúc. \\
+\hline
+3 & Lưu buổi học thủ công & Hệ thống kiểm tra lớp hợp lệ, ngày học, thời gian bắt đầu/kết thúc và tạo Session mới. \\
+\hline
+4 & Nhấn vào thẻ buổi học & Hệ thống điều hướng đến màn hình Chi tiết buổi học / Điểm danh. \\
+\hline
+5 & Nhấn Hủy buổi học & Hệ thống gọi API hủy buổi học, cập nhật trạng thái và tải lại danh sách. \\
+\hline
+6 & Không có buổi học phù hợp & Hệ thống hiển thị trạng thái rỗng để người dùng biết bộ lọc hiện tại không có dữ liệu. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Chi tiết buổi học / Điểm danh}
+
+\noindent\textbf{a) Giao diện}
+
+\uiscreenshot{diemdanh.png}{Màn hình Chi tiết buổi học / Điểm danh}
+
+\noindent\textbf{b) Mô tả các đối tượng trên màn hình}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{3.2cm}|p{2.4cm}|p{3.0cm}|X|}
+\hline
+\textbf{STT} & \textbf{Tên} & \textbf{Kiểu} & \textbf{Ràng buộc} & \textbf{Chức năng} \\
+\hline
+1 & Nút quay lại danh sách & Button/Link & Không & Quay lại màn hình Quản lý buổi học. \\
+\hline
+2 & Tiêu đề lớp và trạng thái buổi học & Header/Badge & Read-only & Hiển thị tên lớp, ngày học và trạng thái scheduled/in\_progress/completed/cancelled. \\
+\hline
+3 & Thẻ Ngày & Card/Label & Read-only & Hiển thị ngày diễn ra buổi học. \\
+\hline
+4 & Thẻ Giờ & Card/Label & Read-only & Hiển thị giờ bắt đầu của buổi học. \\
+\hline
+5 & Thẻ Trạng thái & Card/Badge & Read-only & Hiển thị trạng thái hiện tại của buổi học. \\
+\hline
+6 & Thẻ Loại & Card/Label & Read-only & Cho biết buổi học được tạo thủ công hay sinh từ lịch recurring. \\
+\hline
+7 & Bảng điểm danh & Table & Read-only kết hợp nhập liệu & Hiển thị học sinh, trạng thái điểm danh, nguồn điểm danh và ghi chú. \\
+\hline
+8 & Dropdown trạng thái điểm danh & Select & Có mặt, Vắng có lý do, Vắng không lý do & Cập nhật trạng thái điểm danh của từng học sinh. \\
+\hline
+9 & Ô ghi chú & Textbox & Không bắt buộc & Ghi chú thêm cho bản ghi điểm danh. \\
+\hline
+10 & Cảnh báo buổi đã hủy & Alert/Label & Khi session cancelled & Thông báo bảng điểm danh chỉ đọc vì buổi học đã hủy. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent\textbf{c) Danh sách biến cố và xử lý}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{5.2cm}|X|}
+\hline
+\textbf{STT} & \textbf{Biến cố} & \textbf{Xử lý} \\
+\hline
+1 & Giáo viên mở chi tiết buổi học & Hệ thống tải thông tin session, lớp học và danh sách điểm danh của học sinh trong lớp. \\
+\hline
+2 & Giáo viên đổi trạng thái điểm danh & Hệ thống gọi API upsert Attendance, sau đó tải lại bảng điểm danh và cập nhật khoản phí liên quan nếu nghiệp vụ yêu cầu. \\
+\hline
+3 & Giáo viên nhập ghi chú và rời khỏi ô nhập & Hệ thống lưu ghi chú nếu nội dung thay đổi so với dữ liệu cũ. \\
+\hline
+4 & Buổi học đã bị hủy & Hệ thống vô hiệu hóa dropdown/ô ghi chú và hiển thị cảnh báo bảng điểm danh chỉ đọc. \\
+\hline
+5 & Session ID không hợp lệ hoặc không tìm thấy dữ liệu & Hệ thống hiển thị thông báo lỗi và nút quay lại danh sách buổi học. \\
+\hline
+6 & Danh sách điểm danh rỗng & Hệ thống hiển thị thông báo chưa có học sinh để điểm danh trong buổi này. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Quản lý tài chính}
+
+\noindent\textbf{a) Giao diện}
+
+\uiscreenshot{finance.png}{Màn hình Quản lý tài chính}
+
+\noindent\textbf{b) Mô tả các đối tượng trên màn hình}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{3.2cm}|p{2.4cm}|p{3.0cm}|X|}
+\hline
+\textbf{STT} & \textbf{Tên} & \textbf{Kiểu} & \textbf{Ràng buộc} & \textbf{Chức năng} \\
+\hline
+1 & Tab Giao dịch & Button/Tab & Mặc định được chọn & Hiển thị danh sách giao dịch tài chính. \\
+\hline
+2 & Tab Báo cáo & Button/Tab & Không & Chuyển sang màn hình Báo cáo và thống kê trong cùng phân hệ. \\
+\hline
+3 & Nút Ghi nhận giao dịch & Button & Chỉ hiển thị ở tab Giao dịch & Mở modal tạo giao dịch thu tiền hoặc hoàn tiền. \\
+\hline
+4 & Ô tìm kiếm giao dịch & Textbox & Cho phép rỗng & Tìm theo học sinh, mô tả, loại giao dịch, ngày hoặc số tiền. \\
+\hline
+5 & Bộ lọc loại giao dịch & Button Group & Tất cả, Thu tiền, Hoàn trả & Lọc danh sách theo loại giao dịch. \\
+\hline
+6 & Bảng giao dịch & DataGrid/Table & Read-only & Hiển thị ngày, học sinh, loại, mô tả, số tiền và thao tác sửa. \\
+\hline
+7 & Nút Sửa giao dịch & Button/Icon & Chỉ với giao dịch có transaction ID & Mở modal cập nhật giao dịch đã ghi nhận. \\
+\hline
+8 & Modal giao dịch & Modal/Form & Học sinh, loại, số tiền dương, ngày giao dịch hợp lệ & Nhập học sinh, loại payment/refund, số tiền, mô tả và ngày giao dịch. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent\textbf{c) Danh sách biến cố và xử lý}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{5.2cm}|X|}
+\hline
+\textbf{STT} & \textbf{Biến cố} & \textbf{Xử lý} \\
+\hline
+1 & Giáo viên mở màn hình Tài chính & Hệ thống tải danh sách học sinh và tối đa các giao dịch gần đây để hiển thị. \\
+\hline
+2 & Nhập từ khóa tìm kiếm & Hệ thống lọc danh sách giao dịch theo tên học sinh, mô tả, loại giao dịch, ngày hoặc số tiền. \\
+\hline
+3 & Chọn bộ lọc loại giao dịch & Hệ thống chỉ hiển thị giao dịch thu tiền, hoàn trả hoặc toàn bộ. \\
+\hline
+4 & Nhấn Ghi nhận giao dịch & Hệ thống mở modal chọn học sinh, nhập số tiền, loại giao dịch, mô tả và ngày giao dịch. \\
+\hline
+5 & Lưu giao dịch & Hệ thống kiểm tra học sinh hợp lệ và số tiền nguyên dương, chuẩn hóa amount theo loại giao dịch rồi lưu Transaction. \\
+\hline
+6 & Nhấn Sửa giao dịch & Hệ thống mở modal với dữ liệu hiện tại và cập nhật giao dịch sau khi người dùng lưu. \\
+\hline
+7 & Nhấn tab Báo cáo & Hệ thống chuyển sang giao diện Báo cáo và thống kê, giữ trong phân hệ Tài chính. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Báo cáo và thống kê}
+
+\noindent\textbf{a) Giao diện}
+
+\uiscreenshot{report.png}{Màn hình Báo cáo và thống kê}
+
+\noindent\textbf{b) Mô tả các đối tượng trên màn hình}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{3.2cm}|p{2.4cm}|p{3.0cm}|X|}
+\hline
+\textbf{STT} & \textbf{Tên} & \textbf{Kiểu} & \textbf{Ràng buộc} & \textbf{Chức năng} \\
+\hline
+1 & Bộ chọn kỳ nhanh & Button Group & Tháng này, Tháng trước, Từ đầu năm & Tự động điền khoảng thời gian báo cáo. \\
+\hline
+2 & Từ ngày/Đến ngày & Date Picker & Từ ngày không được sau đến ngày & Chọn khoảng thời gian lập báo cáo. \\
+\hline
+3 & Bộ lọc lớp & Dropdown & Lớp thuộc giáo viên hiện tại & Lọc báo cáo theo một lớp hoặc tất cả lớp. \\
+\hline
+4 & Bộ lọc trạng thái học sinh & Dropdown & Tất cả, Đang học, Chờ xử lý, Đã archive & Lọc danh sách số dư/công nợ theo trạng thái học sinh. \\
+\hline
+5 & Checkbox Bao gồm khoản chưa thu & Checkbox & Không & Tính thêm khoản phí chưa thu vào chỉ số lợi nhuận/doanh thu dự kiến. \\
+\hline
+6 & Nút Xuất CSV & Button & Không & Kết xuất báo cáo tài chính thành file CSV. \\
+\hline
+7 & Thẻ Tiền vào & Card/Label & Read-only & Hiển thị tổng tiền thu trong kỳ. \\
+\hline
+8 & Thẻ Tiền ra & Card/Label & Read-only & Hiển thị tổng tiền hoàn trả trong kỳ. \\
+\hline
+9 & Thẻ Lợi nhuận & Card/Label & Read-only & Hiển thị lợi nhuận hoặc doanh thu dự kiến theo tùy chọn bao gồm khoản chưa thu. \\
+\hline
+10 & Bảng học sinh đang nợ & Table & Read-only & Hiển thị học sinh có số dư âm, trạng thái và số nợ. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent\textbf{c) Danh sách biến cố và xử lý}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{5.2cm}|X|}
+\hline
+\textbf{STT} & \textbf{Biến cố} & \textbf{Xử lý} \\
+\hline
+1 & Người dùng chọn kỳ nhanh & Hệ thống cập nhật từ ngày/đến ngày theo preset và tự tải lại báo cáo. \\
+\hline
+2 & Người dùng thay đổi ngày, lớp hoặc trạng thái học sinh & Hệ thống truy vấn lại báo cáo thu nhập và danh sách số dư học sinh theo bộ lọc mới. \\
+\hline
+3 & Người dùng bật/tắt Bao gồm khoản chưa thu & Hệ thống tính lại chỉ số lợi nhuận/doanh thu dự kiến dựa trên tùy chọn này. \\
+\hline
+4 & Nhấn Xuất CSV & Hệ thống tạo file CSV gồm thời gian lọc, chỉ số tài chính và danh sách học sinh nợ để tải xuống trình duyệt. \\
+\hline
+5 & Không có học sinh nợ & Hệ thống hiển thị trạng thái rỗng ``Không có khoản nợ''. \\
+\hline
+6 & Backend trả lỗi khi lập báo cáo & Hệ thống hiển thị thông báo lỗi và giữ các bộ lọc hiện tại để người dùng sửa. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Bảng xếp hạng Codeforces Gym}
+
+\noindent\textbf{a) Giao diện}
+
+\uiscreenshot{standing.png}{Màn hình Bảng xếp hạng Codeforces Gym}
+
+\noindent\textbf{b) Mô tả các đối tượng trên màn hình}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{3.2cm}|p{2.4cm}|p{3.0cm}|X|}
+\hline
+\textbf{STT} & \textbf{Tên} & \textbf{Kiểu} & \textbf{Ràng buộc} & \textbf{Chức năng} \\
+\hline
+1 & Nút quay lại lớp & Button & Không & Quay lại màn hình Chi tiết lớp học chứa Gym. \\
+\hline
+2 & Tiêu đề Gym & Header/Label & Read-only & Hiển thị tên contest/Gym đang xem. \\
+\hline
+3 & Nút Mở Codeforces & Button/Link & Gym link hợp lệ & Mở trang Codeforces Gym tương ứng trong tab mới. \\
+\hline
+4 & Bảng ma trận kết quả & DataGrid/Table & Read-only & Hiển thị danh sách học sinh và trạng thái giải từng bài trong Gym. \\
+\hline
+5 & Cột học sinh & Table Column & Read-only & Hiển thị tên học sinh trong lớp. \\
+\hline
+6 & Cột bài tập & Table Header & Read-only & Hiển thị mã bài hoặc tên bài trong Gym. \\
+\hline
+7 & Ô kết quả từng bài & Label/Icon & Read-only & Thể hiện học sinh đã giải, chưa giải hoặc trạng thái liên quan đến từng bài tập. \\
+\hline
+8 & Thông báo rỗng/lỗi & Empty State/Alert & Khi chưa có dữ liệu hoặc lỗi & Thông báo Gym chưa có dữ liệu đồng bộ, không tìm thấy Gym hoặc lỗi tải standing. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent\textbf{c) Danh sách biến cố và xử lý}
+
+\begin{table}[H]
+\centering
+\tablesetup
+\begin{tabularx}{\textwidth}{|p{0.7cm}|p{5.2cm}|X|}
+\hline
+\textbf{STT} & \textbf{Biến cố} & \textbf{Xử lý} \\
+\hline
+1 & Giáo viên mở bảng xếp hạng Gym & Hệ thống tải ma trận standing của Gym, danh sách bài tập và danh sách học sinh trong lớp. \\
+\hline
+2 & Gym chưa có dữ liệu đồng bộ & Hệ thống hiển thị thông báo chưa có dữ liệu hoặc bảng rỗng. \\
+\hline
+3 & Nhấn Mở Codeforces & Hệ thống mở link Codeforces Gym trong tab mới để giáo viên đối chiếu dữ liệu gốc. \\
+\hline
+4 & Nhấn quay lại lớp & Hệ thống điều hướng về màn hình Chi tiết lớp học chứa Gym đó. \\
+\hline
+5 & Class ID hoặc Gym ID không hợp lệ & Hệ thống hiển thị lỗi và cung cấp nút quay lại danh sách lớp. \\
+\hline
+\end{tabularx}
+\end{table}

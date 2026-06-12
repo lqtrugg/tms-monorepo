@@ -150,7 +150,7 @@ export function PendingArchive() {
               <p className="text-2xl font-semibold text-zinc-900">{needRefund.length}</p>
             </div>
           </div>
-          <div className="text-sm text-zinc-600">
+          <div className="text-sm text-zinc-600 ">
             Tổng dư: <span className="text-zinc-900 font-semibold">{formatMoney(totalRefund)}</span>
           </div>
         </div>

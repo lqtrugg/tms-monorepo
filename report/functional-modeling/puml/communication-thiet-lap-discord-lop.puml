@@ -1,0 +1,40 @@
+@startuml
+title Sơ đồ giao tiếp - Thiết lập Discord cho lớp học
+skinparam shadowing false
+skinparam linetype ortho
+skinparam object {
+  BackgroundColor White
+  BorderColor Black
+}
+
+object ":Giáo viên" as Teacher
+object ":Discord" as Discord
+object ":Màn hình quản lý" as Screen
+object ":API client" as ApiClient
+object ":Route" as Route
+object ":Security" as Security
+object ":Controller" as Controller
+object ":Account" as Account
+object ":Classroom" as Classroom
+object ":AccountReader" as AccountReader
+object ":ClassroomWriter" as ClassroomWriter
+object ":Azure Database Server" as DB
+
+Teacher -down-> Screen : 1: chọn Discord cho lớp
+Screen -right-> ApiClient : 1.1: gửi lựa chọn
+ApiClient -right-> Route : 1.2: chuyển yêu cầu
+Route -down-> Security : 1.3: kiểm tra truy cập
+Route -right-> Controller : 1.4: chuyển nghiệp vụ
+Controller -down-> Account : 1.5: kiểm tra định danh Discord giáo viên
+Account -left-> AccountReader : 1.5.1: đọc dữ liệu tài khoản
+Controller -right-> Classroom : 1.6: thiết lập Discord lớp
+Classroom -up-> Discord : 1.6.1: lấy guild và channel
+Classroom -left-> ClassroomWriter : 1.6.2: lưu cấu hình lớp
+AccountReader -down-> DB : 1.7.1: đọc CSDL TMS
+ClassroomWriter -down-> DB : 1.7.2: ghi CSDL TMS
+Classroom -up-> Controller : 1.8: trả kết quả
+Controller -left-> Route : 1.9: trả kết quả backend
+Route -left-> ApiClient : 1.10: trả kết quả frontend
+ApiClient -left-> Screen : 1.11: cập nhật màn hình
+Screen -up-> Teacher : 1.12: hiển thị thiết lập mới
+@enduml

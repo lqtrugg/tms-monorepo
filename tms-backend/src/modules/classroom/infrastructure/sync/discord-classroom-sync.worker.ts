@@ -37,6 +37,8 @@ import { Session } from '../../../../infrastructure/database/entities/session.en
 import { Student } from '../../../../infrastructure/database/entities/student.entity.js';
 import { StudentDiscordCredential } from '../../../../infrastructure/database/entities/student-discord-credential.entity.js';
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 type OpenVoiceAttendanceSession = {
   teacher_id: number;
   class_id: number;
@@ -73,6 +75,14 @@ type MaterializeSessionRow = {
   teacher_id: number;
 };
 
+// ─── Discord Bot Health ──────────────────────────────────────────────────────
+
+/**
+ * Checks the default Discord bot token and stores the latest health result.
+ *
+ * Missing database or bot token is treated as "nothing to sync yet", so this
+ * pass exits quietly instead of failing the whole worker.
+ */
 export async function checkDiscordBotHealthOnce(): Promise<void> {
   if (!AppDataSource.isInitialized) {
     return;
@@ -98,6 +108,11 @@ export async function checkDiscordBotHealthOnce(): Promise<void> {
   await updateDefaultDiscordBotHealth({ status, message, checkedAt });
 }
 
+// ─── Guild + Channel Cache Sync ──────────────────────────────────────────────
+
+/**
+ * Lists teachers that linked a Discord user account.
+ */
 export async function listDiscordSyncTeacherIds(): Promise<number[]> {
   if (!AppDataSource.isInitialized) {
     return [];
@@ -106,6 +121,18 @@ export async function listDiscordSyncTeacherIds(): Promise<number[]> {
   return listTeacherIdsWithDiscordUserId();
 }
 
+/**
+ * Refreshes Discord guild/channel cache for one teacher.
+ *
+ * Workflow:
+ *   1. Load default bot token and teacher Discord user id
+ *   2. Merge guild ids from user-owned cache and existing class bindings
+ *   3. Fetch guild metadata and keep only bot-accessible guilds
+ *   4. Replace cached guilds and prune stale class bindings
+ *   5. Refresh channel cache for each accessible guild
+ *
+ * Discord is the source of truth. Local guild/channel rows are cache only.
+ */
 export async function syncDiscordGuildsForTeacherOnce(teacherId: number): Promise<{
   synced_guilds: number;
   removed_bindings: number;
@@ -124,6 +151,7 @@ export async function syncDiscordGuildsForTeacherOnce(teacherId: number): Promis
   let removedBindings = 0;
   const discordCache = new TypeOrmDiscordCacheStore();
 
+  // Step 1: Build the guild set relevant to this teacher.
   const [ownedGuilds, boundGuilds] = await Promise.all([
     discordCache.listGuildIdsForOwner(discordUserId),
     AppDataSource.getRepository(ClassDiscordBinding).find({
@@ -138,6 +166,7 @@ export async function syncDiscordGuildsForTeacherOnce(teacherId: number): Promis
   ));
   const guilds: Array<{ id: string; name: string }> = [];
 
+  // Step 2: Keep only guilds still accessible through the bot token.
   for (const discordGuildId of knownDiscordGuildIds) {
     try {
       guilds.push(await fetchDiscordGuildMetadata(botToken, discordGuildId));
@@ -146,6 +175,7 @@ export async function syncDiscordGuildsForTeacherOnce(teacherId: number): Promis
     }
   }
 
+  // Step 3: Replace guild cache and prune stale bindings in one transaction.
   await AppDataSource.transaction(async (manager) => {
     const transactionDiscordCache = new TypeOrmDiscordCacheStore(manager);
     const bindingRepo = manager.getRepository(ClassDiscordBinding);
@@ -174,6 +204,7 @@ export async function syncDiscordGuildsForTeacherOnce(teacherId: number): Promis
     removedBindings += bindingDelete.affected ?? 0;
   });
 
+  // Step 4: Refresh channel cache for each accessible guild.
   for (const guild of guilds) {
     try {
       const channels = await listDiscordGuildChannels(botToken, guild.id);
@@ -194,6 +225,15 @@ export async function syncDiscordGuildsForTeacherOnce(teacherId: number): Promis
   return { synced_guilds: guilds.length, removed_bindings: removedBindings };
 }
 
+// ─── Student Guild Membership Sync ───────────────────────────────────────────
+
+/**
+ * Loads students whose Discord guild membership needs reconciliation.
+ *
+ * A row is included when the student has a verified Discord user id and either:
+ *   - currently belongs to a Discord guild, or
+ *   - should belong to a bound class guild through active enrollment.
+ */
 async function listStudentDiscordMembershipSyncRows(
   teacherId: number,
 ): Promise<StudentDiscordMembershipSyncRow[]> {
@@ -260,6 +300,12 @@ async function listStudentDiscordMembershipSyncRows(
   }));
 }
 
+/**
+ * Returns a usable student Discord access token for guild join operations.
+ *
+ * Uses the stored token when it has enough remaining lifetime; otherwise tries
+ * to refresh the token and persists the refreshed credential.
+ */
 async function getValidStudentDiscordAccessToken(input: {
   row: StudentDiscordMembershipSyncRow;
   clientId: string | null | undefined;
@@ -296,6 +342,14 @@ async function getValidStudentDiscordAccessToken(input: {
   }
 }
 
+/**
+ * Reconciles one student's Discord guild membership.
+ *
+ * Local desired state comes from active enrollment plus class Discord binding:
+ *   - no target guild: kick from current guild
+ *   - different target guild: kick from old guild, then add to new guild
+ *   - same target guild: no-op
+ */
 async function reconcileStudentDiscordMembershipRow(input: {
   row: StudentDiscordMembershipSyncRow;
   botToken: string;
@@ -304,10 +358,13 @@ async function reconcileStudentDiscordMembershipRow(input: {
 }): Promise<'added' | 'kicked' | 'moved' | 'skipped' | 'unchanged'> {
   const targetGuildId = input.row.target_guild_id;
   const currentGuildId = input.row.current_guild_id;
+
+  // Step 1: Nothing to do when persisted guild already matches desired guild.
   if (currentGuildId === targetGuildId) {
     return 'unchanged';
   }
 
+  // Step 2: Remove stale membership before adding a new one.
   if (currentGuildId) {
     await kickDiscordGuildMember({
       botToken: input.botToken,
@@ -321,10 +378,12 @@ async function reconcileStudentDiscordMembershipRow(input: {
     );
   }
 
+  // Step 3: If no class guild is desired, the kick completed the sync.
   if (!targetGuildId) {
     return currentGuildId ? 'kicked' : 'unchanged';
   }
 
+  // Step 4: Discord requires a valid user access token to add a guild member.
   const accessToken = await getValidStudentDiscordAccessToken({
     row: input.row,
     clientId: input.clientId,
@@ -353,6 +412,9 @@ async function reconcileStudentDiscordMembershipRow(input: {
   return targetGuildId ? 'added' : 'kicked';
 }
 
+/**
+ * Syncs Discord guild membership for all relevant students of one teacher.
+ */
 export async function syncStudentDiscordGuildMembershipForTeacherOnce(teacherId: number): Promise<{
   added: number;
   kicked: number;
@@ -400,6 +462,9 @@ export async function syncStudentDiscordGuildMembershipForTeacherOnce(teacherId:
   return result;
 }
 
+/**
+ * Lists teachers that have at least one student with Discord membership work.
+ */
 export async function listStudentDiscordMembershipSyncTeacherIds(): Promise<number[]> {
   if (!AppDataSource.isInitialized) {
     return [];
@@ -437,6 +502,14 @@ export async function listStudentDiscordMembershipSyncTeacherIds(): Promise<numb
   return rows.map((row) => Number(row.teacher_id));
 }
 
+// ─── Session Status + Attendance Materialization ─────────────────────────────
+
+/**
+ * Calculates the concrete UTC end datetime for a session.
+ *
+ * `scheduled_at` carries the Vietnam calendar date, while `end_time` carries
+ * the local wall-clock time for that same date.
+ */
 function getSessionEndAt(session: Pick<Session, 'scheduled_at' | 'end_time'>): Date | null {
   if (!session.end_time) {
     return null;
@@ -447,6 +520,12 @@ function getSessionEndAt(session: Pick<Session, 'scheduled_at' | 'end_time'>): D
   return vietnamDateTimeToUtcDate(parts.year, parts.month, parts.day, Number(hours), Number(minutes), Number(seconds), 0);
 }
 
+/**
+ * Ensures a session has system attendance rows and matching fee records.
+ *
+ * This runs before status transitions so scheduled/in-progress sessions have
+ * attendance and finance projections once the session time starts.
+ */
 async function materializeSessionAttendance(input: {
   attendanceWriter: TypeOrmAttendanceWriter;
   finance: TypeOrmSessionFinanceService;
@@ -525,6 +604,9 @@ async function materializeSessionAttendance(input: {
   };
 }
 
+/**
+ * Lists teachers with active classes and sessions that may need status updates.
+ */
 export async function listSessionStatusSyncTeacherIds(): Promise<number[]> {
   if (!AppDataSource.isInitialized) {
     return [];
@@ -550,6 +632,15 @@ export async function listSessionStatusSyncTeacherIds(): Promise<number[]> {
   return rows.map((row) => Number(row.teacher_id));
 }
 
+/**
+ * Advances session statuses and materializes attendance/fee projections.
+ *
+ * Workflow per teacher:
+ *   1. Load active scheduled/in-progress sessions whose date has started
+ *   2. Create missing attendance rows and sync fee records
+ *   3. Mark sessions completed when current time is past end time
+ *   4. Mark scheduled sessions in-progress once scheduled time has arrived
+ */
 export async function syncSessionStatusesForTeacherOnce(teacherId: number): Promise<{
   started: number;
   completed: number;
@@ -560,6 +651,7 @@ export async function syncSessionStatusesForTeacherOnce(teacherId: number): Prom
     return { started: 0, completed: 0, attendance_created: 0, fee_records_synced: 0 };
   }
 
+  // Step 1: Load sessions eligible for worker-driven status changes.
   const activeSessions = await AppDataSource
     .getRepository(Session)
     .createQueryBuilder('session')
@@ -582,6 +674,7 @@ export async function syncSessionStatusesForTeacherOnce(teacherId: number): Prom
     teacher_id: session.teacher_id,
   }));
 
+  // Step 2: Materialize attendance and finance rows for each eligible session.
   let attendanceCreated = 0;
   let feeRecordsSynced = 0;
   for (const row of materializeRows) {
@@ -604,6 +697,7 @@ export async function syncSessionStatusesForTeacherOnce(teacherId: number): Prom
   const completedRows: UpdatedSessionRow[] = [];
   const startedRows: UpdatedSessionRow[] = [];
 
+  // Step 3: Classify sessions into start/completion updates.
   for (const session of activeSessions) {
     const endAt = getSessionEndAt(session);
     if (!endAt) {
@@ -642,11 +736,16 @@ export async function syncSessionStatusesForTeacherOnce(teacherId: number): Prom
   };
 }
 
+// ─── Voice Attendance Sync ──────────────────────────────────────────────────
+
 function normalizeDiscordIdentity(value: string | null | undefined): string | null {
   const normalized = value?.trim().toLowerCase().replace(/^@+/, '');
   return normalized && normalized.length > 0 ? normalized : null;
 }
 
+/**
+ * Builds the set of Discord identity strings that can match a local student.
+ */
 function identityCandidates(identity: DiscordGuildMemberIdentity): Set<string> {
   const candidates = new Set<string>();
   const values = [
@@ -669,11 +768,17 @@ function identityCandidates(identity: DiscordGuildMemberIdentity): Set<string> {
   return candidates;
 }
 
+/**
+ * Chooses the best local Discord key for matching a student to a voice member.
+ */
 function studentDiscordKey(student: VoiceAttendanceStudentIdentity): string | null {
   return normalizeDiscordIdentity(student.discord_user_id)
     ?? normalizeDiscordIdentity(student.discord_username);
 }
 
+/**
+ * Loads in-progress sessions that have Discord voice attendance configured.
+ */
 async function getOpenVoiceAttendanceSessions(teacherId?: number): Promise<OpenVoiceAttendanceSession[]> {
   const credential = await findDefaultDiscordBotCredential();
   const botToken = credential?.bot_token?.trim() || null;
@@ -722,6 +827,9 @@ async function getOpenVoiceAttendanceSessions(teacherId?: number): Promise<OpenV
     .filter((row) => row.bot_token && row.attendance_voice_channel_id);
 }
 
+/**
+ * Lists enrolled students for the class at the session's scheduled time.
+ */
 async function listStudentsByClassSession(
   teacherId: number,
   classId: number,
@@ -745,6 +853,11 @@ async function listStudentsByClassSession(
   return listStudentDiscordIdentities(studentIds);
 }
 
+/**
+ * Marks students present when their verified Discord identity appears in voice.
+ *
+ * Manual attendance overrides are preserved by `markBotPresentIfNotManual`.
+ */
 async function markPresentStudentsForSession(
   session: OpenVoiceAttendanceSession,
   identities: DiscordGuildMemberIdentity[],
@@ -787,6 +900,9 @@ async function markPresentStudentsForSession(
   return markedCount;
 }
 
+/**
+ * Marks a single student's attendance as bot-present and syncs the fee record.
+ */
 async function upsertBotSessionAttendance(input: {
   attendanceWriter: TypeOrmAttendanceWriter;
   finance: TypeOrmSessionFinanceService;
@@ -849,6 +965,9 @@ async function upsertBotSessionAttendance(input: {
   return true;
 }
 
+/**
+ * Pulls current Discord voice members and applies attendance for one session.
+ */
 async function syncOpenSession(session: OpenVoiceAttendanceSession): Promise<number> {
   const identities = await new DiscordVoice(session.bot_token).listVoiceChannelMembers(
     session.discord_guild_id,
@@ -858,6 +977,9 @@ async function syncOpenSession(session: OpenVoiceAttendanceSession): Promise<num
   return markPresentStudentsForSession(session, identities);
 }
 
+/**
+ * Resolves and validates one teacher-owned session for manual voice sync.
+ */
 async function getVoiceAttendanceSessionForTeacher(
   teacherId: number,
   sessionId: number,
@@ -915,6 +1037,9 @@ async function getVoiceAttendanceSessionForTeacher(
   };
 }
 
+/**
+ * Manually syncs Discord voice attendance for a single in-progress session.
+ */
 export async function syncVoiceAttendanceForSession(teacherId: number, sessionId: number): Promise<{
   marked_count: number;
 }> {
@@ -936,6 +1061,9 @@ export async function syncVoiceAttendanceForSession(teacherId: number, sessionId
   return { marked_count: markedCount };
 }
 
+/**
+ * Syncs voice attendance for every currently open voice-attendance session.
+ */
 export async function syncVoiceAttendanceOnce(): Promise<void> {
   if (!AppDataSource.isInitialized) {
     return;
@@ -952,11 +1080,17 @@ export async function syncVoiceAttendanceOnce(): Promise<void> {
   }
 }
 
+/**
+ * Lists teachers that currently have open voice-attendance sessions.
+ */
 export async function listVoiceAttendanceSyncTeacherIds(): Promise<number[]> {
   const sessions = await getOpenVoiceAttendanceSessions();
   return Array.from(new Set(sessions.map((session) => session.teacher_id)));
 }
 
+/**
+ * Syncs voice attendance for all open sessions of one teacher.
+ */
 export async function syncVoiceAttendanceForTeacherOnce(teacherId: number): Promise<{
   marked_count: number;
 }> {
@@ -977,14 +1111,36 @@ export async function syncVoiceAttendanceForTeacherOnce(teacherId: number): Prom
   return { marked_count: markedCount };
 }
 
+/**
+ * Closes persistent Discord voice clients when the worker loop stops.
+ */
 export function destroyVoiceAttendanceClients(): void {
   DiscordVoice.destroyAll();
 }
 
+// ─── ClassroomDiscordWorker ─────────────────────────────────────────────────
+
+/**
+ * Orchestrates classroom Discord sync per teacher.
+ *
+ * The worker combines four independent projections:
+ *   - Bot health: validate the default system bot token
+ *   - Guild cache: refresh accessible guilds/channels and prune stale bindings
+ *   - Membership: move students into the Discord guild for their active class
+ *   - Sessions: advance status, create attendance/fees, and mark voice presence
+ *
+ * Local database state is desired state for classes/enrollments. Discord is the
+ * source of truth for guild/channel availability and current voice presence.
+ */
 export class ClassroomDiscordWorker {
+  /**
+   * Runs one full classroom Discord sync pass.
+   */
   async runOnce(): Promise<void> {
+    // Step 1: Validate bot token health once per pass.
     await checkDiscordBotHealthOnce();
 
+    // Step 2: Merge teacher ids from every Discord-related sync concern.
     const teacherIds = Array.from(new Set([
       ...await listDiscordSyncTeacherIds(),
       ...await listStudentDiscordMembershipSyncTeacherIds(),
@@ -1003,6 +1159,7 @@ export class ClassroomDiscordWorker {
     let membershipMoved = 0;
     let membershipSkipped = 0;
 
+    // Step 3: Run teacher-scoped sync tasks and aggregate pass metrics.
     for (const teacherId of teacherIds) {
       const sessionStatusResult = await syncSessionStatusesForTeacherOnce(teacherId);
       sessionsStarted += sessionStatusResult.started;
@@ -1031,6 +1188,8 @@ export class ClassroomDiscordWorker {
     }
   }
 }
+
+// ─── Worker Entry Point ──────────────────────────────────────────────────────
 
 export function startClassroomDiscordSyncWorker(): SyncLoop {
   const worker = new ClassroomDiscordWorker();

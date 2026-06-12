@@ -1,5 +1,5 @@
 # Fdb version 4
-["pdflatex"] 1780166237.15163 "database-design.tex" "build/database-design.pdf" "database-design" 1780166238.02143 0
+["pdflatex"] 1780255916.63234 "database-design.tex" "build/database-design.pdf" "database-design" 1780255917.62123 0
   "/Users/lequangtrung123/Library/texlive/2025basic/texmf-var/web2c/pdftex/pdflatex.fmt" 1761662772 2959263 c6677bec0d84dc730832384bef1d90eb ""
   "/usr/local/texlive/2025basic/texmf-dist/fonts/tfm/public/cm/cmmi10.tfm" 1136768653 1528 abec98dbc43e172678c11b3b9031252a ""
   "/usr/local/texlive/2025basic/texmf-dist/fonts/tfm/public/cm/cmmi6.tfm" 1136768653 1512 f21f83efb36853c0b70002322c1ab3ad ""
@@ -162,9 +162,9 @@
   "/usr/local/texlive/2025basic/texmf-dist/web2c/texmf.cnf" 1749313668 42213 4e2ca030e8e2640502016e9e45868dcb ""
   "/usr/local/texlive/2025basic/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1763310251 5388553 bb0667fe22c2b4240976b263acc4f97d ""
   "/usr/local/texlive/2025basic/texmf.cnf" 1741448314 628 81d1ada0f601fb1ffa62f1323192d946 ""
-  "build/database-design.aux" 1780166237.93321 3423 4aeaf321bac36af14ac1bbbc86e6fb36 "pdflatex"
-  "build/database-design.out" 1780166237.93391 3571 e43044d9682f843c526877a259547df9 "pdflatex"
-  "database-design.tex" 1780166226.98974 22072 de46eb024167e161555c147927865c8a ""
+  "build/database-design.aux" 1780255917.52385 3424 c00fcc62eae8a4c27548793dc47e389d "pdflatex"
+  "build/database-design.out" 1780255917.52455 3571 152ade66145cf56b0d477f2f29603687 "pdflatex"
+  "database-design.tex" 1780255904.76576 22096 ca4ee57f2c627b83c315625104e8ab39 ""
   "diagrams/so-do-lop-co-so-du-lieu.png" 1780165441.50644 52152 a01be3088337b217f5d97103d4580495 ""
   (generated)
   "build/database-design.aux"
